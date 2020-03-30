@@ -7,4 +7,11 @@ This repo contains the Coq formalization of the language and results.
 
 ## Project structure
 ### Trees.v
-Contains the inductive definition of the language.
+Contains the inductive definition of the language and other structures used:
+
+ - `Expr`: language expressions
+ - `Method`, `Field`, `Class`, `Program`: Constructors of language structures
+ - `Result` : result type for the evaluator
+
+### Eval.v
+Defines the evaluator and helpers
