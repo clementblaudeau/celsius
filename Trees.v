@@ -13,8 +13,9 @@ Check @hot.
 Definition Var : Type := nat.
 Definition Mtd : Type := nat.
 Definition ClN : Type := nat.
-Definition Tpe : Type := ClN.
+Definition Tpe : Type := (ClN * mode).
 Definition Loc : Type := nat.
+
 
 (* Expression constructors *)
 Inductive Expr: Type :=
@@ -26,13 +27,13 @@ Inductive Expr: Type :=
   | asgn  : Expr -> Var -> Expr -> Expr -> Expr.
 
 Inductive Method: Type :=
-  | method(μ : mode)(args : list (Var * Tpe))(out_type : Tpe)(body :Expr).
+  | method(μ: mode)(args: list (Var * Tpe))(out_type: Tpe)(body: Expr).
 
 Inductive Field: Type :=
-  | field(x : Var)(type: Tpe)(expr: Expr).
+  | field(x: Var)(type: Tpe)(expr: Expr).
 
 Inductive Class: Type :=
-  | class(args: list (Var * Tpe))(fields : list Field)(methods : Mtd -> (option Method)).
+  | class(args: list (Var * Tpe))(fields: list Field)(methods: Mtd -> (option Method)).
 
 Inductive Program: Type :=
   | program(C: list Class)(entry: Expr).
