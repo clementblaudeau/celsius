@@ -42,3 +42,5 @@ Proof.
   apply s_mode.
   assumption.
 Qed.
+
+(* Typing *)
