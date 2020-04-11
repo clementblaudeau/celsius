@@ -1,4 +1,5 @@
 From Celsius Require Export Trees.
+From Celsius Require Export Eval.
 Require Import ssreflect ssrbool.
 
 Require Import List.
@@ -213,6 +214,49 @@ Lemma partialMonotonicity_assignment : forall (σ σ': Store) (l l': Loc) (C: Cl
       rewrite H1 H8.
       unfold initializedFields in H3 => //.
       done.
-Qed.      
+Qed.
 
-  
+
+Theorem partialMonotonicity_theorem : forall (e: Expr) (ct: ClassTable) (σ σ': Store) (ρ: Env) (v v': Value) (k: nat),
+      ⟦e⟧(ct, σ, ρ, v)(k) = (Success v' σ') -> σ ⪯ σ'.
+  intros.
+  generalize dependent k.
+  generalize dependent v'.
+  generalize dependent σ'.
+  induction e.
+  - (* case e = x *)
+    move => σ' v' k H.
+    destruct k. discriminate.
+    unfold eval in H.
+    destruct (getVal ρ v0) => //.
+    injection H => H1 H2.
+    rewrite H1.
+    apply partialMonotonicity_reflexivity => //.
+  - (* case e = this *)
+    move => σ' v' k H.
+    destruct k. discriminate.
+    unfold eval in H.
+    injection H => H1 H2.
+    rewrite H1.
+    apply partialMonotonicity_reflexivity => //.
+  - (* case e = e0.field *)
+    move => σ' v' k H.
+    destruct k. discriminate.
+    simpl in H.
+    destruct  (⟦ e ⟧ (ct, σ, ρ, v )( k)) eqn:E.
+    discriminate.
+    discriminate.
+    destruct (getObj s v1).
+    destruct o.
+    destruct (getVal e0 v0).
+    injection H => H1 H2.
+    rewrite<- H1.
+    apply (IHe s v1 k) => //.
+    discriminate.
+    discriminate.
+    discriminate.
+  - (* case e = e0.m(ē) *)
+    Abort.
+
+    
+    
