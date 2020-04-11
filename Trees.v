@@ -1,5 +1,6 @@
 From Coq Require Import Lists.List.
 Import ListNotations.
+Require Import ssreflect ssrbool.
 
 (* Read the pen/paper proofs of scopability *)
 (* Github repo  ? *)
@@ -65,7 +66,7 @@ Fixpoint update_one {X : Type} (position : nat) (value : X)(l : list X) : list X
   match (l, position) with
     | ([], _) => []
     | (_::t, 0) => value::t
-    | (_::l', S n) => update_one n value l' end.
+    | (h::l', S n) => h::(update_one n value l') end.
 
 Fixpoint update_list {X : Type} (positions : list nat) (values : list X) (l : list X) : list X :=
   match (positions, values) with
@@ -76,6 +77,71 @@ Notation "∅" := ([]).
 Notation "[ x ↦ v ] σ" := (update_one x v σ) (at level 0).
 Notation "[ x ⟼ v ] σ" := (update_list x v σ) (at level 0).
 
+
+Lemma update_one1 : forall (X: Type) (p: nat) (v: X) (l: list X),
+    p < (length l) ->
+    (nth_error [p ↦ v]l p) = Some v.
+  Proof.
+    intros X p v.
+    generalize dependent p.
+    induction p.
+    - simpl.
+    destruct l.
+    simpl.
+    move :(PeanoNat.Nat.lt_irrefl 0) => h1 => //.
+    reflexivity.
+    - destruct l => H.
+      simpl in H.
+      move :(PeanoNat.Nat.nlt_0_r (S p)) => h1 => //.
+      simpl.
+      move :(Lt.lt_S_n p (length l)) => H1.
+      simpl in H.
+      apply H1 in H.
+      apply IHp in H => //.
+Qed.
+
+Lemma update_one2 : forall (X: Type) (p p': nat) (v: X) (l: list X),
+    p < (length l) ->
+    p <> p' ->
+    (nth_error [p ↦ v]l p') = (nth_error l p').
+  Proof.
+    intros X p.
+    generalize dependent p.
+    induction p.
+    - intros.
+      destruct l.
+      auto.
+      destruct p' => //.
+    - intros.
+      destruct l.
+      auto.
+      destruct p' => //.
+      simpl.
+      Search _ (S _ <>S _).
+      move : (PeanoNat.Nat.succ_inj_wd_neg p p') => H1.
+      apply H1 in H0.
+      simpl in H.
+      move : (Lt.lt_S_n p (length l)) => H2.
+      apply H2 in H.
+      apply (IHp p' v) in H => //.
+Qed.      
+      
+Lemma update_one3 : forall (X: Type) (p: nat) (v: X) (l: list X),
+      length ([p ↦ v]l) = length l.
+  Proof.
+    intros X.
+    induction p.
+    - destruct l.
+      done.
+      done.
+    - intros.
+      destruct l.
+      done.
+      simpl.
+      apply eq_S.
+      apply IHp.
+Qed.
+  
 Check [0].
 Check [0 ↦ 1] ∅.
 Check [[0] ⟼ [1]] [1 ; 2 ; 3].

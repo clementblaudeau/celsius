@@ -23,7 +23,7 @@ Definition partialMonotonicity (σ σ': Store) :=
 Notation "σ ⪯ σ'" := (partialMonotonicity σ σ') (at level 80).
 
 Lemma partialMonotonicity_reflexivity : forall (σ : Store), σ ⪯ σ.
-  Proof. unfold partialMonotonicity. intros. assumption.
+  Proof. unfold partialMonotonicity => //.
   Qed.
 
 Lemma initializedFields_dom : forall (σ: Store) (l: nat) (f: list Field), (σ ⊨ l : f) -> (l < (dom σ)).
@@ -104,13 +104,6 @@ Lemma domBounds : forall (σ: Store) (l: nat), (l < (dom σ) -> exists C ω , (g
         unfold ge in IHσ.
         apply IHσ in h => //.
 Qed. *)        
-
-Lemma getObj_last : forall (σ : Store) (c:ClN) (e:Env), getObj (σ ++ [(c,e)]) (dom σ) = Some (c,e).
-  Proof.
-    intros.    induction σ.
-    simpl => //.
-    simpl => //.
-Qed.
     
 Lemma partialMonotonicity_domains : forall (σ σ': Store), σ ⪯ σ' -> (dom σ) <= (dom σ').
   Proof.
@@ -149,4 +142,77 @@ Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), ((σ1 ⪯
     apply h1 => //.
 Qed.    
 
+Lemma getObj_update1 : forall (σ: Store) (o: Obj) (x: nat),
+      x < dom σ -> (getObj [x ↦ o]σ x) = Some o.
+  Proof.
+  intros.
+  move : (update_one1 Obj x o σ) => H1.
+  unfold dom in H.
+  unfold getObj.
+  apply H1 => //.
+Qed.  
+  
+Lemma getObj_update2 : forall (σ: Store) (o: Obj) (x x': nat),
+      x < dom σ ->
+      x <> x' ->
+      (getObj [x ↦ o]σ x') = (getObj σ x').
+  Proof.
+  intros.
+  move : (update_one2 Obj x x' o σ) => H1.
+  unfold dom in H.
+  unfold getObj.
+  apply H1 => //.
+Qed.
 
+Lemma getObj_dom : forall (σ: Store) (o: Obj) (l: nat),
+      (getObj σ l) = Some o ->
+      l < (dom σ).
+  Proof.
+    intros.
+    generalize dependent  l.
+    induction σ.    
+    - destruct l => H.
+    simpl in H.
+    discriminate H.
+    simpl in H.
+    discriminate H.
+    - destruct l.
+      simpl => H.
+      apply PeanoNat.Nat.lt_0_succ.
+      simpl => H.
+      Search _ (_ < _ -> S _ < S _).
+      apply Lt.lt_n_S.
+      apply IHσ => //.
+Qed.
+
+
+Lemma partialMonotonicity_assignment : forall (σ σ': Store) (l l': Loc) (C: ClN) (f: Value) (ω ω': Env),
+      (getObj σ l) = Some (C, ω) ->
+      ω' = [f ↦ l']ω ->
+      σ' = [l ↦ (C, ω')]σ ->
+      σ ⪯ σ'.
+  Proof.
+    unfold partialMonotonicity.
+    intros.
+    unfold initializedFields.
+    move: (PeanoNat.Nat.eq_dec l l0) => [H4 | H4].
+    - rewrite H1.
+    rewrite H4.
+    rewrite getObj_update1 => //.
+    unfold initializedFields in H3.
+    rewrite <- H4 in H3.
+    rewrite H in H3 => //.
+    move: (update_one3 Loc f l' ω) => H5.
+    rewrite -H0 in H5.
+    rewrite H5 => //.
+    - move: (getObj_update2 σ (C, ω') l l0)=>H5.
+      move: (initializedFields_dom σ l0 f0)=>H6.
+      move: (H6 H3)=>H7.
+      move: ((getObj_dom σ (C,ω) l) H) => H8.
+      apply H5 in H8.
+      rewrite H1 H8.
+      unfold initializedFields in H3 => //.
+      done.
+Qed.      
+
+  
