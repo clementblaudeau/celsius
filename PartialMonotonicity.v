@@ -129,10 +129,9 @@ Lemma partialMonotonicity_domains : forall (σ σ': Store), σ ⪯ σ' -> (dom �
     simpl => //.
 Qed.
 
-Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), ((σ1 ⪯ σ2) /\ (σ2 ⪯ σ3)) -> (σ1 ⪯ σ3).
+Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), (σ1 ⪯ σ2) -> (σ2 ⪯ σ3) -> (σ1 ⪯ σ3).
   Proof.
-    move => σ1 σ2 σ3 h1.
-    destruct h1 as [h1  h2].
+    move => σ1 σ2 σ3 h1 h2.
     move : (partialMonotonicity_domains σ1 σ2) => h3.
     move : (h3 h1) => h4.
     unfold partialMonotonicity.
@@ -217,6 +216,8 @@ Lemma partialMonotonicity_assignment : forall (σ σ': Store) (l l': Loc) (C: Cl
 Qed.
 
 
+
+(* Try with induction on e before k *)
 Theorem partialMonotonicity_theorem : forall (e: Expr) (ct: ClassTable) (σ σ': Store) (ρ: Env) (v v': Value) (k: nat),
       ⟦e⟧(ct, σ, ρ, v)(k) = (Success v' σ') -> σ ⪯ σ'.
   intros.
@@ -256,7 +257,180 @@ Theorem partialMonotonicity_theorem : forall (e: Expr) (ct: ClassTable) (σ σ':
     discriminate.
     discriminate.
   - (* case e = e0.m(ē) *)
-    Abort.
+    move => σ' v' k H.
+    destruct k. discriminate.
+    simpl in H.
+    destruct  (⟦ e ⟧ (ct, σ, ρ, v )( k)) eqn:E.
+    discriminate.
+    discriminate.
+    destruct (getObj s v0).
+    destruct o.
+    destruct (ct c).
+    destruct c0.
+    destruct (methods m).
+    destruct m0.
+    Admitted.
+    
+    Theorem strong_induction:
+forall P : nat -> Prop,
+(forall n : nat, (forall k : nat, (k < n -> P k)) -> P n) ->
+forall n : nat, P n.
+      Proof.
+      intros.
+      apply H.
+      induction n.
+      intros. apply PeanoNat.Nat.nlt_0_r in H0 => //.
+      intros.
+      Search _ (_ < S _).
+      move : (H n) => H1.
+      destruct k.
+      destruct n.
+      apply H1.
+      intros. apply PeanoNat.Nat.nlt_0_r in H2 => //.
+      apply IHn.
+      apply PeanoNat.Nat.lt_0_succ.
+      apply Lt.lt_S_n in H0.
+      apply H.
+      intros l H2.
+      apply IHn.
+      Search _ (_ < S _).
+      apply Lt.lt_n_Sm_le in H2.
+      Search _ (_ <= _ -> _ < _ -> _ < _).
+      apply (PeanoNat.Nat.le_lt_trans l k n) => //.
+Qed.
 
+Definition partialMonotonicity_prop (k : nat) :=  forall (e: Expr) (ct: ClassTable) (σ σ': Store) (ρ: Env) (v v': Value),
+      ⟦e⟧(ct, σ, ρ, v)(k) = (Success v' σ') -> σ ⪯ σ'.
+
+Definition partialMonotonicity_prop_list (k : nat) :=  forall (l: list Expr) (ct: ClassTable) (σ1 σ2: Store) (ρ: Env) (v : Value) (v_list: list Value),
+      ⟦_ l _⟧(ct, σ1, ρ, v)(k) = (Success_list v_list σ2) -> σ1 ⪯ σ2.
+
+Definition partialMonotonicity_prop_list2 (k : nat) :=  forall (l: list Expr) (ct: ClassTable) (σ1 σ2 σ3: Store) (ρ: Env) (v : Value) (v_list1 v_list2 : list Value),
+      fold_left (eval_list_aux ct σ1 ρ v k) l (Success_list v_list1 σ2) = (Success_list v_list2 σ3) -> σ2 ⪯ σ3.
+
+
+Lemma partialMonotonicity_rec_step_list : forall (n : nat),
+    (* Strong induction *)
+    (forall (k: nat), (k < n) -> partialMonotonicity_prop k) ->
+    (forall (k: nat), (k < n) -> partialMonotonicity_prop_list2 k).
+  unfold partialMonotonicity_prop. 
+  unfold partialMonotonicity_prop_list2.
+  intros n H k H_bound.
+  induction l as [| e l].
+  + (* case [] *)
+    intros. simpl in H0. injection H0 => H2 H3. rewrite H2; apply partialMonotonicity_reflexivity.
+  + (* case e::l *)
+    intros. simpl in H0. destruct k => //.
+    ++ (* k = 0, timeout *)
+      simpl in H0. assert (forall l', (fold_left (fun (_ : Result) (_ : Expr) => Timeout) l' Timeout = Timeout)) as H_timeout. { induction l' => //. } rewrite H_timeout in H0 => //.
+    ++ (* k > 0 *)
+       simpl in H0.
+       destruct (⟦ e ⟧ (ct, σ2, ρ, v )( k)) eqn: E.
+    +++ assert (H_abs: forall l', fold_left
+         (fun (acc : Result) (e : Expr) =>
+          match acc with
+          | Success_list vs σ1 =>
+              match (⟦ e ⟧ (ct, σ1, ρ, v )( k)) with
+              | Timeout => Timeout
+              | Error => Error
+              | Success v σ2 => Success_list (v :: vs) σ2
+              | Success_list l s => Success_list l s
+              end
+          | _ => acc
+          end) l' Timeout = Timeout).  { induction  l' => //. }
+        rewrite H_abs in H0 => //.
+    +++ assert (H_abs: forall l', fold_left
+         (fun (acc : Result) (e : Expr) =>
+          match acc with
+          | Success_list vs σ1 =>
+              match (⟦ e ⟧ (ct, σ1, ρ, v )( k)) with
+              | Timeout => Timeout
+              | Error => Error
+              | Success v σ2 => Success_list (v :: vs) σ2
+              | Success_list l s => Success_list l s
+              end
+          | _ => acc
+          end) l' Error = Error).  { induction  l' => //. }
+        rewrite H_abs in H0 => //.
+    +++ rewrite -/eval_list in H0.
+        simpl in IHl.
+        apply (IHl ct σ1 s σ3 ρ v (v0::v_list1) v_list2) in H0.
+        apply H in E.
+        apply (partialMonotonicity_transitivity σ2 s σ3) => //.
+        apply PeanoNat.Nat.lt_succ_l => //.
+    +++ move : (eval_not_success_list k e ct σ2 s ρ v l0)=> E_not => //.
+Qed.
+
+Lemma partialMonotonicity_rec_step_list_2 : forall (n : nat),
+    (* Strong induction *)
+    (forall (k: nat), (k < n) -> partialMonotonicity_prop k) ->
+    (forall (k: nat), (k < n) -> partialMonotonicity_prop_list k).
+Proof.
+  unfold partialMonotonicity_prop_list.
+  intros.
+  destruct k => //.
+  simpl in H1.
+  apply PeanoNat.Nat.lt_succ_l in H0.
+  move : (partialMonotonicity_rec_step_list n H k H0 l ct σ1 σ1 σ2 ρ v [] v_list) => H2.
+  apply H2 => //.
+Qed.
+
+(* Try with induction on k before e *)
+Theorem partialMonotonicity_theorem2 : forall (n : nat),
+  (* Strong induction *)
+  (forall (k : nat), (k < n ) -> partialMonotonicity_prop k) ->
+  (partialMonotonicity_prop n).
+
+  (* To get one step of the evaluator, we destruct n *)
+  destruct n.
+
+  (* n = 0 - Timeout *)
+  unfold partialMonotonicity_prop => //.
+
+  (* n > 0 - case analysis over e *)
+  unfold partialMonotonicity_prop.
+  intros H_strong; intros.
+  destruct e.
+  
+  - (* case e = x *)
+    unfold eval in H.
+    destruct (getVal ρ v0) => //.
+    injection H => H1 H2.
+    rewrite H1.
+    apply partialMonotonicity_reflexivity => //.
+  - (* case e = this *)
+    unfold eval in H.
+    injection H => H1 H2.
+    rewrite H1.
+    apply partialMonotonicity_reflexivity => //.
+  - (* case e = e0.field *)
+    simpl in H.
+    destruct  (⟦ e ⟧ (ct, σ, ρ, v )( n)) eqn:E => //.
+    destruct (getObj s v1) => //.
+    destruct o.
+    destruct (getVal e0 v0) => //.
+    injection H => H1 H2.
+    rewrite<- H1.
+    apply (H_strong n (PeanoNat.Nat.lt_succ_diag_r n) e ct σ s ρ v v1) => //.
+  - (* case e = e0.m(ē) *)
+    simpl in H.
+    destruct  (⟦ e ⟧ (ct, σ, ρ, v )( n)) eqn:E => //.
+    destruct (getObj s v0) => //.
+    destruct o.
+    destruct (ct c) => //.
+    destruct c0.
+    destruct (methods m) => //.
+    destruct m0.
+    destruct (⟦_ l _⟧ (ct, s, ρ, v )( n)) eqn: L => //.
+    move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
+    move : (partialMonotonicity_rec_step_list_2 (S n) H_strong n Hn l ct s s0 ρ v l0 L)=> H1.
+    move : (H_strong n Hn e ct σ s ρ v v0 E) => H2.
+    move : (H_strong n Hn body ct s0 σ' ([removeTypes args0 ⟼ l0] ([])) v v' H) => H3.
+    move : (partialMonotonicity_transitivity σ s0 σ' (partialMonotonicity_transitivity σ s s0 H2 H1) H3) => //.
+  - (* case e = new C(l) *)
+    simpl in H.
+    destruct (⟦_ l _⟧ (ct, σ, ρ, v )( n)) => //.
+    
+    Admitted.
     
     

@@ -15,3 +15,6 @@ Contains the inductive definition of the language and other structures used:
 
 ### Eval.v
 Defines the evaluator and helpers
+
+### PartialMonotonicity.v
+Defines the partial monotonicity relationship. Proves the lemmas and the main theorem about partial monotonicity.

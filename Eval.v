@@ -1,4 +1,5 @@
 From Celsius Require Export Trees.
+Require Import ssreflect ssrbool.
 
 Require Import List.
 Import ListNotations.
@@ -45,7 +46,7 @@ Fixpoint eval (e: Expr) (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: na
                   | Some v1 => Success v1 σ1
                   | _ => Error end
                 | _ => Error end
-              | r => r end )
+              | _ => Error end )
 
           (* Method call : compute object value, compute arguments and do the call*)
           | mtd e0 m e_l => (
@@ -60,11 +61,11 @@ Fixpoint eval (e: Expr) (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: na
                                 match (⟦_ e_l _⟧(ct, σ1, ρ, v)(n)) with
                                  | Success_list args_val σ2 => let ρ1 := [(removeTypes x) ⟼ args_val]∅ in
                                                            ⟦e1⟧(ct, σ2, ρ1, v)(n)
-                                 | r => r end)
+                                 | _ => Error end)
                             | _ => Error end)
                        | _ => Error end)
                    | _ => Error end)
-              | r => r end)
+              | _ => Error end)
                              
           (* New class *)
           | new C args => (
@@ -83,22 +84,24 @@ Fixpoint eval (e: Expr) (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: na
                                     | Success v2 σ2 => (
                                         let σ3 := (assign v1 x v2 σ2) in
                                         ⟦e'⟧(ct, σ3, ρ, v)(n))
-                                    | z => z end
-                | z => z end ) 
+                                    | _ => Error end
+                | _ => Error end ) 
           end
   end
 where "'⟦' e '⟧' '(' ct ',' σ ',' ρ ',' v ')(' k ')'" := (eval e ct σ ρ v k)
 with eval_list (e_l: list Expr) (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: nat) :  Result :=
    match k with
      | 0 => Timeout
-     | S n => fold_left (fun (acc: Result) (e: Expr) =>
-                          match acc with
-                            | Success_list vs σ1 => match (⟦e⟧(ct, σ1, ρ, v)(n)) with
-                                                     | Success v σ2 => Success_list (v::vs) σ2
-                                                     | z => z end
-                            | z => z end )
-                       e_l (Success_list [] σ) end
+     | S n => fold_left (eval_list_aux ct σ ρ v n) e_l (Success_list [] σ) end
 where "'⟦_' e '_⟧' '(' ct ',' σ ',' ρ ',' v ')(' k ')'" := (eval_list e ct σ ρ v k)
+with eval_list_aux (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: nat) (acc: Result) (e: Expr) :=
+   match k with
+     | 0 => Timeout
+     | S n => match acc with
+       | Success_list vs σ1 => match (⟦e⟧(ct, σ1, ρ, v)(n)) with
+                              | Success v σ2 => Success_list (v::vs) σ2
+                              | z => z end
+       | z => z end end
 with init (I : Var) (v : list Var) (C: ClN) (ct: ClassTable) (σ: Store) (k :nat) : Store :=
    match k with
      | 0 => ∅
@@ -116,3 +119,15 @@ with init (I : Var) (v : list Var) (C: ClN) (ct: ClassTable) (σ: Store) (k :nat
        end
    end.
 
+
+Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (ct: ClassTable) (σ σ': Store) (ρ: Env) (v: Value) (l: list Value),
+    not (⟦e⟧(ct, σ, ρ, v)(k) = Success_list l σ').
+  induction k => //.
+  intros.
+  destruct e => //.
+  - simpl. destruct (getVal ρ v0) => //.
+  - simpl. destruct (⟦ e ⟧ (ct, σ, ρ, v )( k)) => //. destruct (getObj s v1) => //. destruct o => //. destruct (getVal e0 v0) => //.
+  - simpl. destruct (⟦ e ⟧ (ct, σ, ρ, v )( k)) => //. destruct (getObj s v0) => //. destruct o => //. destruct (ct c) => //. destruct c0 => //. destruct (methods m) => //. destruct m0 => //. destruct (⟦_ l0 _⟧ (ct, s, ρ, v )( k)) => //.
+  - simpl. destruct (⟦_ l0 _⟧ (ct, σ, ρ, v )( k)) => //.
+  - simpl. destruct (⟦ e1 ⟧ (ct, σ, ρ, v )( k)) => //. destruct (⟦ e2 ⟧ (ct, s, ρ, v )( k)) => //.
+Qed.  
