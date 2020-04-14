@@ -274,7 +274,7 @@ Lemma partialMonotonicity_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
     apply H0.
 Qed.    
   
-Theorem partialMonotonicity_theorem : forall (n : nat),
+Lemma partialMonotonicity_theorem_rec_step : forall (n : nat),
   (* Strong induction *)
   (forall (k : nat), (k < n ) -> partialMonotonicity_prop k) ->
   (partialMonotonicity_prop n).
@@ -337,17 +337,58 @@ Theorem partialMonotonicity_theorem : forall (n : nat),
     apply (partialMonotonicity_transitivity σ s s0) => //.
     apply (partialMonotonicity_transitivity s ( [length s + 1 ↦ (c, [])] (s)) s0) => //.
     apply (partialMonotonicity_freshness).
-  - (* case e1.v0 = e2 ; e3 *)     
-    
-    destruct n => //.
+  - (* case e1.v0 = e2 ; e3 *)
     simpl in H.
-    destruct (ct c) => //.
-    destruct c0.
-    injection H => H1 H2.
-    destruct n => //.
-    simpl in H1.
-    unfold init in H1.
-    
-    Admitted.
-    
-    
+    destruct (⟦ e1 ⟧ (ct, σ, ρ, v )( n)) eqn:E1 => //.
+    destruct (⟦ e2 ⟧ (ct, s, ρ, v )( n)) eqn:E2 => //.
+    move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
+    apply (partialMonotonicity_transitivity σ s σ') => //.
+    + apply (H_strong n Hn e1 ct σ s ρ v v1 E1).
+    + apply (partialMonotonicity_transitivity s (assign v1 v0 v2 s0) σ').
+      ++ unfold assign.
+         move: (H_strong n Hn e2 ct s s0 ρ v v2 E2) => H2.
+         destruct (getObj s0 v1) eqn:G => //. destruct o.
+         set s' := [v1 ↦ (c, [v0 ↦ v2] (e))] s0.
+         move: (partialMonotonicity_assignment s0 s' v1 v2 c v0 e ([v0 ↦ v2] (e)) G) => H1.
+         apply (partialMonotonicity_transitivity s s0 s') => //.
+         apply H1 => //.
+      ++ 
+    unfold assign.
+    unfold assign  in H.
+    destruct (getObj s0 v1) eqn:G => //.
+    destruct o.
+    move: H.
+    set s' := [v1 ↦ (c, [v0 ↦ v2] (e))] s0 => H.
+    move: (H_strong n Hn e3 ct s' σ' ρ v v' H) => //.
+    move: (H_strong n Hn e3 ct s0 σ' ρ v v' H) => //.
+Qed.
+
+
+  
+Theorem partialMonotonicity_theorem: forall (n : nat), (partialMonotonicity_prop n).
+  Proof.
+    intros.
+    move: (partialMonotonicity_theorem_rec_step) => H.
+    apply H.
+    induction n.
+    - intros.
+      apply PeanoNat.Nat.nlt_0_r in H0 => //.
+    - intros.
+      move : (H n) => H1.
+      destruct k.
+      destruct n.
+      apply H1.
+      intros. apply PeanoNat.Nat.nlt_0_r in H2 => //.
+      apply IHn.
+      apply PeanoNat.Nat.lt_0_succ.
+      apply Lt.lt_S_n in H0.
+      apply H.
+      intros l H2.
+      apply IHn.
+      apply Lt.lt_n_Sm_le in H2.
+      apply (PeanoNat.Nat.le_lt_trans l k n) => //.
+Qed.
+ 
+
+
+
