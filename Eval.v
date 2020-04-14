@@ -19,7 +19,7 @@ Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : S
     | None => ∅
   end.
 
-Reserved Notation "'⟦' e '⟧' '(' ct ',' σ ',' ρ ',' v ')(' k ')'" (at level 200).
+Reserved Notation "'⟦' e '⟧' '(' ct ',' σ ',' ρ ',' v ')(' k ')'"   (at level 200).
 Reserved Notation "'⟦_' e '_⟧' '(' ct ',' σ ',' ρ ',' v ')(' k ')'" (at level 200).
 
 Fixpoint eval (e: Expr) (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: nat) : Result :=
@@ -72,9 +72,10 @@ Fixpoint eval (e: Expr) (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: na
               match (⟦_ args _⟧(ct, σ, ρ, v)(n)) with
                 | Success_list args_val σ1 => (
                     let I := (length σ1) + 1 in
-                    let σ2 := [I ↦ (C, ∅)] σ1 in
-                    let σ3 := (init I args_val C ct σ2 n) in
-                    (Success I σ3))
+                    let σ2 := [I ↦ (C, ∅)] σ1 in (
+                    match (init I args_val C ct σ2 n) with
+                      | Some σ3 => (Success I σ3)
+                      | None => Error end ))
                 | _ => Error end) (* Unknown class *) 
 
           (* Field assignement *)
@@ -102,9 +103,9 @@ with eval_list_aux (ct: ClassTable) (σ: Store) (ρ: Env) (v: Value) (k: nat) (a
                               | Success v σ2 => Success_list (v::vs) σ2
                               | z => z end
        | z => z end end
-with init (I : Var) (v : list Var) (C: ClN) (ct: ClassTable) (σ: Store) (k :nat) : Store :=
+with init (I : Var) (v : list Var) (C: ClN) (ct: ClassTable) (σ: Store) (k :nat) : option Store :=
    match k with
-     | 0 => ∅
+     | 0 => None
      | S n =>
        match (ct C) with
          | Some (class x F M) => (
@@ -114,10 +115,11 @@ with init (I : Var) (v : list Var) (C: ClN) (ct: ClassTable) (σ: Store) (k :nat
                              match (⟦e⟧(ct, σ, ∅, I)(n)) with
                                | Success v1 σ1 => (assign I x v1 σ1)
                                | _ => ∅ end) end) in
-             (fold_left f F σ)) 
-         | None => ∅
+             Some (fold_left f F σ)) 
+         | None => None
        end
    end.
+
 
 
 Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (ct: ClassTable) (σ σ': Store) (ρ: Env) (v: Value) (l: list Value),
@@ -128,6 +130,6 @@ Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (ct: ClassTable) (σ σ'
   - simpl. destruct (getVal ρ v0) => //.
   - simpl. destruct (⟦ e ⟧ (ct, σ, ρ, v )( k)) => //. destruct (getObj s v1) => //. destruct o => //. destruct (getVal e0 v0) => //.
   - simpl. destruct (⟦ e ⟧ (ct, σ, ρ, v )( k)) => //. destruct (getObj s v0) => //. destruct o => //. destruct (ct c) => //. destruct c0 => //. destruct (methods m) => //. destruct m0 => //. destruct (⟦_ l0 _⟧ (ct, s, ρ, v )( k)) => //.
-  - simpl. destruct (⟦_ l0 _⟧ (ct, σ, ρ, v )( k)) => //.
+  - simpl. destruct (⟦_ l0 _⟧ (ct, σ, ρ, v )( k)) => //. destruct (init (length s + 1) l1 c ct [length s + 1 ↦ (c, [])] (s) k) => //.
   - simpl. destruct (⟦ e1 ⟧ (ct, σ, ρ, v )( k)) => //. destruct (⟦ e2 ⟧ (ct, s, ρ, v )( k)) => //.
 Qed.  
