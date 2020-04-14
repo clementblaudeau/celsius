@@ -10,13 +10,13 @@ Check fold_left.
 Definition assign (v0: Value) (x: Var) (v: Value) (σ: Store) : Store :=
   match (getObj σ v0) with
     | Some (C, fields) => [ v0 ↦ (C, [x ↦ v]fields)] σ
-    | None => ∅ (* ? *)
+    | None => σ (* ? *)
   end.
 
 Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
   match (getObj σ v0) with
     | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
-    | None => ∅
+    | None => σ
   end.
 
 Reserved Notation "'⟦' e '⟧' '(' ct ',' σ ',' ρ ',' v ')(' k ')'"   (at level 200).
@@ -114,7 +114,8 @@ with init (I : Var) (v : list Var) (C: ClN) (ct: ClassTable) (σ: Store) (k :nat
                           |field x t e => (
                              match (⟦e⟧(ct, σ, ∅, I)(n)) with
                                | Success v1 σ1 => (assign I x v1 σ1)
-                               | _ => ∅ end) end) in
+                               | _ => σ (* In case or error, we keep σ to help for some proofs *)
+                             end) end) in
              Some (fold_left f F σ)) 
          | None => None
        end
