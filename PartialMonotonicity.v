@@ -19,7 +19,7 @@ Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=
 Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 0).
 
 Definition partialMonotonicity (σ σ': Store) :=
-  forall l f, l < (dom σ) -> (σ ⊨ l : f) -> (σ' ⊨ l : f).
+  forall l f, (σ ⊨ l : f) -> (σ' ⊨ l : f).
 
 Notation "σ ⪯ σ'" := (partialMonotonicity σ σ') (at level 80).
 
@@ -65,24 +65,13 @@ Proof.
   - apply le_0_n.
   - destruct o.
     case : (initializedFields_exists s c e) => f Hf.
-    move : (H (dom s) f ) => H1.
-    simpl in H1.
-    move : (PeanoNat.Nat.lt_succ_diag_r (dom s)) => H2.
-    apply H1 in H2.
-    move : (initializedFields_dom σ' (dom s) f H2) => H3.
-    apply Lt.lt_le_S => //.
-    simpl => //.
+    apply (Lt.lt_le_S _ _ (Hσ' _ _ (H _ _ Hf)) )=> //.
 Qed.
 
+
 Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), (σ1 ⪯ σ2) -> (σ2 ⪯ σ3) -> (σ1 ⪯ σ3).
-  Proof.
-    move => σ1 σ2 σ3 h1 h2.
-    move : (partialMonotonicity_domains σ1 σ2 h1) => h3.
-    unfold partialMonotonicity => l f h4 h5.
-    unfold partialMonotonicity in h2, h1.
-    apply h2 => //.
-    apply (PeanoNat.Nat.lt_le_trans l (dom σ1) ) => //.
-    apply h1 => //.
+Proof.
+    unfold partialMonotonicity; auto.
 Qed.    
 
 Lemma getObj_update1 : forall (σ: Store) (o: Obj) (x: nat),
@@ -106,13 +95,9 @@ Lemma getObj_dom : forall (σ: Store) (o: Obj) (l: nat),
       l < (dom σ).
   Proof.
     intros σ o.
-    induction σ.    
-    - destruct l => H => //.
-    - destruct l => //.
+    induction σ ; destruct l => //.    
       + move: (PeanoNat.Nat.lt_0_succ (dom σ)) => //.
-      + simpl => H. 
-        apply Lt.lt_n_S.
-        apply IHσ => //.
+      + simpl => H. apply (Lt.lt_n_S _ _ (IHσ _ H)) . 
   Qed.
 
 
@@ -127,16 +112,15 @@ Lemma getObj_dom : forall (σ: Store) (o: Obj) (l: nat),
     unfold initializedFields.
     move: (PeanoNat.Nat.eq_dec l l0) => [H4 | H4].
     - rewrite H1 H4 getObj_update1 => //.
-      unfold initializedFields in H3.
-      rewrite -H4 H in H3.
+      apply (initializedFields_dom _ _ f0 H2).
+      unfold initializedFields in H2.
+      rewrite -H4 H in H2 => //.
       move: (update_one3 Loc f l' ω) => H5.
       rewrite H0 H5 => //. 
     - move: (getObj_update2 σ (C, ω') l l0 ((getObj_dom σ (C,ω) l) H) H4)=>H5.
-      move: (initializedFields_dom σ l0 f0 H3)=>H7.
       rewrite H1 H5.
-      unfold initializedFields in H3 => //.
-  Qed.
-
+      apply H2.
+Qed.
 
     
 
@@ -263,15 +247,8 @@ Lemma partialMonotonicity_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
   Proof.
     unfold partialMonotonicity.
     unfold initializedFields.
-    induction σ => //.
-    destruct l => //.
-    intros.
-    simpl in H0.
-    simpl.
-    apply IHσ.
-    simpl in H.
-    apply Lt.lt_S_n => //.
-    apply H0.
+    induction σ ; destruct l => //.
+    apply IHσ => //.
 Qed.    
   
 Lemma partialMonotonicity_theorem_rec_step : forall (n : nat),
@@ -374,19 +351,11 @@ Theorem partialMonotonicity_theorem: forall (n : nat), (partialMonotonicity_prop
     - intros.
       apply PeanoNat.Nat.nlt_0_r in H0 => //.
     - intros.
-      move : (H n) => H1.
-      destruct k.
-      destruct n.
-      apply H1.
-      intros. apply PeanoNat.Nat.nlt_0_r in H2 => //.
-      apply IHn.
-      apply PeanoNat.Nat.lt_0_succ.
-      apply Lt.lt_S_n in H0.
-      apply H.
-      intros l H2.
-      apply IHn.
-      apply Lt.lt_n_Sm_le in H2.
-      apply (PeanoNat.Nat.le_lt_trans l k n) => //.
+      move/(_ n):H => H.
+      move/(_ IHn):H => H.
+      move:(Lt.le_lt_or_eq _ _  (Lt.lt_n_Sm_le _ _ H0) ) => [ H1 | H1 ].
+      + apply IHn => //.
+      + rewrite H1 => //.
 Qed.
  
 
