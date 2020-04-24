@@ -6,7 +6,7 @@ Require Import List.
 Import ListNotations.
 Open Scope nat_scope.
 
-
+(* Definitions and notations : *)
 Definition dom {X: Type} (x: list X) : nat :=
   (length x).
 
@@ -15,14 +15,13 @@ Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=
     | Some (C, ω) => ((length ω) <= (length f))
     | _ => False
   end.
-
 Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 0).
 
 Definition partialMonotonicity (σ σ': Store) :=
   forall l f, (σ ⊨ l : f) -> (σ' ⊨ l : f).
-
 Notation "σ ⪯ σ'" := (partialMonotonicity σ σ') (at level 80).
 
+(* Results : *)
 Lemma partialMonotonicity_reflexivity : forall (σ : Store), σ ⪯ σ.
   Proof. unfold partialMonotonicity => //. Qed.
 
