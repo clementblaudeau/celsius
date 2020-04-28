@@ -58,6 +58,11 @@ Definition dom {X: Type} (x: list X) : nat := (length x).
 Definition getObj (l : list Obj):= nth_error l.
 Definition getVal (l : list Value) := nth_error l.
 
+Lemma getObj_fresh : forall (σ: Store) (C: ClN) (ρ: Env), getObj (σ++[(C,ρ)]) (length σ) = Some (C, ρ).
+Proof.
+  induction σ; simpl; intros => //.
+  Qed.
+
 Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
   match l with
     | [] => []

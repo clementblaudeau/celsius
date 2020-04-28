@@ -177,24 +177,13 @@ Proof.
 Qed.
 
 
- 
-  Lemma stackability_assignment2 : forall (σ σ': Store) (l : Loc) (C: ClN)  (ω: Env),
-      σ' = [l ↦ (C, ω)]σ ->
-      σ ≪ σ'.
-  Proof.
-    unfold stackability, dom.
-    intros.
-    right.
-    move: (update_one3 _ l (C,ω) σ).
-    rewrite -H => H3.
-    rewrite -H3 => //.
-  Qed.
-
 Lemma stackability_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
-  σ ≪ [length σ + 1 ↦ (c, ρ)] (σ).
+  σ ≪ σ++[(c,ρ)].
 Proof.
-    intros.
-    unfold stackability, dom.
+  unfold stackability, dom.
+  intros.
+  rewrite app_length in H; simpl in H.
+    simpl; intros
     right.
     move: (update_one3 _ (length σ + 1) (c,ρ) σ).
     destruct σ.
