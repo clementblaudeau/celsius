@@ -245,7 +245,7 @@ Proof.
   Qed.
   
 Lemma partialMonotonicity_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
-  σ ⪯ [length σ + 1 ↦ (c, ρ)] (σ).
+  σ ⪯ σ ++ [(c, ρ)].
   Proof.
     unfold partialMonotonicity.
     unfold initializedFields.
@@ -307,14 +307,14 @@ Lemma partialMonotonicity_theorem_rec_step : forall (n : nat),
   - (* case e = new C(l) *)
     simpl in H.
     destruct (⟦_ l _⟧ (σ, ρ, v )( n)) eqn:L => //.
-    destruct (init (length s + 1) l0 c [length s + 1 ↦ (c, [])] (s) n) eqn:I => //.
+    destruct (init (length s + 1) l0 c (s ++ [(c, [])]) n) eqn:I => //.
     injection H => H1 H2.
     move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
-    move : (partialMonotonicity_rec_step_init (S n) H_strong n Hn (length s +1) l0 c ([length s + 1 ↦ (c, [])] (s)) s0 I) => H3.
+    move : (partialMonotonicity_rec_step_init (S n) H_strong n Hn (length s +1) l0 c _ s0 I) => H3.
     move : (partialMonotonicity_rec_step_list (S n) H_strong n Hn l σ s ρ v l0 L) => H4.
     rewrite -H1.
     apply (partialMonotonicity_transitivity σ s s0) => //.
-    apply (partialMonotonicity_transitivity s ( [length s + 1 ↦ (c, [])] (s)) s0) => //.
+    apply (partialMonotonicity_transitivity s (s++[(c,[])]) s0) => //.
     apply (partialMonotonicity_freshness).
   - (* case e1.v0 = e2 ; e3 *)
     simpl in H.

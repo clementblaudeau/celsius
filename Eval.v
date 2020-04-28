@@ -73,7 +73,7 @@ Module Evaluator.
                 match (⟦_ args _⟧(σ, ρ, v)(n)) with
                 | Success_list args_val σ1 => (
                     let I := (length σ1) + 1 in
-                    let σ2 := [I ↦ (C, ∅)] σ1 in (
+                    let σ2 := σ1 ++ [(C, ∅)] in (
                       match (init I args_val C σ2 n) with
                       | Some σ3 => (Success I σ3)
                       | None => Error end ))
@@ -147,7 +147,7 @@ Module Evaluator.
       destruct (⟦_ l0 _⟧ ( s, ρ, v )( k)) => //.
     - simpl.
       destruct (⟦_ l0 _⟧ (σ, ρ, v )( k)) => //.
-      destruct (init (length s + 1) l1 c [length s + 1 ↦ (c, [])] (s) k) => //.
+      destruct (init (length s + 1) l1 c (s ++ [(c, [])]) k) => //.
     - simpl.
       destruct (⟦ e1 ⟧ (σ, ρ, v )( k)) => //.
       destruct (⟦ e2 ⟧ (s, ρ, v )( k)) => //.

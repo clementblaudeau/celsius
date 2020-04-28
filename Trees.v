@@ -65,8 +65,7 @@ Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
 
 Fixpoint update_one {X : Type} (position : nat) (value : X)(l : list X) : list X :=
   match (l, position) with
-  | ([], 0) => [value]
-  |([], _) => []
+  | ([], _) => []
   | (_::t, 0) => value::t
   | (h::l', S n) => h::(update_one n value l')
   end.
@@ -112,9 +111,6 @@ Lemma update_one2 : forall (X: Type) (p p': nat) (v: X) (l: list X),
     generalize dependent p.
     induction p; intros; destruct l ; destruct p' => //.
     - simpl in H.
-      apply (PeanoNat.Nat.nlt_0_r 0) in H => //.
-    - simpl.
-      Search _ (_ <-> _ -> _).
       move : (iffLR (PeanoNat.Nat.succ_inj_wd_neg p p') H0) => H1.
       simpl in H.
       move : (Lt.lt_S_n p (length l) H) => H2.
@@ -122,14 +118,11 @@ Lemma update_one2 : forall (X: Type) (p p': nat) (v: X) (l: list X),
 Qed.      
       
   Lemma update_one3 : forall (X: Type) (p: nat) (v: X) (l: list X),
-      p < length l ->
       length ([p ↦ v]l) = length l.
   Proof.
     intros X.
     induction p; intros; destruct l => //.
-    - apply (PeanoNat.Nat.nlt_0_r 0) in H => //.
-    - simpl.
-      apply (eq_S _ _(IHp _ _ (Lt.lt_S_n _ _ H))).
+    apply (eq_S _ _(IHp _ _ )).
 Qed.
   
 Check [0].
