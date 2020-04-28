@@ -54,6 +54,7 @@ Inductive Result : Type :=
   | Success_list : (list Value) -> Store -> Result.
 
 (* Helpers *)
+Definition dom {X: Type} (x: list X) : nat := (length x).
 Definition getObj (l : list Obj):= nth_error l.
 Definition getVal (l : list Value) := nth_error l.
 

@@ -1,6 +1,5 @@
 From Celsius Require Export Trees.
 From Celsius Require Export Eval.
-From Celsius Require Export PartialMonotonicity.
 Require Import ssreflect ssrbool. 
 
 Require Import List.
@@ -9,7 +8,7 @@ Open Scope nat_scope.
 Open Scope list_scope.
 
 Module Reachability.
-  Parameter ct: ClassTable.
+  Import Eval.Evaluator.
 
   (* Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80). *)
   Inductive reachability : Store -> Loc -> Loc ->Prop :=
@@ -17,10 +16,18 @@ Module Reachability.
   |rch_trans : forall l0 l1 l2 C ω σ, (reachability σ l0 l1) -> (getObj σ l1 = Some (C, ω)) -> (exists f, (getVal ω f = Some l2)) -> (l2 < dom σ) -> (reachability σ l0 l2).
 
   Notation "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2) (at level 80, l1 at level 99).
-  Notation "σ ⊨ l : 'cold'" := (l < dom (σ: Store)) (at level 80, l at level 99).
-  Notation "σ ⊨ l : 'warm'" := (exists C ω args fields methods , (getObj σ l) = Some (C, ω) /\ ((ct C) = Some (class args fields methods)) /\ (length fields <= length ω)) (at level 80, l at level 99).
-  Notation "σ ⊨ l : 'hot'"  := (forall (l': Loc), σ ⊨ l ⇝ l' -> (σ ⊨ l' : cold)) (at level 80, l at level 99).
 
+
+  Definition reachable_cold (σ: Store) (l: Loc) := (l < dom σ).
+  Notation "σ ⊨ l : 'cold'" := (reachable_cold σ l) (at level 80, l at level 99).
+  
+  Definition reachable_warm (σ: Store) (l: Loc) := (exists C ω args fields methods , (getObj σ l) = Some (C, ω) /\ ((ct C) = Some (class args fields methods)) /\ (length fields <= length ω)).
+  Notation "σ ⊨ l : 'warm'" := (reachable_warm σ l) (at level 80, l at level 99).
+  
+  Definition reachable_hot  (σ: Store) (l: Loc) :=(forall (l': Loc), σ ⊨ l ⇝ l' -> (σ ⊨ l' : cold)).  
+  Notation "σ ⊨ l : 'hot'"  := (reachable_hot σ l) (at level 80, l at level 99).
+
+  
   
   Lemma reachability_trans: (forall σ l1 l2 l3, (σ ⊨ l1 ⇝ l2) -> (σ ⊨ l2 ⇝ l3) -> (σ ⊨ l1 ⇝ l3)).
   Proof.
