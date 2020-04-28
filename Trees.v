@@ -65,9 +65,11 @@ Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
 
 Fixpoint update_one {X : Type} (position : nat) (value : X)(l : list X) : list X :=
   match (l, position) with
-    | ([], _) => []
-    | (_::t, 0) => value::t
-    | (h::l', S n) => h::(update_one n value l') end.
+  | ([], 0) => [value]
+  |([], _) => []
+  | (_::t, 0) => value::t
+  | (h::l', S n) => h::(update_one n value l')
+  end.
 
 Fixpoint update_list {X : Type} (positions : list nat) (values : list X) (l : list X) : list X :=
   match (positions, values) with
@@ -108,39 +110,26 @@ Lemma update_one2 : forall (X: Type) (p p': nat) (v: X) (l: list X),
   Proof.
     intros X p.
     generalize dependent p.
-    induction p.
-    - intros.
-      destruct l.
-      auto.
-      destruct p' => //.
-    - intros.
-      destruct l.
-      auto.
-      destruct p' => //.
-      simpl.
-      Search _ (S _ <>S _).
-      move : (PeanoNat.Nat.succ_inj_wd_neg p p') => H1.
-      apply H1 in H0.
+    induction p; intros; destruct l ; destruct p' => //.
+    - simpl in H.
+      apply (PeanoNat.Nat.nlt_0_r 0) in H => //.
+    - simpl.
+      Search _ (_ <-> _ -> _).
+      move : (iffLR (PeanoNat.Nat.succ_inj_wd_neg p p') H0) => H1.
       simpl in H.
-      move : (Lt.lt_S_n p (length l)) => H2.
-      apply H2 in H.
-      apply (IHp p' v) in H => //.
+      move : (Lt.lt_S_n p (length l) H) => H2.
+      apply (IHp p' v)  => //.
 Qed.      
       
-Lemma update_one3 : forall (X: Type) (p: nat) (v: X) (l: list X),
+  Lemma update_one3 : forall (X: Type) (p: nat) (v: X) (l: list X),
+      p < length l ->
       length ([p ↦ v]l) = length l.
   Proof.
     intros X.
-    induction p.
-    - destruct l.
-      done.
-      done.
-    - intros.
-      destruct l.
-      done.
-      simpl.
-      apply eq_S.
-      apply IHp.
+    induction p; intros; destruct l => //.
+    - apply (PeanoNat.Nat.nlt_0_r 0) in H => //.
+    - simpl.
+      apply (eq_S _ _(IHp _ _ (Lt.lt_S_n _ _ H))).
 Qed.
   
 Check [0].
