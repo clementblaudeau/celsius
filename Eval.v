@@ -7,13 +7,15 @@ Open Scope nat_scope.
 
 Module Evaluator.
   Parameter ct: ClassTable.
-  
+
+  (* Update store with new value *)
   Definition assign (v0: Value) (x: Var) (v: Value) (σ: Store) : Store :=
     match (getObj σ v0) with
     | Some (C, fields) => [ v0 ↦ (C, [x ↦ v]fields)] σ
     | None => σ (* ? *)
     end.
 
+  (* Update store with new values *)
   Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
     match (getObj σ v0) with
     | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
@@ -111,16 +113,18 @@ Module Evaluator.
            match (ct C) with
            | Some (class x F M) => (
                let σ1 := (assign_list I (removeTypes x) v σ) in
-               let f  := (fun (σ: Store) (f: Field) => match f with
-                                                    |field x t e => (
-                                                       match (⟦e⟧(σ, ∅, I)(n)) with
-                                                       | Success v1 σ1 => (assign I x v1 σ1)
-                                                       | _ => σ (* In case or error, we keep σ to help for some proofs *)
-                                                       end) end) in
-               Some (fold_left f F σ)) 
+               let f  := (fun (σ: Store) (f: Field) =>) in
+               (fold_left f F σ1)) 
            | None => None
            end
-         end.
+         end
+  with init_aux (σ_opt: option Store) (f: Field) (v: Var) (k: nat): option Store :=
+         match f with 
+         |field x t e => (
+            match (⟦e⟧(σ, ∅, I)(n)) with
+            | Success v1 σ1 => (assign I x v1 σ1)
+            | _ => None
+            end) end.
 
 
 

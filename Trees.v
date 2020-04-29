@@ -28,13 +28,13 @@ Inductive Expr: Type :=
   | asgn  : Expr -> Var -> Expr -> Expr -> Expr.
 
 Inductive Method: Type :=
-  | method(μ: mode)(args: list (Var * Tpe))(out_type: Tpe)(body: Expr).
+  | method(μ: mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
 
 Inductive Field: Type :=
-  | field(x: Var)(type: Tpe)(expr: Expr).
+  | field(type: Tpe)(expr: Expr).
 
 Inductive Class: Type :=
-  | class(args: list (Var * Tpe))(fields: list Field)(methods: Mtd -> (option Method)).
+  | class(args: list Tpe)(fields: list Field)(methods: Mtd -> (option Method)).
 
 Inductive Program: Type :=
   | program(C: list Class)(entry: Expr).
@@ -58,7 +58,8 @@ Definition dom {X: Type} (x: list X) : nat := (length x).
 Definition getObj (l : list Obj):= nth_error l.
 Definition getVal (l : list Value) := nth_error l.
 
-Lemma getObj_fresh : forall (σ: Store) (C: ClN) (ρ: Env), getObj (σ++[(C,ρ)]) (length σ) = Some (C, ρ).
+
+Lemma getObj_last : forall (σ: Store) (C: ClN) (ρ: Env), getObj (σ++[(C,ρ)]) (length σ) = Some (C, ρ).
 Proof.
   induction σ; simpl; intros => //.
   Qed.

@@ -133,7 +133,48 @@ Qed.
 
 
 Definition stackability_prop_init (k : nat) :=  forall (I: Var) (v: list Var) (C: ClN) (σ σ_res: Store),
-      (init I v C σ k) = Some σ_res -> σ ≪ σ_res /\ σ ⪯ σ_res.
+    (init I v C σ k) = Some σ_res -> σ ≪ σ_res /\ σ ⪯ σ_res.
+
+Lemma stackability_init_warm : forall (n: nat) (v: list Var) (C: ClN) (s1 s2: Store),
+    init (length s1) v C (s1 ++ [(C, [])]) n = Some s2 -> exists (ρ: Env), s2 = s1 ++ [(C, ρ)] /\ [(C, ρ)] ⊨ 0: warm.
+Proof.
+  destruct n  => //.
+  simpl; intros.
+  destruct (ct C) eqn:C0 => //.
+  destruct c eqn:C1 => //.
+  injection H => H1; clear H.
+  generalize dependent fields.
+  induction fields.
+  - (* fields = [] *)
+    intros.
+    simpl in H1.
+      rewrite -H1.
+      exists [] => //.
+      split => //.
+      unfold reachable_warm.
+      exists C, [], args, [], methods.
+      repeat (split; auto).
+  - (* fields = f::fields *)
+    
+    
+    Check reachable_warm.
+    
+    
+    destruct fields => //.
+    + simpl in H1.
+      rewrite -H1.
+      exists [] => //.
+      split => //.
+      unfold reachable_warm.
+      exists C, [], args, [], methods.
+      repeat (split; auto).
+    + simpl in H1.
+      destruct f.
+      destruct (⟦ expr ⟧ ([(C, [])], [], 0 )( n)) => //.
+      Search _ (fold_left _).
+
+      
+  simpl.
 
 
 Lemma stackability_rec_step_init : forall (n : nat),
@@ -178,19 +219,30 @@ Qed.
 
 
 Lemma stackability_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
+  [(c, ρ)] ⊨ 0 : warm -> 
   σ ≪ σ++[(c,ρ)].
 Proof.
   unfold stackability, dom.
   intros.
-  rewrite app_length in H; simpl in H.
-    simpl; intros
-    right.
-    move: (update_one3 _ (length σ + 1) (c,ρ) σ).
-    destruct σ.
+  rewrite app_length in H0; simpl in H.
+  rewrite PeanoNat.Nat.add_1_r in H0.
+  move: (Lt.le_lt_or_eq l (length σ) (Lt.lt_n_Sm_le _ _ H0)) => [H1 | H1].
+  right => //.
+  left.
+  move: H0 H1. induction σ; simpl; intros => //.
+  - rewrite H1 => //.
+  - unfold reachable_warm.
+    unfold reachable_warm in H.
+    destruct H as [C [ω [args [fields [methods [H [H_ct H_len]]]]]]].
+    simpl in H.
+    injection H => H3 H4.    
+    exists c, ρ, args, fields, methods.
+    rewrite H1 H4 H3. 
+    destruct σ => //.
     simpl.
-    rewrite -H => H3.
-    apply : (stackability_assignment2 σ [length σ + 1 ↦ (c, ρ)] (σ) (length σ +1) c ρ (eq_refl _)). 
-Qed.
+    rewrite getObj_fresh.
+    repeat (split; auto).
+Qed.    
   
 Lemma stackability_theorem_rec_step : forall (n : nat),
   (* Strong induction *)
@@ -247,14 +299,26 @@ Lemma stackability_theorem_rec_step : forall (n : nat),
   - (* case e = new C(l) *)
     simpl in H.
     destruct (⟦_ l _⟧ (σ, ρ, v )( n)) eqn:L => //.
-    destruct (init (length s + 1) l0 c [length s + 1 ↦ (c, [])] (s) n) eqn:I => //.
+    destruct (init (length s) l0 c (s++[(c, [])]) n) eqn:I => //.
     injection H => H1 H2.
     move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
-    move : (stackability_rec_step_init (S n) H_strong n Hn (length s +1) l0 c ([length s + 1 ↦ (c, [])] (s)) s0 I) => [H3 H4].
+    move : (stackability_rec_step_init (S n) H_strong n Hn (length s) l0 c (s++[(c, [])]) s0 I) => [H3 H4].
     move : (stackability_rec_step_list (S n) H_strong n Hn l σ s ρ v l0 L) => [H5 H6].
     rewrite -H1.
     apply:  (stackability_transitivity σ s s0 H5).
-    apply (stackability_transitivity s ( [length s + 1 ↦ (c, [])] (s)) s0) => //.
+    apply (stackability_transitivity s ( (s++[(c, [])])) s0) => //.
+    apply (stackability_freshness).
+    unfold reachable_warm.
+    unfold init in I.
+    destruct n as [| n]=> //.
+    destruct (ct c) eqn:C1 => //. destruct c0 eqn:C2.
+    clear I.
+    exists c, [], args, fields, methods.
+    split. simpl => //.
+    split. auto.
+    
+    
+    
     unfold stackability => l1 H7.
     simpl; simpl in H7.
     apply (stackability_freshness).
