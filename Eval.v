@@ -1,4 +1,4 @@
-From Celsius Require Export Trees.
+From Celsius Require Export Trees Tactics.
 Require Import ssreflect ssrbool.
 
 Require Import List.
@@ -136,61 +136,6 @@ Module Evaluator.
 
   Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (v: Value) (l: list Value),
       not (⟦e⟧(σ, ρ, v)(k) = Success_list l σ').
-    induction k => //.
-    intros.
-    destruct e => //.
-    - simpl.
-      destruct (getVal ρ v0) => //.
-    - simpl.
-      destruct (⟦ e ⟧ (σ, ρ, v )( k)) => //.
-      destruct (getObj s v1) => //.
-      destruct o => //.
-      destruct (getVal e0 v0) => //.
-    - simpl.
-      destruct (⟦ e ⟧ (σ, ρ, v )( k)) => //.
-      destruct (getObj s v0) => //.
-      destruct o => //.
-      destruct (ct c) => //.
-      destruct c0 => //.
-      destruct (methods m) => //.
-      destruct m0 => //.
-      destruct (⟦_ l0 _⟧ ( s, ρ, v )( k)) => //.
-    - simpl.
-      destruct (⟦_ l0 _⟧ (σ, ρ, v )( k)) => //.
-      destruct (init (length s) l1 c (s ++ [(c, [])]) k) => //.
-    - simpl.
-      destruct (⟦ e1 ⟧ (σ, ρ, v )( k)) => //.
-      destruct (⟦ e2 ⟧ (s, ρ, v )( k)) => //.
-  Qed.
-
-
-  (*
-  Lemma eval_preserves_types: forall (k: nat) (e: Expr) (σ σ': Store) (ρ ω ω': Env) (v v': Value) (l: Loc) (C C': ClN),
-      (⟦e⟧(σ, ρ, v)(k) = Success v' σ') ->
-      (getObj σ l) = Some (C, ω) ->
-      (getObj σ' l) = Some (C', ω') -> C=C'.
-    induction k => //.
-    destruct e; simpl ; intros.
-    - destruct (getVal ρ v) => //.
-      injection H => H2 H3.
-      rewrite -H2 in H1.
-      rewrite H0 in H1.
-      injection H1  => //.
-    - injection H => H2 H3.
-      rewrite -H2 in H1.
-      rewrite H0 in H1.
-      injection H1  => //.
-    - destruct (⟦ e ⟧ (σ, ρ, v0 )( k)) eqn:E => //.
-      destruct (getObj s v1) eqn:S => //.
-      destruct o => //.
-      destruct (getVal e0 v) => //.
-      injection H => H2 H3.
-      rewrite -H2 in H1.
-      apply : (IHk e σ s ρ ω ω' v0 v1 l C C' E H0 H1).
-    -  Admitted.      
-*)      
-    
-      
+    induction k; repeat light || eauto || destruct_match. Qed.
   
-
   End Evaluator.
