@@ -1,6 +1,4 @@
-From Celsius Require Export Trees.
-From Celsius Require Export Eval.
-From Celsius Require Export Reachability.
+From Celsius Require Export Trees Eval Reachability Tactics.
 Require Import ssreflect ssrbool.
 
 Require Import List.
@@ -30,31 +28,20 @@ Module PartialMonotonicity.
 
   Lemma initializedFields_dom : forall (σ: Store) (l: nat) (f: list Field), (σ ⊨ l : f) -> (l < (dom σ)).
   Proof.
-    induction σ.
-    - intros.
-      rewrite /initializedFields /getObj in H.
-      destruct l => //.
-    - destruct a.
-      intros.
-      unfold initializedFields in H.
-      destruct l => //.
+    unfold initializedFields, getObj.
+    induction σ; repeat light || destruct l as [|l'] || eauto.
       apply (PeanoNat.Nat.lt_0_succ).
-      simpl.
       apply (Lt.lt_n_S).
-      simpl in H.
-      unfold initializedFields in IHσ.
       apply IHσ in H => //.
   Qed.
 
   Lemma initializedFields_exists : forall (σ: Store) (c: ClN) (e: Env), exists (f: list Field), ((c,e)::σ) ⊨ (dom σ) : f.
   Proof.
     unfold initializedFields.
-    induction σ.
-    - intros => //.
-      exists (repeat (field 0 (0,hot) this) (length e)).
+    induction σ; intros => //.
+    - exists (repeat (field (0,hot) this) (length e)).
       rewrite repeat_length => //.
-    - intros => //.
-      destruct a.
+    - destruct a.
       apply IHσ.
   Qed.            
   
@@ -203,43 +190,57 @@ Module PartialMonotonicity.
     apply H2 => //.
   Qed.
 
+  Create HintDb pM.
+  Hint Resolve partialMonotonicity_reflexivity.
 
   Definition partialMonotonicity_prop_init (k : nat) :=  forall (I: Var) (v: list Var) (C: ClN) (σ σ_res: Store),
       (init I v C σ k) = Some σ_res -> σ ⪯ σ_res.
 
-
+  Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
+      (forall (y:B), f res y = res) -> fold_left f l res = res.
+    intros.
+    induction l => //.
+    simpl. rewrite H. apply IHl.
+  Qed.
+  
+    
+  
   Lemma partialMonotonicity_rec_step_init : forall (n : nat),
       (* Strong induction *)
       (forall (k: nat), (k < n) -> partialMonotonicity_prop k) ->
       (forall (k: nat), (k < n) -> partialMonotonicity_prop_init k).
   Proof.
     intros n H_strong k H_bound.
-    unfold partialMonotonicity_prop_init => I v C σ σ_res H.
-    destruct k => //.
-    simpl in H.
-    destruct (ct C) => //.
-    destruct c.
-    injection H => H1.
-    destruct H.
+    unfold partialMonotonicity_prop_init => I args_val C σ σ_res H.
+    destruct k ; simpl in H => //.
+    destruct k ; simpl in H ; destruct (ct C) => //. 
+    - destruct c. destruct fields ; simpl in H.
+      + invert_constructor_equalities. eauto with pM.
+      + rewrite foldLeft_constant in H => //.
+    - destruct c.
     generalize dependent σ.
     generalize dependent σ_res.
     induction fields.
-    - intros. simpl in H1. rewrite H1. apply partialMonotonicity_reflexivity.
-    - intros. simpl in H1. destruct a as [ f t e] eqn:A.
-      destruct ((⟦ e ⟧ (σ, [], I )( k))) eqn:E.
-      + apply IHfields => //. (* Timeout *)
-      + apply IHfields => //. (* Error *)
-      +  (* Success *)
-        apply IHfields in H1.
-        move : (H_strong k (PeanoNat.Nat.lt_succ_l k n H_bound) e σ s [] I v0 E) => H2.
-        unfold assign in H1.
-        destruct (getObj s I) eqn:G.
-        destruct  o.
-        move: (partialMonotonicity_assignment s ([I ↦ (c, [f ↦ v0] (e0))] (s)) I v0 c f e0 ([f ↦ v0] (e0)) G) => H3.
+    + repeat light || auto with pM.
+    + intros.  
+      destruct a as [ f e] eqn:A.
+      simpl in H.
+      destruct ((⟦ e ⟧ (σ, args_val, I )( k))) eqn:E.
+      ++ rewrite foldLeft_constant in H => //. (* Timeout *)
+      ++ rewrite foldLeft_constant in H => //. (* Error *)
+      ++ (* Success *)
+        unfold assign_new in H.
+        destruct (getObj s I) eqn:O => //.
+        +++ destruct o.
+            apply IHfields in H.
+            move : (PeanoNat.Nat.lt_succ_l _ _ (PeanoNat.Nat.lt_succ_l (S k) n H_bound)) => H_bound2.
+        move : (H_strong k H_bound2 e σ s args_val I v E) => H2.
+        apply (partialMonotonicity_transitivity σ s σ_res) => //.
+        apply (partialMonotonicity_transitivity s [I ↦ (c, e0 ++ [v])] (s) σ_res) => //.
+        apply (partialMonotonicity_assignment _ _ ). ([I ↦ (c, [f ↦ v0] (e0))] (s)) I v0 c f e0 ([f ↦ v0] (e0)) G) => H3.
         apply (partialMonotonicity_transitivity σ s σ_res) => //.
         apply (partialMonotonicity_transitivity s [I ↦ (c, [f ↦ v0] (e0))] (s) σ_res) => //.
         apply H3 => //.
-        apply (partialMonotonicity_transitivity σ s σ_res) => //.
         
       + apply IHfields => //. (* Success_list *)
   Qed.
