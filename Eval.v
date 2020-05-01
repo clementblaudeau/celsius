@@ -8,10 +8,17 @@ Open Scope nat_scope.
 Module Evaluator.
   Parameter ct: ClassTable.
 
-  (* Update store with new value *)
-  Definition assign (v0: Value) (x: Var) (v: Value) (σ: Store) : Store :=
-    match (getObj σ v0) with
-    | Some (C, fields) => [ v0 ↦ (C, [x ↦ v]fields)] σ
+  (* Update store with new value in local env *)
+  Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
+    match (getObj σ obj) with
+    | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
+    | None => None (* ? *)
+    end.
+
+  (* Update store with update in local env *)
+  Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
+    match (getObj σ obj) with
+    | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
     | None => σ (* ? *)
     end.
 
@@ -62,8 +69,8 @@ Module Evaluator.
                             match methods m with
                             | Some (method μ x _ e1) => (
                                 match (⟦_ el _⟧(σ1, ρ, v)(n)) with
-                                | Success_list args_val σ2 => let ρ1 := [(removeTypes x) ⟼ args_val]∅ in
-                                                             ⟦e1⟧(σ2, ρ1, v)(n)
+                                | Success_list args_val σ2 =>
+                                  let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v)(n)
                                 | _ => Error end)
                             | _ => Error end)
                         | _ => Error end)
@@ -74,12 +81,13 @@ Module Evaluator.
             | new C args => (
                 match (⟦_ args _⟧(σ, ρ, v)(n)) with
                 | Success_list args_val σ1 => (
-                    let I := (length σ1) in
-                    let σ2 := σ1 ++ [(C, ∅)] in (
-                      match (init I args_val C σ2 n) with
-                      | Some σ3 => (Success I σ3)
-                      | None => Error end ))
-                | _ => Error end) (* Unknown class *) 
+                    let I := (length σ1) in (* Fresh location for new object *)
+                    let ρ_init := args_val in (* Local env during initialisation *)
+                    let σ2 := σ1 ++ [(C, ∅)] in (* New object with empty local env *)
+                      match (init I ρ_init C σ2 n) with
+                      | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
+                      | None => Error end )
+                | _ => Error end) (* Invalid args *) 
 
             (* Field assignement *)
             | asgn e1 x e2 e' => (
@@ -106,25 +114,23 @@ Module Evaluator.
                                         | Success v σ2 => Success_list (v::vs) σ2
                                         | z => z end
                  | z => z end end
-  with init (I : Var) (v : list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
-         match k with
-         | 0 => None
-         | S n =>
+  with init (I : Var) (args_values: list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
+         match k with | 0 => None | S n =>
            match (ct C) with
-           | Some (class x F M) => (
-               let σ1 := (assign_list I (removeTypes x) v σ) in
-               let f  := (fun (σ: Store) (f: Field) =>) in
-               (fold_left f F σ1)) 
+           | Some (class x F M) => (fold_left (init_field args_values I n) F (Some σ))
            | None => None
            end
          end
-  with init_aux (σ_opt: option Store) (f: Field) (v: Var) (k: nat): option Store :=
-         match f with 
-         |field x t e => (
-            match (⟦e⟧(σ, ∅, I)(n)) with
-            | Success v1 σ1 => (assign I x v1 σ1)
+  with init_field (args_values: list Var) (this: Var) (k: nat) (σ_opt: option Store)  (f: Field): option Store :=
+         match k with | 0 => None | S n =>
+         match σ_opt with
+         | None => None
+         | Some σ => ( match f with 
+         | field t e => (
+            match (⟦e⟧(σ, args_values, this)(n)) with
+            | Success v1 σ1 => (assign_new this v1 σ1)
             | _ => None
-            end) end.
+            end) end) end end.
 
 
 
