@@ -138,4 +138,11 @@ Module Evaluator.
       not (⟦e⟧(σ, ρ, v)(k) = Success_list l σ').
     induction k; repeat light || eauto || destruct_match. Qed.
   
+  Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
+      (forall (y:B), f res y = res) -> fold_left f l res = res.
+    intros.
+    induction l => //.
+    simpl. rewrite H. apply IHl.
+  Qed.
+  
   End Evaluator.

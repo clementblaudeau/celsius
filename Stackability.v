@@ -80,32 +80,8 @@ Lemma stackability_rec_step_list2 : forall (n : nat),
     ++ (* k > 0 *)
        simpl in H0.
        destruct (⟦ e ⟧ (σ2, ρ, v )( k)) eqn: E.
-    +++ assert (H_abs: forall l', fold_left
-         (fun (acc : Result) (e : Expr) =>
-          match acc with
-          | Success_list vs σ1 =>
-              match (⟦ e ⟧ (σ1, ρ, v )( k)) with
-              | Timeout => Timeout
-              | Error => Error
-              | Success v σ2 => Success_list (v :: vs) σ2
-              | Success_list l s => Success_list l s
-              end
-          | _ => acc
-          end) l' Timeout = Timeout).  { induction  l' => //. }
-        rewrite H_abs in H0 => //.
-    +++ assert (H_abs: forall l', fold_left
-         (fun (acc : Result) (e : Expr) =>
-          match acc with
-          | Success_list vs σ1 =>
-              match (⟦ e ⟧ (σ1, ρ, v )( k)) with
-              | Timeout => Timeout
-              | Error => Error
-              | Success v σ2 => Success_list (v :: vs) σ2
-              | Success_list l s => Success_list l s
-              end
-          | _ => acc
-          end) l' Error = Error).  { induction  l' => //. }
-        rewrite H_abs in H0 => //.
+    +++ rewrite foldLeft_constant in H0 => //. 
+    +++ rewrite foldLeft_constant in H0 => //. 
     +++ simpl in IHl.
         apply (IHl σ1 s σ3 ρ v (v0::v_list1) v_list2) in H0.
         move: (partialMonotonicity_theorem k e σ2 s ρ v v0 E) => H1.
@@ -135,46 +111,69 @@ Qed.
 Definition stackability_prop_init (k : nat) :=  forall (I: Var) (v: list Var) (C: ClN) (σ σ_res: Store),
     (init I v C σ k) = Some σ_res -> σ ≪ σ_res /\ σ ⪯ σ_res.
 
-Lemma stackability_init_warm : forall (n: nat) (v: list Var) (C: ClN) (s1 s2: Store),
-    init (length s1) v C (s1 ++ [(C, [])]) n = Some s2 -> exists (ρ: Env), s2 = s1 ++ [(C, ρ)] /\ [(C, ρ)] ⊨ 0: warm.
+Lemma stackability_init_warm : forall (F: list Field) (n: nat) (args_val: list Var) (I: Loc) (s1 s2: Store) (C: ClN) (ρ: Env),
+    I < dom s1 ->
+    (getObj s1 I) = Some (C, ρ) -> 
+    fold_left (init_field args_val I n) F (Some s1) = Some s2 ->
+    exists (C': ClN) (ρ': Env), (getObj s2 I) = Some (C', ρ') /\ ( (length F + length ρ) <= length ρ').
 Proof.
-  destruct n  => //.
-  simpl; intros.
-  destruct (ct C) eqn:C0 => //.
-  destruct c eqn:C1 => //.
-  injection H => H1; clear H.
-  generalize dependent fields.
-  induction fields.
-  - (* fields = [] *)
+  intros.
+  move : H1 H H0. move: ρ s1 s2 C.
+  induction F.
+  + (* fields = [] *)
+    simpl; intros.
+    invert_constructor_equalities.
+    rewrite -H3 H0.
+    exists C, ρ => //.
+  + (* fields = f::fields *)
+    simpl.
     intros.
-    simpl in H1.
-      rewrite -H1.
-      exists [] => //.
-      split => //.
-      unfold reachable_warm.
-      exists C, [], args, [], methods.
-      repeat (split; auto).
-  - (* fields = f::fields *)
-    
-    
-    Check reachable_warm.
-    
-    
-    destruct fields => //.
-    + simpl in H1.
-      rewrite -H1.
-      exists [] => //.
-      split => //.
-      unfold reachable_warm.
-      exists C, [], args, [], methods.
-      repeat (split; auto).
-    + simpl in H1.
-      destruct f.
-      destruct (⟦ expr ⟧ ([(C, [])], [], 0 )( n)) => //.
-      Search _ (fold_left _).
-
-      
-  simpl.
+    destruct n => //.
+    ++ simpl in H1.
+       rewrite foldLeft_constant in H1 => //.
+    ++ destruct a as [ t e ] eqn:fieldEq.
+        simpl in H1.
+    destruct ( ⟦ e ⟧ (s1, args_val, I)( n)) eqn:E => //.
+    +++ rewrite foldLeft_constant in H1 => //.
+    +++ rewrite foldLeft_constant in H1 => //.
+    +++ rewrite {2}/assign_new in H1.
+       destruct (getObj s I) eqn:G.
+       destruct o.
+       simpl.
+       assert (I < dom s) as H_doms2. {
+         apply (getObj_dom _ (c, e0) _ G).
+       }
+       assert (I < dom [I ↦ (c, e0 ++ [v])] (s)) as H_doms. {         
+         unfold dom.
+         rewrite update_one3.
+         apply H_doms2.
+       }
+       move: (getObj_update1 s (c,e0++[v]) I H_doms2) => H_sobj. 
+       move: (IHF (e0++[v]) ([I ↦ (c, e0 ++ [v])] (s)) s2 c H1 H_doms H_sobj).
+       rewrite app_length. simpl.
+       rewrite PeanoNat.Nat.add_1_r.
+       rewrite -plus_n_Sm.
+       move => [C' [ρ' [H3 H4]]].
+       exists C', ρ'.
+       split => //.
+       assert (length ρ <= length e0) as H5.
+       {
+         move: (partialMonotonicity_theorem n e _ _ _ _ _ E I).
+         unfold partialMonotonicity, initializedFields.
+         rewrite H0 G.
+         move => H5. move /(_ (repeat a (length ρ))):H5 => H5.
+         rewrite repeat_length in H5.
+         apply H5 => //.
+       }
+       apply (PeanoNat.Nat.le_trans _ (S (length F + length e0)) _).
+       apply le_n_S.
+       Search _ (_ + _ <= _+ _).
+       apply Plus.plus_le_compat_l.
+       apply H5.
+       apply H4.
+       rewrite foldLeft_constant in H1 => //.
+   +++  rewrite foldLeft_constant in H1 => //.
+Qed.
 
 
 Lemma stackability_rec_step_init : forall (n : nat),
@@ -188,8 +187,6 @@ Proof.
   simpl in H.
   destruct (ct C) => //.
   destruct c.
-  injection H => H1.
-  destruct H.
   generalize dependent σ.
   generalize dependent σ_res.
   induction fields.

@@ -24,14 +24,6 @@ Module PartialMonotonicity.
 
   (* Results : *)
 
-  
-  Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
-      (forall (y:B), f res y = res) -> fold_left f l res = res.
-    intros.
-    induction l => //.
-    simpl. rewrite H. apply IHl.
-  Qed.
-  
   Lemma partialMonotonicity_reflexivity : forall (σ : Store), σ ⪯ σ.
   Proof. unfold partialMonotonicity => //. Qed.
 
@@ -289,7 +281,8 @@ Module PartialMonotonicity.
 
   Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).
   Proof.
-    unfold reachable_warm. intros σ σ' l H [C [ω [args [fields[ methods [H2 [H3 H4]] ]]]]].
+    unfold reachable_warm.
+    intros σ σ' l H [C [ω [args [fields[ methods [H2 [H3 H4]] ]]]]].
     unfold partialMonotonicity, initializedFields in H.
     move /(_ l fields):H => H.
     rewrite H2 in H.
