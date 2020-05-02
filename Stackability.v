@@ -36,9 +36,9 @@ Module Reachability.
       + right => //.
   Qed.      
 
-  Lemma stackability_assignment : forall (σ σ': Store) (l l': Loc) (C: ClN) (f: Value) (ω ω': Env),
+  Lemma stackability_assignment : forall (σ σ': Store) (l : Loc) (C: ClN) (ω ω': Env),
       (getObj σ l) = Some (C, ω) ->
-      ω' = [f ↦ l']ω ->
+      length ω <= length ω' ->
       σ' = [l ↦ (C, ω')]σ ->
       σ ≪ σ'.
   Proof.
@@ -52,7 +52,7 @@ Module Reachability.
 
 
 Definition stackability_prop (k : nat) :=  forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
-      ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> σ ≪ σ'.
+      ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> σ ≪ σ' /\ σ ⪯ σ'.
 
 Definition stackability_prop_list (k : nat) :=  forall (l: list Expr) (σ1 σ2: Store) (ρ: Env) (v : Value) (v_list: list Value),
       ⟦_ l _⟧(σ1, ρ, v)(k) = (Success_list v_list σ2) -> σ1 ≪ σ2 /\ σ1 ⪯ σ2.
@@ -87,7 +87,7 @@ Lemma stackability_rec_step_list2 : forall (n : nat),
         move: (partialMonotonicity_theorem k e σ2 s ρ v v0 E) => H1.
         apply (H _ (PeanoNat.Nat.lt_succ_l _ _ H_bound))in E.
         move: H0 => [H01 H02].
-        move: (stackability_transitivity σ2 s σ3 E H01 H02 ) => H2.
+        move: (stackability_transitivity σ2 s σ3 (proj1 E) H01 H02 ) => H2.
         split => //.
         apply (partialMonotonicity_transitivity _ s _ H1 H02).
     +++ move : (eval_not_success_list k e σ2 s ρ v l0)=> E_not => //.
@@ -108,16 +108,20 @@ Proof.
 Qed.
 
 
-Definition stackability_prop_init (k : nat) :=  forall (I: Var) (v: list Var) (C: ClN) (σ σ_res: Store),
-    (init I v C σ k) = Some σ_res -> σ ≪ σ_res /\ σ ⪯ σ_res.
+Definition stackability_prop_init (k : nat) :=  forall (args_val: list Var) (C: ClN) (σ σ_res: Store),
+    (init (length σ) args_val C (σ++[(C,[])]) k) = Some σ_res -> σ ≪ σ_res /\ σ ⪯ σ_res.
 
 Lemma stackability_init_warm : forall (F: list Field) (n: nat) (args_val: list Var) (I: Loc) (s1 s2: Store) (C: ClN) (ρ: Env),
     I < dom s1 ->
     (getObj s1 I) = Some (C, ρ) -> 
+    (forall (k: nat), (k < n) -> stackability_prop k) ->
     fold_left (init_field args_val I n) F (Some s1) = Some s2 ->
-    exists (C': ClN) (ρ': Env), (getObj s2 I) = Some (C', ρ') /\ ( (length F + length ρ) <= length ρ').
+    exists (C': ClN) (ρ': Env), (getObj s2 I) = Some (C', ρ')
+                           /\ ((length F + length ρ) <= length ρ')
+                           /\ s1 ≪ s2
+                           /\ s1 ⪯ s2.
 Proof.
-  intros.
+  move => F n args_val I s1 s2 C ρ H H0 H_strong H1.
   move : H1 H H0. move: ρ s1 s2 C.
   induction F.
   + (* fields = [] *)
@@ -125,6 +129,7 @@ Proof.
     invert_constructor_equalities.
     rewrite -H3 H0.
     exists C, ρ => //.
+    auto using stackability_reflexivity.
   + (* fields = f::fields *)
     simpl.
     intros.
@@ -153,24 +158,38 @@ Proof.
        rewrite app_length. simpl.
        rewrite PeanoNat.Nat.add_1_r.
        rewrite -plus_n_Sm.
-       move => [C' [ρ' [H3 H4]]].
+       move => [C' [ρ' [H3 [H4 [H5 H6]]]]].
        exists C', ρ'.
        split => //.
-       assert (length ρ <= length e0) as H5.
+       split.
+       assert (length ρ <= length e0) as H_len_ρ.
        {
          move: (partialMonotonicity_theorem n e _ _ _ _ _ E I).
          unfold partialMonotonicity, initializedFields.
          rewrite H0 G.
-         move => H5. move /(_ (repeat a (length ρ))):H5 => H5.
-         rewrite repeat_length in H5.
-         apply H5 => //.
+         move => H_len_ρ. move /(_ (repeat a (length ρ))):H_len_ρ => H_len_ρ.
+         rewrite repeat_length in H_len_ρ => //.
+         apply H_len_ρ => //.
        }
        apply (PeanoNat.Nat.le_trans _ (S (length F + length e0)) _).
        apply le_n_S.
-       Search _ (_ + _ <= _+ _).
        apply Plus.plus_le_compat_l.
-       apply H5.
+       apply H_len_ρ.
        apply H4.
+       assert (s1 ≪ s) as H_s1s. {
+         apply (proj1 (H_strong n (PeanoNat.Nat.lt_succ_diag_r n) e _ _ _ _ _ E)).
+       }       
+       assert ( length e0 <= length (e0 ++ [v])) as H_len_e0.
+       rewrite app_length. simpl. rewrite PeanoNat.Nat.add_1_r.
+       apply PeanoNat.Nat.le_succ_diag_r.
+       move : (stackability_assignment s ([I ↦ (c, e0 ++ [v])] (s)) I c e0 (e0++[v]) G H_len_e0 eq_refl) => H_se.
+       move: (partialMonotonicity_assignment _ _ I c e0 (e0++[v]) G H_len_e0 eq_refl) => H7.
+       split.
+       apply (stackability_transitivity s1 [I ↦ (c, e0 ++ [v])] (s) s2) => //.
+       apply (stackability_transitivity s1 s [I ↦ (c, e0 ++ [v])] (s)) => //.
+       apply (partialMonotonicity_transitivity s1 s s2) => //.
+       apply (partialMonotonicity_theorem n e _ _ _ _ _ E).
+       apply (partialMonotonicity_transitivity s  [I ↦ (c, e0 ++ [v])] (s) s2) => //.
        rewrite foldLeft_constant in H1 => //.
    +++  rewrite foldLeft_constant in H1 => //.
 Qed.
@@ -182,22 +201,76 @@ Lemma stackability_rec_step_init : forall (n : nat),
     (forall (k: nat), (k < n) -> stackability_prop_init k).
 Proof.
   intros n H_strong k H_bound.
-  unfold stackability_prop_init => I v C σ σ_res H.
+  unfold stackability_prop_init => args_val C σ σ_res H.
   destruct k => //.
   simpl in H.
-  destruct (ct C) => //.
+  destruct (ct C) eqn:H_class  => //.
   destruct c.
+  assert (length σ < dom (σ ++ [(C, [])])) as H_len. {  
+    rewrite /dom app_length; simpl. rewrite PeanoNat.Nat.add_1_r. apply PeanoNat.Nat.lt_succ_diag_r.
+  }
+  move : (getObj_last σ C []) => H_obj.
+  assert ((forall k0 : nat, k0 < k -> stackability_prop k0)) as H_strong2. {
+    intros. apply H_strong.
+    apply (PeanoNat.Nat.lt_trans _ k _) => //.
+    apply PeanoNat.Nat.lt_succ_l => //.
+  }
+  move: (stackability_init_warm fields k args_val (length σ) (σ++[(C,[])]) σ_res C [] H_len H_obj H_strong2 H) => [C' [ρ [H_warm1 [H_warm2 [H_warm3 H_warm4]]]]].
+  simpl in H_warm2. rewrite PeanoNat.Nat.add_0_r in H_warm2.
+  split.
+  + unfold stackability => l H_l.
+    unfold stackability,dom in H_warm3.
+    move /(_ l H_l):H_warm3 => H_warm3.
+    case: H_warm3; auto.
+    rewrite app_length. simpl. rewrite PeanoNat.Nat.add_1_r => H_l'.
+    move:(Lt.le_lt_or_eq _ _  (Lt.lt_n_Sm_le _ _ H_l') ) => [ H_l'' | H_l'' ].
+    right => //.
+    left. rewrite H_l''. unfold reachable_warm.
+    exists C', ρ, args, fields, methods. repeat split => //.
+
+  
+  apply (stackability_transitivity _ (σ++[(C, [])]) _) => //.
+  unfold stackability, dom; simpl => l.
+  rewrite app_length. simpl. rewrite PeanoNat.Nat.add_1_r => H_l.
+  move:(Lt.le_lt_or_eq _ _  (Lt.lt_n_Sm_le _ _ H_l) ) => [ H_l' | H_l' ].
+  + right => //.
+  + left. rewrite H_l'. unfold reachable_warm.
+    exists C, ρ, args, fields, methods. repeat split => //.
+  
+  
+  
   generalize dependent σ.
   generalize dependent σ_res.
-  induction fields.
-  - intros. simpl in H1. rewrite H1. apply (conj (stackability_reflexivity _) (partialMonotonicity_reflexivity _)).
-  - intros. simpl in H1. destruct a as [ f t e] eqn:A.
-    destruct ((⟦ e ⟧ (σ, [], I )( k))) eqn:E.
-    + apply IHfields => //. (* Timeout *)
-    + apply IHfields => //. (* Error *)
-    +  (* Success *)
-      unfold assign in IHfields, H1.
-      move /(_ _ _ H1):IHfields => [H1s H1p] ; clear H1.
+  induction fields; simpl; intros.
+  - invert_constructor_equalities.
+    split.
+    + unfold stackability, dom; intros.
+      rewrite app_length in H. simpl in H. rewrite PeanoNat.Nat.add_1_r in H.
+      move:(Lt.le_lt_or_eq _ _  (Lt.lt_n_Sm_le _ _ H) ) => [ H2 | H2 ].
+      right => //.
+      left. unfold reachable_warm. rewrite H2.
+      move : (getObj_last σ C []) => H_obj.
+      exists C, [], args, [], methods.
+      split => //.
+    + apply partialMonotonicity_freshness.
+  - destruct a as [ t e] eqn:A.
+    destruct k ; simpl in H.
+    + rewrite foldLeft_constant in H => //.
+    + destruct ((⟦ e ⟧ (σ++[(C, [])], args_val, (length σ) )( k))) eqn:E.
+
+      
+    ++ rewrite foldLeft_constant in H => //. (* Timeout *)
+    ++ rewrite foldLeft_constant in H => //. (* Error *)
+    ++  (* Success *)
+      unfold assign_new in H.
+      destruct (getObj s (length σ)).
+      +++ destruct o.
+          
+
+
+
+
+          move /(_ _ _ _ H):IHfields => [H1s H1p] ; clear H1.
       move : (H_strong k (PeanoNat.Nat.lt_succ_l k n H_bound) e σ s [] I v0 E) => H2.
       move: (partialMonotonicity_theorem k e σ s [] I v0 E) => H3.
       destruct (getObj s I) eqn:G.
@@ -213,7 +286,14 @@ Proof.
       apply (conj (stackability_transitivity σ s σ_res H2 H1s H1p) (partialMonotonicity_transitivity _ s _ H3 H1p)) => //.
     + apply IHfields => //. (* Success_list *)
 Qed.
-
+  
+  assert (length σ < dom (σ ++ [(C, [])])) as H_len. {  
+    rewrite /dom app_length; simpl. rewrite PeanoNat.Nat.add_1_r. apply PeanoNat.Nat.lt_succ_diag_r.
+  }
+  move : (getObj_last σ C []) => H_obj.
+  move: (stackability_init_warm fields k args_val (length σ) (σ++[(C,[])]) σ_res C [] H_len H_obj H) => [C' [ρ [H_warm1 H_warm2]]].
+  simpl in H_warm2. rewrite PeanoNat.Nat.add_0_r in H_warm2.
+  split. unfold stackability; intros.
 
 Lemma stackability_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
   [(c, ρ)] ⊨ 0 : warm -> 
