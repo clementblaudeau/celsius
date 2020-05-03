@@ -1,4 +1,4 @@
-From Celsius Require Export Trees Eval Reachability Tactics.
+From Celsius Require Export Trees Eval Reachability Tactics Compatibility.
 Require Import ssreflect ssrbool.
 
 Require Import List.
@@ -8,6 +8,7 @@ Open Scope nat_scope.
 Module PartialMonotonicity.
   Import Reachability.Reachability.
   Import Eval.Evaluator.
+  Import Compatibility.Compatibility.
   
   (* Definitions and notations : *)
   Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=
@@ -253,15 +254,19 @@ Module PartialMonotonicity.
   Qed.
   
 
-  Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).
+  Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> σ ⊆ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).
   Proof.
     unfold reachable_warm.
-    intros σ σ' l H [C [ω [args [fields[ methods [H2 [H3 H4]] ]]]]].
-    unfold partialMonotonicity, initializedFields in H.
-    move /(_ l fields):H => H.
-    rewrite H2 in H.
-  Admitted. (* Issue here *)
-  
+    intros σ σ' l H_pm H_c [C [ω [args [fields[ methods [H2 [H3 H4]] ]]]]].
+    unfold partialMonotonicity, initializedFields in H_pm.
+    move /(_ l fields):H_pm => H_pm.
+    rewrite H2 in H_pm.
+    move /(_ H4):H_pm => H_pm.
+    unfold compatible in H_c.
+    move /(_ l C ω H2):H_c => [ω' H_c].
+    rewrite H_c in H_pm.
+    exists C, ω', args, fields, methods => //.
+  Qed.
   
 
 
