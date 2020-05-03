@@ -9,6 +9,7 @@ Module PartialMonotonicity.
   Import Reachability.Reachability.
   Import Eval.Evaluator.
   Import Compatibility.Compatibility.
+  Create HintDb pM.
   
   (* Definitions and notations : *)
   Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=
@@ -27,6 +28,7 @@ Module PartialMonotonicity.
 
   Lemma partialMonotonicity_reflexivity : forall (σ : Store), σ ⪯ σ.
   Proof. unfold partialMonotonicity => //. Qed.
+  Hint Resolve partialMonotonicity_reflexivity: pM.
 
   Lemma initializedFields_dom : forall (σ: Store) (l: nat) (f: list Field), (σ ⊨ l : f) -> (l < (dom σ)).
   Proof.
@@ -36,6 +38,7 @@ Module PartialMonotonicity.
       apply (Lt.lt_n_S).
       apply IHσ in H => //.
   Qed.
+  Hint Resolve initializedFields_dom: pM.
 
   Lemma initializedFields_exists : forall (σ: Store) (c: ClN) (e: Env), exists (f: list Field), ((c,e)::σ) ⊨ (dom σ) : f.
   Proof.
@@ -59,12 +62,14 @@ Module PartialMonotonicity.
       case : (initializedFields_exists s c e) => f Hf.
       apply (Lt.lt_le_S _ _ (Hσ' _ _ (H _ _ Hf)) )=> //.
   Qed.
+  Hint Resolve partialMonotonicity_domains: pM.
 
 
   Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), (σ1 ⪯ σ2) -> (σ2 ⪯ σ3) -> (σ1 ⪯ σ3).
   Proof.
     unfold partialMonotonicity; auto.
   Qed.    
+  Hint Resolve partialMonotonicity_transitivity: pM.
 
 
   Lemma partialMonotonicity_assignment : forall (σ σ': Store) (l: Loc) (C: ClN) (ω ω': Env),
@@ -85,6 +90,7 @@ Module PartialMonotonicity.
       rewrite H1 H5.
       apply H2.
   Qed.
+  Hint Resolve partialMonotonicity_assignment: pM.
 
   
 
@@ -141,8 +147,6 @@ Module PartialMonotonicity.
     apply H2 => //.
   Qed.
 
-  Create HintDb pM.
-  Hint Resolve partialMonotonicity_reflexivity.
 
   Definition partialMonotonicity_prop_init (k : nat) :=  forall (I: Var) (v: list Var) (C: ClN) (σ σ_res: Store),
       (init I v C σ k) = Some σ_res -> σ ⪯ σ_res.
