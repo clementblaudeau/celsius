@@ -1,4 +1,4 @@
-From Celsius Require Export Trees.
+From Celsius Require Export Trees Tactics.
 Require Import ssreflect ssrbool.
 
 Require Import List.
@@ -7,13 +7,22 @@ Open Scope nat_scope.
 
 Module Evaluator.
   Parameter ct: ClassTable.
-  
-  Definition assign (v0: Value) (x: Var) (v: Value) (σ: Store) : Store :=
-    match (getObj σ v0) with
-    | Some (C, fields) => [ v0 ↦ (C, [x ↦ v]fields)] σ
+
+  (* Update store with new value in local env *)
+  Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
+    match (getObj σ obj) with
+    | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
+    | None => None (* ? *)
+    end.
+
+  (* Update store with update in local env *)
+  Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
+    match (getObj σ obj) with
+    | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
     | None => σ (* ? *)
     end.
 
+  (* Update store with new values *)
   Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
     match (getObj σ v0) with
     | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
@@ -60,8 +69,8 @@ Module Evaluator.
                             match methods m with
                             | Some (method μ x _ e1) => (
                                 match (⟦_ el _⟧(σ1, ρ, v)(n)) with
-                                | Success_list args_val σ2 => let ρ1 := [(removeTypes x) ⟼ args_val]∅ in
-                                                             ⟦e1⟧(σ2, ρ1, v)(n)
+                                | Success_list args_val σ2 =>
+                                  let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v)(n)
                                 | _ => Error end)
                             | _ => Error end)
                         | _ => Error end)
@@ -72,12 +81,13 @@ Module Evaluator.
             | new C args => (
                 match (⟦_ args _⟧(σ, ρ, v)(n)) with
                 | Success_list args_val σ1 => (
-                    let I := (length σ1) in
-                    let σ2 := σ1 ++ [(C, ∅)] in (
-                      match (init I args_val C σ2 n) with
-                      | Some σ3 => (Success I σ3)
-                      | None => Error end ))
-                | _ => Error end) (* Unknown class *) 
+                    let I := (length σ1) in (* Fresh location for new object *)
+                    let ρ_init := args_val in (* Local env during initialisation *)
+                    let σ2 := σ1 ++ [(C, ∅)] in (* New object with empty local env *)
+                      match (init I ρ_init C σ2 n) with
+                      | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
+                      | None => Error end )
+                | _ => Error end) (* Invalid args *) 
 
             (* Field assignement *)
             | asgn e1 x e2 e' => (
@@ -104,83 +114,36 @@ Module Evaluator.
                                         | Success v σ2 => Success_list (v::vs) σ2
                                         | z => z end
                  | z => z end end
-  with init (I : Var) (v : list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
-         match k with
-         | 0 => None
-         | S n =>
+  with init (I : Var) (args_values: list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
+         match k with | 0 => None | S n =>
            match (ct C) with
-           | Some (class x F M) => (
-               let σ1 := (assign_list I (removeTypes x) v σ) in
-               let f  := (fun (σ: Store) (f: Field) => match f with
-                                                    |field x t e => (
-                                                       match (⟦e⟧(σ, ∅, I)(n)) with
-                                                       | Success v1 σ1 => (assign I x v1 σ1)
-                                                       | _ => σ (* In case or error, we keep σ to help for some proofs *)
-                                                       end) end) in
-               Some (fold_left f F σ)) 
+           | Some (class x F M) => (fold_left (init_field args_values I n) F (Some σ))
            | None => None
            end
-         end.
+         end
+  with init_field (args_values: list Var) (this: Var) (k: nat) (σ_opt: option Store)  (f: Field): option Store :=
+         match k with | 0 => None | S n =>
+         match σ_opt with
+         | None => None
+         | Some σ => ( match f with 
+         | field t e => (
+            match (⟦e⟧(σ, args_values, this)(n)) with
+            | Success v1 σ1 => (assign_new this v1 σ1)
+            | _ => None
+            end) end) end end.
 
 
 
   Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (v: Value) (l: list Value),
       not (⟦e⟧(σ, ρ, v)(k) = Success_list l σ').
-    induction k => //.
+    induction k; repeat light || eauto || destruct_match. Qed.
+  
+  Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
+      (forall (y:B), f res y = res) -> fold_left f l res = res.
     intros.
-    destruct e => //.
-    - simpl.
-      destruct (getVal ρ v0) => //.
-    - simpl.
-      destruct (⟦ e ⟧ (σ, ρ, v )( k)) => //.
-      destruct (getObj s v1) => //.
-      destruct o => //.
-      destruct (getVal e0 v0) => //.
-    - simpl.
-      destruct (⟦ e ⟧ (σ, ρ, v )( k)) => //.
-      destruct (getObj s v0) => //.
-      destruct o => //.
-      destruct (ct c) => //.
-      destruct c0 => //.
-      destruct (methods m) => //.
-      destruct m0 => //.
-      destruct (⟦_ l0 _⟧ ( s, ρ, v )( k)) => //.
-    - simpl.
-      destruct (⟦_ l0 _⟧ (σ, ρ, v )( k)) => //.
-      destruct (init (length s) l1 c (s ++ [(c, [])]) k) => //.
-    - simpl.
-      destruct (⟦ e1 ⟧ (σ, ρ, v )( k)) => //.
-      destruct (⟦ e2 ⟧ (s, ρ, v )( k)) => //.
+    induction l => //.
+    simpl. rewrite H. apply IHl.
   Qed.
 
-
-  (*
-  Lemma eval_preserves_types: forall (k: nat) (e: Expr) (σ σ': Store) (ρ ω ω': Env) (v v': Value) (l: Loc) (C C': ClN),
-      (⟦e⟧(σ, ρ, v)(k) = Success v' σ') ->
-      (getObj σ l) = Some (C, ω) ->
-      (getObj σ' l) = Some (C', ω') -> C=C'.
-    induction k => //.
-    destruct e; simpl ; intros.
-    - destruct (getVal ρ v) => //.
-      injection H => H2 H3.
-      rewrite -H2 in H1.
-      rewrite H0 in H1.
-      injection H1  => //.
-    - injection H => H2 H3.
-      rewrite -H2 in H1.
-      rewrite H0 in H1.
-      injection H1  => //.
-    - destruct (⟦ e ⟧ (σ, ρ, v0 )( k)) eqn:E => //.
-      destruct (getObj s v1) eqn:S => //.
-      destruct o => //.
-      destruct (getVal e0 v) => //.
-      injection H => H2 H3.
-      rewrite -H2 in H1.
-      apply : (IHk e σ s ρ ω ω' v0 v1 l C C' E H0 H1).
-    -  Admitted.      
-*)      
-    
-      
   
-
   End Evaluator.

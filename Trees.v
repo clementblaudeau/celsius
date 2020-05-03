@@ -28,13 +28,13 @@ Inductive Expr: Type :=
   | asgn  : Expr -> Var -> Expr -> Expr -> Expr.
 
 Inductive Method: Type :=
-  | method(μ: mode)(args: list (Var * Tpe))(out_type: Tpe)(body: Expr).
+  | method(μ: mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
 
 Inductive Field: Type :=
-  | field(x: Var)(type: Tpe)(expr: Expr).
+  | field(type: Tpe)(expr: Expr).
 
 Inductive Class: Type :=
-  | class(args: list (Var * Tpe))(fields: list Field)(methods: Mtd -> (option Method)).
+  | class(args: list Tpe)(fields: list Field)(methods: Mtd -> (option Method)).
 
 Inductive Program: Type :=
   | program(C: list Class)(entry: Expr).
@@ -58,7 +58,8 @@ Definition dom {X: Type} (x: list X) : nat := (length x).
 Definition getObj (l : list Obj):= nth_error l.
 Definition getVal (l : list Value) := nth_error l.
 
-Lemma getObj_fresh : forall (σ: Store) (C: ClN) (ρ: Env), getObj (σ++[(C,ρ)]) (length σ) = Some (C, ρ).
+
+Lemma getObj_last : forall (σ: Store) (C: ClN) (ρ: Env), getObj (σ++[(C,ρ)]) (length σ) = Some (C, ρ).
 Proof.
   induction σ; simpl; intros => //.
   Qed.
@@ -133,3 +134,31 @@ Qed.
 Check [0].
 Check [0 ↦ 1] ∅.
 Check [[0] ⟼ [1]] [1 ; 2 ; 3].
+
+
+
+  Lemma getObj_update1 : forall (σ: Store) (o: Obj) (x: nat),
+      x < dom σ -> (getObj [x ↦ o]σ x) = Some o.
+  Proof.
+    rewrite /dom /getObj => σ o x.
+    apply : (update_one1 Obj x o σ) => //.
+  Qed.  
+  
+  Lemma getObj_update2 : forall (σ: Store) (o: Obj) (x x': nat),
+      x < dom σ ->
+      x <> x' ->
+      (getObj [x ↦ o]σ x') = (getObj σ x').
+  Proof.
+    rewrite /dom /getObj => σ o x x'.
+    move : (update_one2 Obj x x' o σ) => //.
+  Qed.
+
+  Lemma getObj_dom : forall (σ: Store) (o: Obj) (l: nat),
+      (getObj σ l) = Some o ->
+      l < (dom σ).
+  Proof.
+    intros σ o.
+    induction σ ; destruct l => //.    
+    + move: (PeanoNat.Nat.lt_0_succ (dom σ)) => //.
+    + simpl => H. apply (Lt.lt_n_S _ _ (IHσ _ H)) . 
+  Qed.
