@@ -2,6 +2,7 @@ From Celsius Require Export Trees.
 From Celsius Require Export Eval.
 From Celsius Require Export PartialMonotonicity.
 From Celsius Require Export Reachability.
+From Celsius Require Export Compatibility.
 Require Import ssreflect ssrbool.
 
 
@@ -14,6 +15,7 @@ Module Stackability.
   Import Eval.Evaluator.
   Import Reachability.Reachability.
   Import PartialMonotonicity.PartialMonotonicity.
+  Import Compatibility.Compatibility.
   
   Definition stackability (σ σ' : Store) :=
     forall l, l < (dom σ') -> ((σ' ⊨ l : warm) \/ (l < (dom σ))).
@@ -25,14 +27,18 @@ Module Stackability.
   Qed.
 
   Lemma stackability_transitivity: forall σ1 σ2 σ3,
-      σ1 ≪ σ2 -> σ2 ≪ σ3 -> σ2 ⪯ σ3 -> σ1 ≪ σ3.
+      σ1 ≪ σ2 ->
+      σ2 ≪ σ3 ->
+      σ2 ⪯ σ3 ->
+      σ2 ⊆ σ3 ->
+      σ1 ≪ σ3.
   Proof.
     unfold stackability.
     intros.
-    case /(_ l H2):H0 => H0.
+    case /(_ l H3):H0 => H0.
     - left => //.
     - case /(_ l H0):H => H.
-      + left. apply: (partialMonotonicity_warm_monotone σ2 σ3 l H1 H) => //.
+      + left. apply: (partialMonotonicity_warm_monotone σ2 σ3 l H1 H2 H) => //.
       + right => //.
   Qed.      
 
@@ -52,13 +58,13 @@ Module Stackability.
 
 
   Definition stackability_prop (k : nat) :=  forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
-      ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> σ ≪ σ' /\ σ ⪯ σ'.
+      ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> σ ≪ σ'.
 
   Definition stackability_prop_list (k : nat) :=  forall (l: list Expr) (σ1 σ2: Store) (ρ: Env) (v : Value) (v_list: list Value),
-      ⟦_ l _⟧(σ1, ρ, v)(k) = (Success_list v_list σ2) -> σ1 ≪ σ2 /\ σ1 ⪯ σ2.
+      ⟦_ l _⟧(σ1, ρ, v)(k) = (Success_list v_list σ2) -> σ1 ≪ σ2 /\ σ1 ⪯ σ2 /\ σ1 ⊆ σ2.
 
   Definition stackability_prop_list2 (k : nat) :=  forall (l: list Expr) (σ1 σ2 σ3: Store) (ρ: Env) (v : Value) (v_list1 v_list2 : list Value),
-      fold_left (eval_list_aux σ1 ρ v k) l (Success_list v_list1 σ2) = (Success_list v_list2 σ3) -> σ2 ≪ σ3 /\ σ2 ⪯ σ3.
+      fold_left (eval_list_aux σ1 ρ v k) l (Success_list v_list1 σ2) = (Success_list v_list2 σ3) -> σ2 ≪ σ3 /\ σ2 ⪯ σ3 /\ σ2 ⊆ σ3.
 
 
   Lemma stackability_rec_step_list2 : forall (n : nat),
@@ -72,23 +78,31 @@ Module Stackability.
     induction l as [| e l].
     + (* case [] *)
       intros. simpl in H0. injection H0 => H2 H3. rewrite H2.
-      apply (conj (stackability_reflexivity _) (partialMonotonicity_reflexivity _)).
+      eauto using stackability_reflexivity with pM cmpt.
     + (* case e::l *)
       intros. simpl in H0. destruct k => //.
       ++ (* k = 0, timeout *)
-        simpl in H0. assert (forall l', (fold_left (fun (_ : Result) (_ : Expr) => Timeout) l' Timeout = Timeout)) as H_timeout. { induction l' => //. } rewrite H_timeout in H0 => //.
+        simpl in H0. rewrite foldLeft_constant in H0 => //.
       ++ (* k > 0 *)
+            move: (PeanoNat.Nat.lt_succ_l _ _ H_bound) => Hn.
+            assert ((forall k0 : nat, k0 < n -> compatibility_prop k0)) as H_comp. {
+              intros. apply compatibility_theorem.
+            }
+(*            move: (compatibility_rec_step_list2 n H_comp (S k) H_bound l σ1 σ1 _ _ _ _ _ H0). *)
+            
         simpl in H0.
         destruct (⟦ e ⟧ (σ2, ρ, v )( k)) eqn: E.
         +++ rewrite foldLeft_constant in H0 => //. 
         +++ rewrite foldLeft_constant in H0 => //. 
         +++ simpl in IHl.
             apply (IHl σ1 s σ3 ρ v (v0::v_list1) v_list2) in H0.
+            move: H0 => [H01 [H02 H03]].
             move: (partialMonotonicity_theorem k e σ2 s ρ v v0 E) => H1.
+            move: (compatibility_theorem k e _ _ _ _ _  E) => H_c2s.
             apply (H _ (PeanoNat.Nat.lt_succ_l _ _ H_bound))in E.
-            move: H0 => [H01 H02].
-            move: (stackability_transitivity σ2 s σ3 (proj1 E) H01 H02 ) => H2.
-            split => //.
+            move: (stackability_transitivity σ2 s σ3 E H01 H02 H03) => Hσ23.
+            move: (compatibility_transitivity σ2 s σ3 H_c2s H03) => H_cσ23.
+            split => //. split => //.
             apply (partialMonotonicity_transitivity _ s _ H1 H02).
         +++ move : (eval_not_success_list k e σ2 s ρ v l0)=> E_not => //.
   Qed.
