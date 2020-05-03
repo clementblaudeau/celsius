@@ -65,32 +65,6 @@ Module PartialMonotonicity.
     unfold partialMonotonicity; auto.
   Qed.    
 
-  Lemma getObj_update1 : forall (σ: Store) (o: Obj) (x: nat),
-      x < dom σ -> (getObj [x ↦ o]σ x) = Some o.
-  Proof.
-    rewrite /dom /getObj => σ o x.
-    apply : (update_one1 Obj x o σ) => //.
-  Qed.  
-  
-  Lemma getObj_update2 : forall (σ: Store) (o: Obj) (x x': nat),
-      x < dom σ ->
-      x <> x' ->
-      (getObj [x ↦ o]σ x') = (getObj σ x').
-  Proof.
-    rewrite /dom /getObj => σ o x x'.
-    move : (update_one2 Obj x x' o σ) => //.
-  Qed.
-
-  Lemma getObj_dom : forall (σ: Store) (o: Obj) (l: nat),
-      (getObj σ l) = Some o ->
-      l < (dom σ).
-  Proof.
-    intros σ o.
-    induction σ ; destruct l => //.    
-    + move: (PeanoNat.Nat.lt_0_succ (dom σ)) => //.
-    + simpl => H. apply (Lt.lt_n_S _ _ (IHσ _ H)) . 
-  Qed.
-
 
   Lemma partialMonotonicity_assignment : forall (σ σ': Store) (l: Loc) (C: ClN) (ω ω': Env),
       getObj σ l = Some (C, ω) ->

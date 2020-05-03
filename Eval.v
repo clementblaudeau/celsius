@@ -145,34 +145,5 @@ Module Evaluator.
     simpl. rewrite H. apply IHl.
   Qed.
 
-  Lemma eval_maintains_ClN: forall(k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value) (l: Loc) (C C': ClN) (ω ω': Env),
-      (⟦e⟧(σ, ρ, v)(k) = Success v' σ') ->
-      (getObj σ l) = Some (C, ω) ->
-      (getObj σ' l) = Some (C', ω') ->
-      C = C'.
-    admit.
-    Admitted. (*
-    induction k.
-    - (* k = 0 *)
-      simpl => //.
-    - (* k > 0 *)
-      destruct e.
-      + repeat light || eauto || destruct_match.
-      + repeat light || eauto || destruct_match.
-      + repeat light || eauto || destruct_match || invert_constructor_equalities.
-      + repeat light || eauto || destruct_match || invert_constructor_equalities.
-        
-        apply (IHk e _ _ _ _ _ l _ _ ω ω' matched) => //.
-      + intros.
-        simpl in H.
-        destruct_match => //.
-        destruct_match => //.
-        destruct_match => //.
-        destruct_match => //.
-        apply (IHk e _ _ .
-        repeat light || eauto || destruct_match || invert_constructor_equalities.
-            
-  Qed.*)
-    
   
   End Evaluator.
