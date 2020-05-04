@@ -16,5 +16,15 @@ Contains the inductive definition of the language and other structures used:
 ### Eval.v
 Defines the evaluator and helpers
 
+### Reachability.v
+Defines the reachability relationship.
+
+### Compatibility.v
+Defines the compatibility relationship. Store are *compatible* if they have the same objects at the same locations, regardless of the local environments.
+The evaluator's initial and result stores are compatible (`compatibility_theorem`).
+
 ### PartialMonotonicity.v
-Defines the partial monotonicity relationship. Proves the lemmas and the main theorem about partial monotonicity.
+Defines the partial monotonicity relationship. Store `s1` and `s2` are in a *partial monotonicity* relationship if `s2` has more elements in every local environments associated with a stored object. The evaluator's initial and result stores are in a partial monotonicity relationship (`partialMonotonicity_theorem`).
+
+### Stackability.v
+Defines the stackability relationship. Stores `s1` and `s2` are *stackable* if all objects that are in `s2` and not in `s1` are `warm` (all fields initialized). The evaluator's initial and result stores are stackable (`stackability_theorem`).
