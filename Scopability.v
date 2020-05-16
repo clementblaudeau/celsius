@@ -40,3 +40,28 @@ Module Scopability.
     unfold Included in H.
     auto.
   Qed.
+
+  Lemma scoping_subset : forall σ1 σ2 L L1 L2, (σ2, L2)  ⋖ (σ1, L1) ->
+                                          L ⊆ L2 ->
+                                          (σ2, L)  ⋖ (σ1, L1).
+  Proof.
+    unfold scoping, reachability_set.
+    simpl.
+    intros.
+    apply (H l H1).
+    move: H2 => [l' [Hl'1 Hl'2]].
+    exists l'; split => //.
+    unfold Included in H0.
+    auto.
+  Qed.
+
+  Lemma scoping_union :  forall σ1 σ2 L L1 L2, (σ2, L1)  ⋖ (σ1, L) ->
+                                          (σ2, L2)  ⋖ (σ1, L) ->
+                                          (σ2, L1∪L2)  ⋖ (σ1, L).
+  Proof.
+    unfold scoping, reachability_set.
+    simpl.
+    intros.
+    move: H2 => [l' [Hl'1 Hl'2]].
+    induction Hl'1 as [l' | l']; repeat eauto ; exists l'.
+  Qed.
