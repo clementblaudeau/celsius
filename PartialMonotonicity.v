@@ -10,14 +10,14 @@ Module PartialMonotonicity.
   Import Eval.Evaluator.
   Import Compatibility.Compatibility.
   Create HintDb pM.
-  
+
   (* Definitions and notations : *)
   Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=
     match (getObj σ l) with
     | Some (C, ω) => ((length f) <= (length ω))
     | _ => False
     end.
-  Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 99, f at level 99).
+  Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 80, f at level 80).
 
   Definition partialMonotonicity (σ σ': Store) :=
     forall l f, (σ ⊨ l : f) -> (σ' ⊨ l : f).
@@ -50,10 +50,10 @@ Module PartialMonotonicity.
       simpl.
       destruct a. apply le_0_n.
   Qed.
-  
+
   Lemma partialMonotonicity_domains : forall (σ σ': Store), σ ⪯ σ' -> (dom σ) <= (dom σ').
   Proof.
-    intros.    
+    intros.
     unfold partialMonotonicity in H.
     move : (initializedFields_dom σ') => Hσ'.
     destruct (σ) eqn:Σ.
@@ -68,7 +68,7 @@ Module PartialMonotonicity.
   Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), (σ1 ⪯ σ2) -> (σ2 ⪯ σ3) -> (σ1 ⪯ σ3).
   Proof.
     unfold partialMonotonicity; auto.
-  Qed.    
+  Qed.
   Hint Resolve partialMonotonicity_transitivity: pM.
 
 
@@ -92,7 +92,7 @@ Module PartialMonotonicity.
   Qed.
   Hint Resolve partialMonotonicity_assignment: pM.
 
-  
+
 
   Definition partialMonotonicity_prop (k : nat) :=  forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
       ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> σ ⪯ σ'.
@@ -109,7 +109,7 @@ Module PartialMonotonicity.
       (forall (k: nat), (k < n) -> partialMonotonicity_prop k) ->
       (forall (k: nat), (k < n) -> partialMonotonicity_prop_list2 k).
   Proof.
-    unfold partialMonotonicity_prop. 
+    unfold partialMonotonicity_prop.
     unfold partialMonotonicity_prop_list2.
     intros n H k H_bound.
     induction l as [| e l].
@@ -122,8 +122,8 @@ Module PartialMonotonicity.
       ++ (* k > 0 *)
         simpl in H0.
         destruct (⟦ e ⟧ (σ2, ρ, v )( k)) eqn: E.
-        +++ rewrite foldLeft_constant in H0 => //.  
-        +++ rewrite foldLeft_constant in H0 => //.  
+        +++ rewrite foldLeft_constant in H0 => //.
+        +++ rewrite foldLeft_constant in H0 => //.
         +++ rewrite -/eval_list in H0.
             simpl in IHl.
             apply (IHl σ1 s σ3 ρ v (v0::v_list1) v_list2) in H0.
@@ -151,9 +151,9 @@ Module PartialMonotonicity.
   Definition partialMonotonicity_prop_init (k : nat) :=  forall (I: Var) (v: list Var) (C: ClN) (σ σ_res: Store),
       (init I v C σ k) = Some σ_res -> σ ⪯ σ_res.
 
-  
-  
-  
+
+
+
   Lemma partialMonotonicity_rec_step_init : forall (n : nat),
       (* Strong induction *)
       (forall (k: nat), (k < n) -> partialMonotonicity_prop k) ->
@@ -162,7 +162,7 @@ Module PartialMonotonicity.
     intros n H_strong k H_bound.
     unfold partialMonotonicity_prop_init => I args_val C σ σ_res H.
     destruct k ; simpl in H => //.
-    destruct k ; simpl in H ; destruct (ct C) => //. 
+    destruct k ; simpl in H ; destruct (ct C) => //.
     - destruct c. destruct fields ; simpl in H.
       + invert_constructor_equalities. eauto with pM.
       + rewrite foldLeft_constant in H => //.
@@ -171,7 +171,7 @@ Module PartialMonotonicity.
       generalize dependent σ_res.
       induction fields.
       + repeat light || auto with pM.
-      + intros.  
+      + intros.
         destruct a as [ f e] eqn:A.
         simpl in H.
         destruct ((⟦ e ⟧ (σ, args_val, I )( k))) eqn:E.
@@ -192,7 +192,7 @@ Module PartialMonotonicity.
           +++ rewrite foldLeft_constant in H => //.
         ++ rewrite foldLeft_constant in H => //. (* Success_list *)
   Qed.
-  
+
   Lemma partialMonotonicity_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
       σ ⪯ σ ++ [(c, ρ)].
   Proof.
@@ -200,8 +200,8 @@ Module PartialMonotonicity.
     unfold initializedFields.
     induction σ ; destruct l => //.
     apply IHσ => //.
-  Qed.    
-  
+  Qed.
+
   Lemma partialMonotonicity_theorem_rec_step : forall (n : nat),
       (* Strong induction *)
       (forall (k : nat), (k < n ) -> partialMonotonicity_prop k) ->
@@ -240,7 +240,7 @@ Module PartialMonotonicity.
   Qed.
 
 
-  
+
   Theorem partialMonotonicity_theorem: forall (n : nat), (partialMonotonicity_prop n).
   Proof.
     intros.
@@ -256,7 +256,6 @@ Module PartialMonotonicity.
       + apply IHn => //.
       + rewrite H1 => //.
   Qed.
-  
 
   Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> σ ⊆ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).
   Proof.
@@ -271,7 +270,7 @@ Module PartialMonotonicity.
     rewrite H_c in H_pm.
     exists C, ω', args, fields, methods => //.
   Qed.
-  
+
 
 
 
