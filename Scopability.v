@@ -27,8 +27,10 @@ Module Scopability.
 
   Definition scoping_preservation (σ1 σ2: Store) L :=
     forall σ0 (L0 L1: Ensemble Loc),
-      (forall l, (l ∈ L0) -> l < (dom σ0)) ->
-      (forall l, (l ∈ L1) -> l < (dom σ1)) ->
+      (dom σ0) <= (dom σ1) ->
+      (* (dom σ0) <= (dom σ2 -> *)
+      (* (forall l, (l ∈ L0) -> l < (dom σ0)) -> *)
+      (* (forall l, (l ∈ L1) -> l < (dom σ1)) -> *)
       (σ1, L)  ⋖ (σ0, L0) ->
       (σ1, L1) ⋖ (σ0, L0) ->
       (σ2, L1) ⋖ (σ0, L0).
@@ -99,45 +101,46 @@ Module Scopability.
   Lemma preserving_transitivity: forall σ1 σ2 σ3 L1 L2, (σ1 ⇝ σ2 ⋖ L1) ->
                                                    (σ2 ⇝ σ3 ⋖ L2) ->
                                                    (σ2, L2) ⋖ (σ1, L1) ->
+                                                   (dom σ1) <= (dom σ2) ->
                                                    (σ1 ⇝ σ3 ⋖ L1).
   Proof.
     intros.
     unfold scoping_preservation.
-    intros σ0 L0 L HL0 HL A1 A2.
-    move : (H _ _ _ HL0 HL A1 A2) => B1.
-    assert (dom σ0 <= dom σ1). admit. (* dom σ0 ⊆ dom σ1 required by scoping transitivity *)
-    move: (scoping_transitivity _ _ _ _ _ _ H2 A1 H1) => C1.
-    assert ( forall l : Loc, l ∈ L -> l < dom σ2). admit. (* L ⊆ σ2 required by scoping preservation *)
-    apply (H0 _ _ _ HL0 H3 C1 B1).
-  Admitted.
+    intros σ0 L0 L Hdom A1 A2.
+    move : (H _ _ _  Hdom A1 A2) => B1.
+    move: (scoping_transitivity _ _ _ _ _ _ Hdom A1 H1) => C1.
+    apply H0 => //.
+    apply (PeanoNat.Nat.le_trans _ (dom σ1) _) => //.
+  Qed.
 
-  Lemma preserving_regularity_environment: forall σ1 σ2 L, σ1 ⇝ σ2 ⋖ L -> (σ2, L) ⋖ (σ1, L).
+
+  Lemma preserving_regularity_degenerate: forall σ1 σ2 L, σ1 ⇝ σ2 ⋖ L -> (σ2, L) ⋖ (σ1, L).
   Proof.
     intros.
-    assert ( forall l : Loc, l ∈ L -> l < dom σ1). admit. (* L ⊆ σ1 required by scoping preservation *)
     assert (L ⊆ L) as Hincluded. move => x => //.
+    assert (dom σ1 <= dom σ1) as Hdom. apply PeanoNat.Nat.le_refl.
     move: (scoping_reflexivity σ1 L L Hincluded) => Href.
-    apply (H σ1 L L H0 H0 Href Href).
-  Admitted.
+    apply (H σ1 L L Hdom) => //.
+    Qed.
 
   Lemma preserving_regularity: forall σ0 σ1 σ2 L L1, σ1 ⇝ σ2 ⋖ L ->
+                                                (dom σ0) <= (dom σ1) ->
                                                 (σ1, L) ⋖ (σ0, L) ->
                                                 (σ1, L1) ⋖ (σ0, L) ->
                                                 (σ2, L1) ⋖ (σ0, L).
   Proof.
     intros.
     apply H => //.
-    admit. (* L ⊆ σ0 *)
-    admit. (* L1 ⊆ σ1 *)
-  Admitted.
+  Qed.
 
   Lemma preserving_transitivity_degenerate: forall σ1 σ2 σ3 L1 , σ1 ⇝ σ2 ⋖ L1 ->
+                                                (dom σ1) <= (dom σ2) ->
                                                  σ2 ⇝ σ3 ⋖ L1 ->
                                                  σ1 ⇝ σ3 ⋖ L1.
   Proof.
     intros.
-    move: (preserving_regularity_environment _ _ _ H) => A1.
-    apply: (preserving_transitivity _ _ _ _ _ H H0 A1) => //.
+    move: (preserving_regularity_degenerate _ _ _ H) => A1.
+    apply: (preserving_transitivity _ _ _ _ _ H H1 A1) => //.
   Qed.
 
 
