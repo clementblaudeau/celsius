@@ -32,8 +32,6 @@ Module Scopability.
 
   Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
     forall σ0 (L0 L1: Ensemble Loc),
-      L0 ⪽ σ0 ->
-      L1 ⪽ σ1 ->
       (σ0, L0) ⋖ (σ1, L) ->
       (σ0, L0) ⋖ (σ1, L1) ->
       (σ0, L0) ⋖ (σ2, L1).
@@ -117,13 +115,10 @@ Module Scopability.
       apply (scoping_transitivity _ σ1 _ _ L1 _) => //.
       admit. }
     apply H0 => //.
-    admit.
   Admitted.
 
 
   Lemma preserving_regularity_degenerate: forall σ1 σ2 L, σ1 ⇝ σ2 ⋖ L ->
-                                                     L ⪽ σ1 ->
-                                                     (dom σ1) <= (dom σ2) ->
                                                      (σ1, L) ⋖ (σ2, L).
   Proof.
     intros.
@@ -139,19 +134,16 @@ Module Scopability.
   Proof.
     intros.
     apply H => //.
-    admit.
-    admit.
-    Admitted.
+  Qed.
 
   Lemma preserving_transitivity_degenerate: forall σ1 σ2 σ3 L1 , σ1 ⇝ σ2 ⋖ L1 ->
-                                                (dom σ1) <= (dom σ2) -> (* ADDED HYPOTHESIS *)
                                                  σ2 ⇝ σ3 ⋖ L1 ->
                                                  σ1 ⇝ σ3 ⋖ L1.
   Proof.
     intros.
     apply (preserving_transitivity σ1 σ2 σ3 L1 L1) => //.
-    move: (scoping_transitivity σ1 σ2 σ2 L1 L1 L1) => //.
-    Admitted.
+    apply: (preserving_regularity_degenerate σ1 σ2 L1) => //.
+  Qed.
 
   Lemma scopability_assignment: forall σ1 σ2 σ2' L1 l l' f C ω ω',
       σ1 ⇝ σ2 ⋖ L1 ->
