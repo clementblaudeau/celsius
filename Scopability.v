@@ -1,4 +1,5 @@
 From Celsius Require Export Trees.
+From Celsius Require Export Tactics.
 From Celsius Require Export Eval.
 From Celsius Require Export PartialMonotonicity.
 From Celsius Require Export Reachability.
@@ -26,16 +27,13 @@ Module Scopability.
   Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).
 
   Definition scoping (σ σ': Store) (L L': Ensemble Loc) :=
-    L ⪽ σ ->
-    L' ⪽ σ' ->
+    L ⪽ σ /\
+    L' ⪽ σ' /\
     (forall l, l < (dom σ) -> (σ' ⊫ L' ⇝ l) -> σ ⊫ L ⇝ l).
   Notation "a ⋖ b" := (scoping (fst a) (fst b) (snd a) (snd b)) (at level 81).
 
   Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
-    (L ⪽ σ1) /\
     forall σ0 (L0 L1: Ensemble Loc),
-      (dom σ0) <= (dom σ1) ->
-      (dom σ0) <= (dom σ2) ->
       L0 ⪽ σ0 ->
       L1 ⪽ σ1 ->
       (σ0, L0) ⋖ (σ1, L) ->
@@ -47,29 +45,31 @@ Module Scopability.
   (* Results : *)
 
 
-  Lemma scoping_reflexivity : forall (σ: Store) (L1 L2: Ensemble Loc), (L2 ⊆ L1) -> ((σ, L1) ⋖ (σ, L2)).
+  Lemma scoping_reflexivity : forall (σ: Store) (L1 L2: Ensemble Loc), (L2 ⊆ L1) -> (L1 ⪽ σ) -> ((σ, L1) ⋖ (σ, L2)).
   Proof.
     intros.
     unfold scoping, reachability_set.
-    simpl.
-    intros A1 A2 l Hdom H1.
-    move: H1 => [l' [Hl'1 Hl'2]].
+    simpl. split => //.
+    split;
+    move => l Hl; eauto.
+    move => [l' [A1 A2]].
     exists l'; split => //.
-    unfold Included in H.
     auto.
   Qed.
 
+  Hint Resolve Union_intror Union_introl:core.
+
   Lemma scoping_subset : forall σ1 σ2 L L1 L2, (σ1, L1)  ⋖ (σ2, L2∪L) ->
-                                          L2∪L ⪽ σ2 ->
                                           (σ1, L1)  ⋖ (σ2, L).
   Proof.
     unfold scoping, reachability_set.
     simpl.
-    intros.
-    apply H => //.
-    move: H4 => [l' [Hl'1 Hl'2]].
+    move => σ1 σ2 L L1 L2 [HL1 [HLL2 A1]].
+    split => //.
+    split. move => l Hl ; auto.
+    move => l Hdom [l' [B1 B2]].
+    apply A1 => //.
     exists l'; split => //.
-    apply Union_intror.
     auto.
   Qed.
 
@@ -79,43 +79,41 @@ Module Scopability.
   Proof.
     unfold scoping, reachability_set.
     simpl.
-    intros.
-    move: H4 => [l' [Hl'1 Hl'2]].
-    move /(_ H1):H => H.
-    move /(_ H1):H0 => H0.
-    induction Hl'1 as [l' | l'].
-    + apply H ; repeat exists l' ; auto => //.
-                         move => l'' Hl'' . apply (H2 l'').
-                         apply Union_introl => //.
-    + apply H0 ; repeat exists l' ; auto => //.
-                         move => l'' Hl'' . apply (H2 l'').
-                         apply Union_intror => //.
+    move => σ1 σ2 L L1 L2 [A1 [A2 A3]] [A4 [A5 A6]].
+    split => //.
+    split. move => l Hl;induction Hl; auto.
+    move => l Hdom [l' [B1 B2]].
+    induction B1 as [l' | l']; auto.
+    + apply A3; repeat (auto ; exists l'; split).
+    + apply A6; repeat (auto ; exists l'; split).
   Qed.
-
 
   Lemma scoping_reachability: forall σ l1 l2, ( σ ⊨ l1 ⇝ l2) -> (σ, {l1}) ⋖ (σ, {l2}).
   Proof.
-    unfold scoping, reachability_set ; simpl.
+    unfold scoping. simpl.
     intros.
-    move: H3 => [l' [Hl'1 Hl'2]].
-    induction Hl'1.
-    exists l1 ; split => //.
-    apply (reachability_trans σ l1 l2 l H Hl'2).
+    split. induction 1. apply (proj1 (reachability_dom _ _ _ H)).
+    split. induction 1. apply (proj2 (reachability_dom _ _ _ H)).
+    move => l Hdom A1.
+    exists l1; split => //.
+    move: A1 => [l' [B1 B2]].
+    induction B1.
+    apply (reachability_trans _ _ l2 _) => //.
   Qed.
 
   Lemma scoping_transitivity: forall σ1 σ2 σ3 L1 L2 L3, (dom σ1) <= (dom σ2) ->
-                                                   L2 ⪽ σ2 -> (* ADDED HYPOTHESIS *)
                                                    (σ1, L1) ⋖ (σ2, L2) ->
                                                    (σ2, L2) ⋖ (σ3, L3) ->
                                                    (σ1, L1) ⋖ (σ3, L3).
   Proof.
-    intros.
+    move => σ1 σ2 σ3 L1 L2 L3 H_dom H1 H2.
     unfold scoping, reachability_set ; simpl.
-    intros.
-    move : H6 => [l3 [H_in_l3 H_reach_l3]].
-    move: (PeanoNat.Nat.lt_le_trans l (dom σ1) _ H5 H) => B1.
-    apply H1; simpl => //.
-    apply H2; simpl => //.
+    split. apply (proj1 H1).
+    split. apply (proj1 (proj2 H2)).
+    move => l Adom [l3 [A1 A2]].
+    move: (PeanoNat.Nat.lt_le_trans l (dom σ1) _ Adom H_dom) => B1.
+    apply (proj2 (proj2 H1)); simpl => //.
+    apply (proj2 (proj2 H2)); simpl => //.
     exists l3 => //.
   Qed.
 

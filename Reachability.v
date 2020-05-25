@@ -17,6 +17,14 @@ Module Reachability.
   |rch_trans : forall l0 l1 l2 C ω σ, (reachability σ l0 l1) -> (getObj σ l1 = Some (C, ω)) -> (exists f, (getVal ω f = Some l2)) -> (l2 < dom σ) -> (reachability σ l0 l2).
   Notation "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2) (at level 80, l1 at level 80, l2 at level 80).
 
+  Lemma reachability_dom : forall σ l1 l2, σ ⊨ l1 ⇝ l2 -> l1 < (dom σ) /\ l2 < (dom σ).
+  Proof.
+    intros.
+    induction H => //.
+    split => //.
+    apply (proj1 IHreachability).
+    Qed.
+
   (* To be moved to Trees.v at some point *)
   Definition LocSet := (Ensemble Loc).
   Notation "l ∈ L" := (In Loc L l) (at level 80).
