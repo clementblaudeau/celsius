@@ -27,7 +27,7 @@ Module Scopability.
   Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).
 
   Definition scoping (σ σ': Store) (L L': Ensemble Loc) :=
-    (forall l, l < (dom σ) -> (σ' ⊫ L' ⇝ l) -> σ ⊫ L ⇝ l).
+    (forall l, l < (dom σ) -> (σ' ⊫ L' ⇝ l) -> σ ⊫ L ⇝ l) /\ (dom σ) <= (dom σ').
   Notation "a ⋖ b" := (scoping (fst a) (fst b) (snd a) (snd b)) (at level 81).
 
   Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
@@ -40,11 +40,11 @@ Module Scopability.
 
   (* Results : *)
 
-
   Lemma scoping_reflexivity : forall (σ: Store) (L1 L2: Ensemble Loc), (L2 ⊆ L1) -> (L1 ⪽ σ) -> ((σ, L1) ⋖ (σ, L2)).
   Proof.
     intros.
     unfold scoping, reachability_set; simpl.
+    split => //.
     move => l Hl [l' [A1 A2]].
     exists l'; split => //.
     auto.
@@ -57,7 +57,8 @@ Module Scopability.
   Proof.
     unfold scoping, reachability_set.
     simpl.
-    move => σ1 σ2 L L1 L2 A1.
+    move => σ1 σ2 L L1 L2 [A1 A2].
+    split => //.
     move => l Hdom [l' [B1 B2]].
     apply A1 => //.
     exists l'; split => //.
@@ -71,34 +72,38 @@ Module Scopability.
     unfold scoping, reachability_set.
     simpl.
     move => σ1 σ2 L L1 L2 A1 A2.
+    split.
     move => l Hdom [l' [B1 B2]].
     induction B1 as [l' | l']; auto.
     + apply A1; repeat (auto ; exists l'; split).
     + apply A2; repeat (auto ; exists l'; split).
+    + apply (proj2 A2).
   Qed.
 
   Lemma scoping_reachability: forall σ l1 l2, ( σ ⊨ l1 ⇝ l2) -> (σ, {l1}) ⋖ (σ, {l2}).
   Proof.
     unfold scoping. simpl.
     intros.
+    split => //.
     exists l1; split => //.
     move: H1 => [l' [B1 B2]].
     induction B1.
     apply (reachability_trans _ _ l2 _) => //.
   Qed.
 
-  Lemma scoping_transitivity: forall σ1 σ2 σ3 L1 L2 L3, (dom σ1) <= (dom σ2) ->
-                                                   (σ1, L1) ⋖ (σ2, L2) ->
+  Lemma scoping_transitivity: forall σ1 σ2 σ3 L1 L2 L3, (σ1, L1) ⋖ (σ2, L2) ->
                                                    (σ2, L2) ⋖ (σ3, L3) ->
                                                    (σ1, L1) ⋖ (σ3, L3).
   Proof.
-    move => σ1 σ2 σ3 L1 L2 L3 H_dom H1 H2.
+    move => σ1 σ2 σ3 L1 L2 L3 H1 H2.
     unfold scoping, reachability_set ; simpl.
-    move => l Adom [l3 [A1 A2]].
-    move: (PeanoNat.Nat.lt_le_trans l (dom σ1) _ Adom H_dom) => B1.
+    split.
+    + move => l Adom [l3 [A1 A2]].
+    move: (PeanoNat.Nat.lt_le_trans l (dom σ1) _ Adom (proj2 H1)) => B1.
     apply H1; simpl => //.
     apply H2; simpl => //.
     exists l3 => //.
+    + apply (PeanoNat.Nat.le_trans _ (dom σ2) _ (proj2 H1) (proj2 H2)) => //.
   Qed.
 
   Lemma preserving_transitivity: forall σ1 σ2 σ3 L1 L2, (σ1 ⇝ σ2 ⋖ L1) ->
@@ -108,14 +113,22 @@ Module Scopability.
   Proof.
     intros.
     unfold scoping_preservation.
-    move => σ0 L0 L A_dom1 A_dom3 A1 A2.
+    move => σ0 L0 L A1 A2 .
+    unfold scoping. simpl.
+    split.
+    +  move => l Hl A0.
     assert ((σ0, L0) ⋖ (σ2, L)) as B1. {
       apply H => //. }
     assert ((σ0, L0) ⋖ (σ2, L2)) as C1. {
-      apply (scoping_transitivity _ σ1 _ _ L1 _) => //.
-      admit. }
-    apply H0 => //.
-  Admitted.
+      apply (scoping_transitivity _ σ1 _ _ L1 _) => //. }
+    unfold scoping_preservation in H0.
+    move /(_ σ0 L0 L C1 B1):H0 => H0.
+    apply ((proj1 H0) l Hl A0).
+    + unfold scoping_preservation in H0.
+      move /(_ σ0 L0 L (scoping_transitivity _ _ _ _ _ _ A1 H1)):H0 => H0.
+      apply H0.
+      apply H => //.
+  Qed.
 
 
   Lemma preserving_regularity_degenerate: forall σ1 σ2 L, σ1 ⇝ σ2 ⋖ L ->
