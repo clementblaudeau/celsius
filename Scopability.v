@@ -166,7 +166,34 @@ Module Scopability.
       ω' = [f ↦ l']ω ->
       σ2' = [l ↦ (C, ω')]σ2 ->
       (σ1 ⇝ σ2' ⋖ L1) /\ ((σ1, L1) ⋖ (σ2', {l})).
-      Admitted.
+  Proof.
+    intros.
+    split.
+    + (*  σ1 ⇝ σ2' ⋖ L1 *)
+      move => σ0 L0 L A1 A2.
+      assert ( (σ0, L0) ⋖ (σ2, L)) as B1. {
+        apply H => //. }
+      assert ((σ0, L0) ⋖ (σ2, {l'})) as C1. {
+        apply (scoping_transitivity _ _ _ _ _ _ A1 H1). }
+      split; simpl.
+      move => l2 Hl2.
+      unfold reachability_set.
+      move => [l0 [D0 D1]].
+      admit. (* reasonning about paths *)
+      rewrite /dom H4 update_one3.
+      apply (proj2 B1).
+    + split. simpl.
+      move => l1 Hl1.
+      rewrite {1}/reachability_set.
+      move => [l'' [Hl'' A1]].
+      induction Hl''.
+      admit. (* reasonning about paths *)
+      simpl.
+      rewrite /dom H4 update_one3.
+      apply (proj2 H0).
+  Admitted.
+
+
 
 
 
