@@ -29,9 +29,9 @@ Module Reachability.
   Definition LocSet := (Ensemble Loc).
   Notation "l ∈ L" := (In Loc L l) (at level 80).
   Notation "L ⊆ L'" := (Included Loc L L') (at level 80).
-  Notation "L ∪ L'" := (Union Loc L L') (at level 80).
-  Notation "{ l }" := (Singleton Loc l).
+  Notation "L ∪ L'" := (Union Loc L L') (right associativity, at level 100).
 
+  Notation "⦃ l ⦄" := (Singleton Loc l) (at level 0, l constr at level 99).
 
   Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
   Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 99, L at level 99).

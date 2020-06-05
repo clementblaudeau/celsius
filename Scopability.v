@@ -22,6 +22,8 @@ Require Import Sets.Ensembles.
 Module Scopability.
   Import Eval.Evaluator.
   Import Reachability.Reachability.
+  Create HintDb scop.
+
 
   Definition storeSubset (σ: Store) L := (forall l, (l ∈ L) -> l < (dom σ)).
   Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).
@@ -37,6 +39,7 @@ Module Scopability.
       (σ0, L0) ⋖ (σ2, L1).
 
   Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 81, σ2 at level 80, L at level 80).
+  Hint Unfold scoping_preservation: scop.
 
   (* Results : *)
 
@@ -80,7 +83,7 @@ Module Scopability.
     + apply (proj2 A2).
   Qed.
 
-  Lemma scoping_reachability: forall σ l1 l2, ( σ ⊨ l1 ⇝ l2) -> (σ, {l1}) ⋖ (σ, {l2}).
+  Lemma scoping_reachability: forall σ l1 l2, ( σ ⊨ l1 ⇝ l2) -> (σ, ⦃l1⦄) ⋖ (σ, ⦃l2⦄).
   Proof.
     unfold scoping. simpl.
     intros.
@@ -160,12 +163,12 @@ Module Scopability.
 
   Lemma scopability_assignment: forall σ1 σ2 σ2' L1 l l' f C ω ω',
       σ1 ⇝ σ2 ⋖ L1 ->
-      (σ1, L1) ⋖ (σ2, {l}) ->
-      (σ1, L1) ⋖ (σ2, {l'}) ->
+      (σ1, L1) ⋖ (σ2, ⦃l⦄) ->
+      (σ1, L1) ⋖ (σ2, ⦃l'⦄) ->
       (getObj σ2 l) = Some (C, ω) ->
       ω' = [f ↦ l']ω ->
       σ2' = [l ↦ (C, ω')]σ2 ->
-      (σ1 ⇝ σ2' ⋖ L1) /\ ((σ1, L1) ⋖ (σ2', {l})).
+      (σ1 ⇝ σ2' ⋖ L1) /\ ((σ1, L1) ⋖ (σ2', ⦃l⦄)).
   Proof.
     intros.
     split.
@@ -173,7 +176,7 @@ Module Scopability.
       move => σ0 L0 L A1 A2.
       assert ( (σ0, L0) ⋖ (σ2, L)) as B1. {
         apply H => //. }
-      assert ((σ0, L0) ⋖ (σ2, {l'})) as C1. {
+      assert ((σ0, L0) ⋖ (σ2, ⦃l'⦄)) as C1. {
         apply (scoping_transitivity _ _ _ _ _ _ A1 H1). }
       split; simpl.
       move => l2 Hl2.
@@ -194,6 +197,95 @@ Module Scopability.
   Admitted.
 
 
+
+  Fixpoint codom ρ : LocSet := match ρ with
+                     | [] => (Empty_set Loc)
+                     | v::ρ' => ⦃v⦄ ∪ (codom ρ') end.
+  Lemma In_codom: forall ρ l v, (getVal ρ l = Some v) -> v ∈ (codom ρ).
+  Proof.
+    intros.
+    generalize dependent l.
+    induction ρ.
+    + destruct l => //.
+    + destruct l => //.
+      simpl => H1.
+      injection H1 => H2.
+      apply Union_introl.
+      rewrite H2 => //.
+      simpl => H3.
+      eauto using Union_intror.
+      Qed.
+
+
+  Definition scopability_prop (k : nat) :=  forall (e: Expr) (σ σ': Store) (ρ: Env) (ψ l: Value),
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      ((σ, (codom ρ) ∪ ⦃ψ⦄) ⋖ (σ', ⦃l⦄)) /\
+      (σ ⇝ σ' ⋖ ((codom ρ) ∪ ⦃ψ⦄)).
+
+  Lemma memoryGrowth: forall (k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (ψ l: Value),
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') -> (dom σ) <= (dom σ').
+  Proof.
+    intros.
+    apply PartialMonotonicity.partialMonotonicity_domains.
+    apply (PartialMonotonicity.partialMonotonicity_theorem k e _ _ _ _ _ H).
+  Qed.
+
+  Hint Resolve memoryGrowth: scop.
+
+  Lemma partialMonotonicity_theorem_rec_step : forall (n : nat),
+      (* Strong induction *)
+      (forall (k : nat), (k < n ) -> scopability_prop k) ->
+      (scopability_prop n).
+
+    (* To get one step of the evaluator, we destruct n *)
+    destruct n.
+    (* n = 0 - Timeout *)
+    unfold scopability_prop => //.
+    (* n > 0 - case analysis over e *)
+    unfold scopability_prop.
+    intros H_strong; intros.
+    move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
+    destruct e; simpl in H.
+    - (* case e = x *)
+      destruct (getVal ρ v) eqn: Hval => //.
+      invert_constructor_equalities.
+      rewrite -H2.
+      unfold scoping. split. repeat eauto || simpl || split.
+      intros.
+      move:H0 => [l' [H3 H4]].
+      induction H3.
+      exists l.
+      split ; eauto .
+      apply Union_introl.
+      apply (In_codom _ v _) ; eauto.
+      rewrite -H1 => //.
+      unfold scoping_preservation. eauto.
+    - (* case e = this *)
+      invert_constructor_equalities. split.
+      + (* 1 *) repeat eauto using memoryGrowth with scop || simpl || split || intros.
+        exists l. split; eauto using Union_intror, In_singleton with scop.
+        move: H0 => [l' [ H3 H4]].
+        induction H3 => //.
+      + unfold scoping_preservation. eauto.
+    - (* case e = e0.f *)
+      destruct (⟦ e ⟧ (σ, ρ, ψ )( n)) as [| | l0 σ1 | ] eqn: A1; try solve [congruence].
+      destruct (getObj σ1 l0) as [[C ω] |] eqn: A4 => //.
+      destruct (getVal ω v) eqn: A5 => //.
+      invert_constructor_equalities.
+      rewrite ?H1 ?H2 in A1, A4 A5.
+      move: (H_strong n Hn _ _ _ _ _ _ A1) => [A2 A3].
+      assert ((σ', ⦃l0⦄) ⋖ (σ', ⦃l⦄)) as C1. {
+        apply scoping_reachability.
+        move: (getObj_dom _ _ _ A4) => Hl0.
+        apply: (rch_trans l0 l0 l C ω σ') => //.
+        apply rch_heap => //.
+        exists v => //.
+        admit.
+      }
+      split => //.
+      apply (scoping_transitivity _ σ' _ _ ⦃l0⦄ _) => //.
+
+  Qed.
 
 
 
