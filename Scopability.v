@@ -357,17 +357,44 @@ Module Scopability.
       destruct (getObj σ0 l0) eqn: A5; try solve [congruence].
       destruct o. destruct (ct c) => //. destruct c0 eqn: D1 => //. destruct (methods m) => //. destruct m0 as [_ _ _ em].
       destruct (⟦_ e_l _⟧ (σ0, ρ, ψ )( n)) as [| | | ln σn] eqn: D3 => //.
-      set ρ' := ln. rewrite -?/ρ' in H.
-      set lm := l. rewrite -?/lm in H.
-      set σm := σ'. rewrite -?/σm in H.
+      set ρ' := ln. set lm := l. set σm := σ'. rewrite -?/ρ' -?/lm -?/σm in H.
       move: (H_strong n Hn _ _ _ _ _ _ A1) => [A2 A3].
       move: (preserving_regularity_degenerate _ _  _ A3) => A4.
       move: A1 A2 A3 A4 A5 D1 D3=> A1 A2 A3 A4 A5 D1 D3.
       move: (H_strong n Hn _ _ _ _ _ _ H) => [E1 E2].
-
-
-  Qed.
-
+      assert ((σ,(codom ρ)∪ ⦃ψ⦄) ⋖ (σn, (codom ρ') ∪⦃l0⦄)) as F1. {
+        admit. }
+      assert (σ ⇝ σn ⋖ ((codom ρ) ∪ ⦃ψ⦄)) as F2. {
+        admit. }
+      split.
+      + eauto using scoping_transitivity.
+      + eauto using preserving_transitivity.
+    - (* case e = new C(ē) *)
+      admit.
+    - (* case e = (e0.f = e1 ; e2) *)
+      destruct (⟦ e0 ⟧ (σ, ρ, ψ )( n)) as [| | l0 σ0 | ] eqn: A0; try solve [congruence].
+      move: (H_strong n Hn _ _ _ _ _ _ A0) => [A1 A2].
+      move: (preserving_regularity_degenerate _ _ _ A2) => A3.
+      destruct ( ⟦ e1 ⟧ (σ0, ρ, ψ )( n)) as [| | l1 σ1 |] eqn: B0; try solve [congruence].
+      move: (H_strong n Hn _ _ _ _ _ _ B0) => [B1 B2].
+      move: (scoping_transitivity _ _ _ _ _ _ A3 B1) => B3.
+      move: (B2 _ _ _ A3 A1) => B4.
+      unfold assign in H.
+      destruct (getObj σ1 l0) as [[C ω] |] eqn: C1. move: C1 => C1.
+      + set σ1' := [l0 ↦ (C, [f ↦ l1] (ω))] (σ1). rewrite -?/σ1' in H.
+        move: (scopability_assignment) => trash.
+        move: (preserving_transitivity _ _ _ _ _ A2 B2 A3) => D0.
+        move: (scopability_assignment σ σ1 σ1' ( codom ρ ∪ ⦃ ψ ⦄) l0 l1 f C ω ([f ↦ l1] (ω)) D0 B4 B3 C1 (eq_refl _) (eq_refl _)) => [D2 D1].
+        move: (preserving_regularity_degenerate _ _ _ D2) => D3.
+        move: (H_strong n Hn _ _ _ _ _ _ H) => [E1 E2].
+        split.
+        ++ eauto using scoping_transitivity.
+        ++ eauto using preserving_transitivity.
+      + move: (H_strong n Hn _ _ _ _ _ _ H) => [E1 E2].
+        split.
+        ++ eauto using scoping_transitivity.
+        ++ eauto using preserving_transitivity.
+      Admitted.
 
 
 
