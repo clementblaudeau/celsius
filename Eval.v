@@ -44,7 +44,7 @@ Module Evaluator.
                 end )
 
             (* This: returns current value *)
-            | this => (Success v σ) 
+            | this => (Success v σ)
 
             (* Field access: compute object value and access field *)
             | fld e0 x => (
@@ -61,8 +61,8 @@ Module Evaluator.
             (* Method call : compute object value, compute arguments and do the call*)
             | mtd e0 m el => (
                 match (⟦e0⟧(σ, ρ, v)(n)) with
-                | Success v0 σ1 => (
-                    match (getObj σ1 v0) with
+                | Success l0 σ1 => (
+                    match (getObj σ1 l0) with
                     | Some (C, _) => (
                         match (ct C)  with
                         | Some (class _  _ methods) => (
@@ -70,13 +70,13 @@ Module Evaluator.
                             | Some (method μ x _ e1) => (
                                 match (⟦_ el _⟧(σ1, ρ, v)(n)) with
                                 | Success_list args_val σ2 =>
-                                  let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v)(n)
+                                  let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, l0)(n)
                                 | _ => Error end)
                             | _ => Error end)
                         | _ => Error end)
                     | _ => Error end)
                 | _ => Error end)
-                               
+
             (* New class *)
             | new C args => (
                 match (⟦_ args _⟧(σ, ρ, v)(n)) with
@@ -87,7 +87,7 @@ Module Evaluator.
                       match (init I ρ_init C σ2 n) with
                       | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
                       | None => Error end )
-                | _ => Error end) (* Invalid args *) 
+                | _ => Error end) (* Invalid args *)
 
             (* Field assignement *)
             | asgn e1 x e2 e' => (
@@ -97,9 +97,9 @@ Module Evaluator.
                                       let σ3 := (assign v1 x v2 σ2) in
                                       ⟦e'⟧(σ3, ρ, v)(n))
                                   | _ => Error end
-                | _ => Error end ) 
-            end 
-    end 
+                | _ => Error end )
+            end
+    end
   where "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"  := (eval e σ ρ v k)
   with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (v: Value) (k: nat) :  Result :=
          match k with
@@ -125,7 +125,7 @@ Module Evaluator.
          match k with | 0 => None | S n =>
          match σ_opt with
          | None => None
-         | Some σ => ( match f with 
+         | Some σ => ( match f with
          | field t e => (
             match (⟦e⟧(σ, args_values, this)(n)) with
             | Success v1 σ1 => (assign_new this v1 σ1)
@@ -137,7 +137,7 @@ Module Evaluator.
   Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (v: Value) (l: list Value),
       not (⟦e⟧(σ, ρ, v)(k) = Success_list l σ').
     induction k; repeat light || eauto || destruct_match. Qed.
-  
+
   Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
       (forall (y:B), f res y = res) -> fold_left f l res = res.
     intros.
@@ -145,5 +145,5 @@ Module Evaluator.
     simpl. rewrite H. apply IHl.
   Qed.
 
-  
+
   End Evaluator.

@@ -217,11 +217,6 @@ Module Scopability.
       Qed.
 
 
-  Definition scopability_prop (k : nat) :=  forall (e: Expr) (σ σ': Store) (ρ: Env) (ψ l: Value),
-      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
-      ((σ, (codom ρ) ∪ ⦃ψ⦄) ⋖ (σ', ⦃l⦄)) /\
-      (σ ⇝ σ' ⋖ ((codom ρ) ∪ ⦃ψ⦄)).
-
   Lemma memoryGrowth: forall (k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (ψ l: Value),
       ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') -> (dom σ) <= (dom σ').
   Proof.
@@ -231,6 +226,80 @@ Module Scopability.
   Qed.
 
   Hint Resolve memoryGrowth: scop.
+
+
+  Definition scopability_prop (k : nat) :=  forall (e: Expr) (σ σ': Store) (ρ: Env) (ψ l: Value),
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      ((σ, (codom ρ) ∪ ⦃ψ⦄) ⋖ (σ', ⦃l⦄)) /\
+      (σ ⇝ σ' ⋖ ((codom ρ) ∪ ⦃ψ⦄)).
+
+  (*
+  Definition scopability_prop_list (k : nat) :=  forall (l: list Expr) (σ1 σ2: Store) (ρ: Env) (ψ v : Value) (v_list: list Value),
+      ⟦_ l _⟧(σ1, ρ, ψ)(k) = (Success_list (v::v_list) σ2) ->
+      ((σ1, (codom ρ) ∪ ⦃ψ⦄) ⋖ (σ2, ⦃v⦄)) /\
+      (σ1 ⇝ σ2 ⋖ ((codom ρ) ∪ ⦃ψ⦄)).
+
+  Definition scopability_prop_list2 (k : nat) :=  forall (l: list Expr) (σ1 σ2 σ3: Store) (ρ: Env) (ψ v : Value) (v_list1 v_list2 : list Value),
+      fold_left (eval_list_aux σ1 ρ v k) l (Success_list v_list1 σ2) = (Success_list v_list2 σ3) ->
+      ((σ2, (codom ρ) ∪ ⦃ψ⦄) ⋖ (σ3, ⦃l⦄)) /\
+      (σ2 ⇝ σ3 ⋖ ((codom ρ) ∪ ⦃ψ⦄)).
+
+
+  Lemma stackability_rec_step_list2 : forall (n : nat),
+      (* Strong induction *)
+      (forall (k: nat), (k < n) -> stackability_prop k) ->
+      (forall (k: nat), (k < n) -> stackability_prop_list2 k).
+  Proof.
+    unfold stackability_prop.
+    unfold stackability_prop_list2.
+    intros n H k H_bound.
+    induction l as [| e l].
+    + (* case [] *)
+      intros. simpl in H0. injection H0 => H2 H3. rewrite H2.
+      eauto using stackability_reflexivity with pM cmpt.
+    + (* case e::l *)
+      intros. simpl in H0. destruct k => //.
+      ++ (* k = 0, timeout *)
+        simpl in H0. rewrite foldLeft_constant in H0 => //.
+      ++ (* k > 0 *)
+            move: (PeanoNat.Nat.lt_succ_l _ _ H_bound) => Hn.
+            assert ((forall k0 : nat, k0 < n -> compatibility_prop k0)) as H_comp. {
+              intros. apply compatibility_theorem.
+            }
+(*            move: (compatibility_rec_step_list2 n H_comp (S k) H_bound l σ1 σ1 _ _ _ _ _ H0). *)
+
+        simpl in H0.
+        destruct (⟦ e ⟧ (σ2, ρ, v )( k)) eqn: E.
+        +++ rewrite foldLeft_constant in H0 => //.
+        +++ rewrite foldLeft_constant in H0 => //.
+        +++ simpl in IHl.
+            apply (IHl σ1 s σ3 ρ v (v0::v_list1) v_list2) in H0.
+            move: H0 => [H01 [H02 H03]].
+            move: (partialMonotonicity_theorem k e σ2 s ρ v v0 E) => H1.
+            move: (compatibility_theorem k e _ _ _ _ _  E) => H_c2s.
+            apply (H _ (PeanoNat.Nat.lt_succ_l _ _ H_bound))in E.
+            move: (stackability_transitivity σ2 s σ3 E H01 H02 H03) => Hσ23.
+            move: (compatibility_transitivity σ2 s σ3 H_c2s H03) => H_cσ23.
+            split => //. split => //.
+            apply (partialMonotonicity_transitivity _ s _ H1 H02).
+        +++ move : (eval_not_success_list k e σ2 s ρ v l0)=> E_not => //.
+  Qed.
+
+  Lemma stackability_rec_step_list : forall (n : nat),
+      (* Strong induction *)
+      (forall (k: nat), (k < n) -> stackability_prop k) ->
+      (forall (k: nat), (k < n) -> stackability_prop_list k).
+  Proof.
+    unfold stackability_prop_list.
+    intros.
+    destruct k => //.
+    simpl in H1.
+    apply PeanoNat.Nat.lt_succ_l in H0.
+    move : (stackability_rec_step_list2 n H k H0 l σ1 σ1 σ2 ρ v [] v_list) => H2.
+    apply H2 => //.
+  Qed. *)
+
+
 
   Lemma partialMonotonicity_theorem_rec_step : forall (n : nat),
       (* Strong induction *)
@@ -245,9 +314,9 @@ Module Scopability.
     unfold scopability_prop.
     intros H_strong; intros.
     move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
-    destruct e; simpl in H.
+    destruct e as [this | x | e0 f | e0 m e_l | C e_l | e0 f e1 e2]; simpl in H.
     - (* case e = x *)
-      destruct (getVal ρ v) eqn: Hval => //.
+      destruct (getVal ρ this) eqn: Hval => //.
       invert_constructor_equalities.
       rewrite -H2.
       unfold scoping. split. repeat eauto || simpl || split.
@@ -257,7 +326,7 @@ Module Scopability.
       exists l.
       split ; eauto .
       apply Union_introl.
-      apply (In_codom _ v _) ; eauto.
+      apply (In_codom _ this _) ; eauto.
       rewrite -H1 => //.
       unfold scoping_preservation. eauto.
     - (* case e = this *)
@@ -268,9 +337,9 @@ Module Scopability.
         induction H3 => //.
       + unfold scoping_preservation. eauto.
     - (* case e = e0.f *)
-      destruct (⟦ e ⟧ (σ, ρ, ψ )( n)) as [| | l0 σ1 | ] eqn: A1; try solve [congruence].
+      destruct (⟦ e0 ⟧ (σ, ρ, ψ )( n)) as [| | l0 σ1 | ] eqn: A1; try solve [congruence].
       destruct (getObj σ1 l0) as [[C ω] |] eqn: A4 => //.
-      destruct (getVal ω v) eqn: A5 => //.
+      destruct (getVal ω f) eqn: A5 => //.
       invert_constructor_equalities.
       rewrite ?H1 ?H2 in A1, A4 A5.
       move: (H_strong n Hn _ _ _ _ _ _ A1) => [A2 A3].
@@ -279,11 +348,23 @@ Module Scopability.
         move: (getObj_dom _ _ _ A4) => Hl0.
         apply: (rch_trans l0 l0 l C ω σ') => //.
         apply rch_heap => //.
-        exists v => //.
-        admit.
+        exists f => //.
       }
       split => //.
       apply (scoping_transitivity _ σ' _ _ ⦃l0⦄ _) => //.
+    - (* case e = e0.m(ē) *)
+      destruct (⟦ e0 ⟧ (σ, ρ, ψ )( n)) as [| | l0 σ0 | ] eqn: A1; try solve [congruence].
+      destruct (getObj σ0 l0) eqn: A5; try solve [congruence].
+      destruct o. destruct (ct c) => //. destruct c0 eqn: D1 => //. destruct (methods m) => //. destruct m0 as [_ _ _ em].
+      destruct (⟦_ e_l _⟧ (σ0, ρ, ψ )( n)) as [| | | ln σn] eqn: D3 => //.
+      set ρ' := ln. rewrite -?/ρ' in H.
+      set lm := l. rewrite -?/lm in H.
+      set σm := σ'. rewrite -?/σm in H.
+      move: (H_strong n Hn _ _ _ _ _ _ A1) => [A2 A3].
+      move: (preserving_regularity_degenerate _ _  _ A3) => A4.
+      move: A1 A2 A3 A4 A5 D1 D3=> A1 A2 A3 A4 A5 D1 D3.
+      move: (H_strong n Hn _ _ _ _ _ _ H) => [E1 E2].
+
 
   Qed.
 

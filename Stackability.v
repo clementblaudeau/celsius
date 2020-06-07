@@ -16,11 +16,11 @@ Module Stackability.
   Import Reachability.Reachability.
   Import PartialMonotonicity.PartialMonotonicity.
   Import Compatibility.Compatibility.
-  
+
   Definition stackability (σ σ' : Store) :=
     forall l, l < (dom σ') -> ((σ' ⊨ l : warm) \/ (l < (dom σ))).
   Notation "σ ≪ σ'" := (stackability σ σ') (at level 80).
-  
+
   Lemma stackability_reflexivity: forall σ, σ ≪ σ.
   Proof.
     unfold stackability. right => //.
@@ -40,7 +40,7 @@ Module Stackability.
     - case /(_ l H0):H => H.
       + left. apply: (partialMonotonicity_warm_monotone σ2 σ3 l H1 H2 H) => //.
       + right => //.
-  Qed.      
+  Qed.
 
   Lemma stackability_assignment : forall (σ σ': Store) (l : Loc) (C: ClN) (ω ω': Env),
       (getObj σ l) = Some (C, ω) ->
@@ -72,7 +72,7 @@ Module Stackability.
       (forall (k: nat), (k < n) -> stackability_prop k) ->
       (forall (k: nat), (k < n) -> stackability_prop_list2 k).
   Proof.
-    unfold stackability_prop. 
+    unfold stackability_prop.
     unfold stackability_prop_list2.
     intros n H k H_bound.
     induction l as [| e l].
@@ -89,11 +89,11 @@ Module Stackability.
               intros. apply compatibility_theorem.
             }
 (*            move: (compatibility_rec_step_list2 n H_comp (S k) H_bound l σ1 σ1 _ _ _ _ _ H0). *)
-            
+
         simpl in H0.
         destruct (⟦ e ⟧ (σ2, ρ, v )( k)) eqn: E.
-        +++ rewrite foldLeft_constant in H0 => //. 
-        +++ rewrite foldLeft_constant in H0 => //. 
+        +++ rewrite foldLeft_constant in H0 => //.
+        +++ rewrite foldLeft_constant in H0 => //.
         +++ simpl in IHl.
             apply (IHl σ1 s σ3 ρ v (v0::v_list1) v_list2) in H0.
             move: H0 => [H01 [H02 H03]].
@@ -127,10 +127,10 @@ Module Stackability.
 
   Lemma stackability_init_warm : forall (F: list Field) (n: nat) (args_val: list Var) (I: Loc) (s1 s2: Store) (C: ClN) (ρ: Env),
       I < dom s1 ->
-      (getObj s1 I) = Some (C, ρ) -> 
+      (getObj s1 I) = Some (C, ρ) ->
       (forall (k: nat), (k < n) -> stackability_prop k) ->
       fold_left (init_field args_val I n) F (Some s1) = Some s2 ->
-      s1 ⊆ s2 /\ s1 ≪ s2 /\ s1 ⪯ s2 /\ 
+      s1 ⊆ s2 /\ s1 ≪ s2 /\ s1 ⪯ s2 /\
       (exists ρ', (getObj s2 I) = Some (C, ρ') /\ ((length F + length ρ) <= length ρ')).
   Proof.
     move => F n args_val I s1 s2 C ρ H H0 H_strong H1.
@@ -159,12 +159,12 @@ Module Stackability.
              assert (I < dom s) as H_doms2. {
                apply (getObj_dom _ (c, e0) _ G).
              }
-             assert (I < dom [I ↦ (c, e0 ++ [v])] (s)) as H_doms. {         
+             assert (I < dom [I ↦ (c, e0 ++ [v])] (s)) as H_doms. {
                unfold dom.
                rewrite update_one3.
                apply H_doms2.
              }
-             move: (getObj_update1 s (c,e0++[v]) I H_doms2) => H_sobj. 
+             move: (getObj_update1 s (c,e0++[v]) I H_doms2) => H_sobj.
              move: (IHF (e0++[v]) ([I ↦ (c, e0 ++ [v])] (s)) s2 c H1 H_doms H_sobj).
              rewrite app_length. simpl.
              rewrite PeanoNat.Nat.add_1_r.
@@ -194,10 +194,10 @@ Module Stackability.
                   move /(_ I C ρ H0):H_cmp3 => [ω' H_cmp3].
                   rewrite G in H_cmp3. invert_constructor_equalities.
                   rewrite H_obj H3 => //.
-             ++++ 
+             ++++
              apply (PeanoNat.Nat.le_trans _ (S (length F + length e0)) _).
              apply le_n_S.
-             apply Plus.plus_le_compat_l. 
+             apply Plus.plus_le_compat_l.
              apply H_len_ρ. auto.
              ++++ rewrite foldLeft_constant in H1 => //.
          +++  rewrite foldLeft_constant in H1 => //.
@@ -215,7 +215,7 @@ Module Stackability.
     simpl in H.
     destruct (ct C) eqn:H_class  => //.
     destruct c.
-    assert (length σ < dom (σ ++ [(C, [])])) as H_len. {  
+    assert (length σ < dom (σ ++ [(C, [])])) as H_len. {
       rewrite /dom app_length; simpl. rewrite PeanoNat.Nat.add_1_r. apply PeanoNat.Nat.lt_succ_diag_r.
     }
     move : (getObj_last σ C []) => H_obj.
@@ -224,7 +224,7 @@ Module Stackability.
       apply (PeanoNat.Nat.lt_trans _ k _) => //.
       apply PeanoNat.Nat.lt_succ_l => //.
     }
-    move: (stackability_init_warm fields k args_val (length σ) (σ++[(C,[])]) σ_res C [] H_len H_obj H_strong2 H) => [H_cmp1 [H_stk1 [H_pm1 [ρ' [H_obj2 H_flen]]]]]. 
+    move: (stackability_init_warm fields k args_val (length σ) (σ++[(C,[])]) σ_res C [] H_len H_obj H_strong2 H) => [H_cmp1 [H_stk1 [H_pm1 [ρ' [H_obj2 H_flen]]]]].
     simpl in H_flen. rewrite PeanoNat.Nat.add_0_r in H_flen.
     split.
     + move :H_stk1. unfold stackability, dom => H_stk1 l H_l.
@@ -239,11 +239,11 @@ Module Stackability.
       apply partialMonotonicity_freshness.
       apply (compatibility_transitivity _ (σ++[(C,[])]) _) => //.
       apply compatibility_freshness.
-  Qed.  
+  Qed.
 
 
   Lemma stackability_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
-      [(c, ρ)] ⊨ 0 : warm -> 
+      [(c, ρ)] ⊨ 0 : warm ->
                      σ ≪ σ++[(c,ρ)].
   Proof.
     unfold stackability, dom.
@@ -259,15 +259,15 @@ Module Stackability.
       unfold reachable_warm in H.
       destruct H as [C [ω [args [fields [methods [H [H_ct H_len]]]]]]].
       simpl in H.
-      injection H => H3 H4.    
+      injection H => H3 H4.
       exists c, ρ, args, fields, methods.
-      rewrite H1 H4 H3. 
+      rewrite H1 H4 H3.
       destruct σ => //.
       simpl.
       rewrite getObj_last.
       repeat (split; auto).
-  Qed.    
-  
+  Qed.
+
   Lemma stackability_theorem_rec_step : forall (n : nat),
       (* Strong induction *)
       (forall (k : nat), (k < n ) -> stackability_prop k) ->
@@ -283,11 +283,11 @@ Module Stackability.
     unfold stackability_prop.
     intros H_strong; intros.
     move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
-    destruct e.    
+    destruct e.
     - (* case e = x *)
       repeat light || invert_constructor_equalities || destruct_match || eauto using stackability_reflexivity with pM.
     - (* case e = this *)
-      repeat light || invert_constructor_equalities || destruct_match || eauto using stackability_reflexivity with pM. 
+      repeat light || invert_constructor_equalities || destruct_match || eauto using stackability_reflexivity with pM.
     - (* case e = e0.field *)
       simpl in H.
       destruct  (⟦ e ⟧ (σ, ρ, v )( n)) eqn:E => //.
@@ -298,13 +298,13 @@ Module Stackability.
       rewrite<- H1.
       apply (H_strong n (PeanoNat.Nat.lt_succ_diag_r n) e σ s ρ v v1) => //.
     - (* case e = e0.m(ē) *)
-      repeat light || invert_constructor_equalities || destruct_match || eauto using stackability_reflexivity with pM. 
-      move : (partialMonotonicity_theorem n body s0 σ' _  v v' H) => H_pm1.
+      repeat light || invert_constructor_equalities || destruct_match || eauto using stackability_reflexivity with pM.
+      move : (partialMonotonicity_theorem n body s0 σ' _  v0 v' H) => H_pm1.
       move : (partialMonotonicity_theorem n e _ _ _  _ _ matched) => H_pm2.
-      move : (compatibility_theorem n body s0 σ' _  v v' H) => H_cmp1.
-      move : (compatibility_theorem n e _ _ _  _ _ matched) => H_cmp2.      
+      move : (compatibility_theorem n body s0 σ' _  v0 v' H) => H_cmp1.
+      move : (compatibility_theorem n e _ _ _  _ _ matched) => H_cmp2.
       move : (H_strong n Hn e σ s ρ v v0 matched) => H_stk1.
-      move : (H_strong n Hn body s0 σ' _ v v' H) => H_stk2.
+      move : (H_strong n Hn body s0 σ' _ v0 v' H) => H_stk2.
       move : (stackability_rec_step_list (S n) H_strong n Hn l s s0 ρ v l0 matched3)=> [H_stk3 [H_pm3 H_cmp3]].
       eauto using partialMonotonicity_transitivity, stackability_transitivity, compatibility_transitivity.
     - (* case e = new C(l) *)
@@ -319,7 +319,7 @@ Module Stackability.
       move : (partialMonotonicity_theorem n e3 _ _ _  _ _ H) => H_pm3.
       move : (compatibility_theorem n e1 _ _ _  _ _ matched) => H_cmp1.
       move : (compatibility_theorem n e2 _ _ _  _ _ matched0) => H_cmp2.
-      move : (compatibility_theorem n e3 _ _ _  _ _ H) => H_cmp3.            
+      move : (compatibility_theorem n e3 _ _ _  _ _ H) => H_cmp3.
       move : (H_strong n Hn _ _ _ _ _ _ matched) => H_stk1.
       move : (H_strong n Hn _ _ _ _ _ _ matched0) => H_stk2.
       move : (H_strong n Hn _ _ _ _ _ _ H) => H_stk3.
@@ -338,8 +338,8 @@ Module Stackability.
         eauto using partialMonotonicity_transitivity, stackability_transitivity, compatibility_transitivity.
       + rewrite /assign G in H H_pm3 H_cmp3 H_stk3.
         eauto using partialMonotonicity_transitivity, stackability_transitivity, compatibility_transitivity.
-Qed.        
-  
+Qed.
+
   Theorem stackability_theorem: forall (n : nat), (stackability_prop n).
   Proof.
     intros.
@@ -355,5 +355,5 @@ Qed.
       + apply IHn => //.
       + rewrite H1 => //.
   Qed.
-  
+
 End Stackability.

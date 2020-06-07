@@ -14,15 +14,17 @@ Module Reachability.
   (* Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80). *)
   Inductive reachability : Store -> Loc -> Loc ->Prop :=
   |rch_heap  : forall l σ,  l < (dom σ) -> (reachability σ l l)
-  |rch_trans : forall l0 l1 l2 C ω σ, (reachability σ l0 l1) -> (getObj σ l1 = Some (C, ω)) -> (exists f, (getVal ω f = Some l2)) -> (l2 < dom σ) -> (reachability σ l0 l2).
+  |rch_trans : forall l0 l1 l2 C ω σ,
+      (reachability σ l0 l1) ->
+      (getObj σ l1 = Some (C, ω)) ->
+      (exists f, (getVal ω f = Some l2)) ->
+      (reachability σ l0 l2).
   Notation "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2) (at level 80, l1 at level 80, l2 at level 80).
 
-  Lemma reachability_dom : forall σ l1 l2, σ ⊨ l1 ⇝ l2 -> l1 < (dom σ) /\ l2 < (dom σ).
+  Lemma reachability_dom : forall σ l1 l2, σ ⊨ l1 ⇝ l2 -> l1 < (dom σ).
   Proof.
     intros.
     induction H => //.
-    split => //.
-    apply (proj1 IHreachability).
     Qed.
 
   (* To be moved to Trees.v at some point *)
@@ -53,7 +55,7 @@ Module Reachability.
   Proof.
     intros σ l1 l2 l3 H1 H2.
     induction H2 => //.
-    apply (rch_trans l1 l2 l3 C ω σ (IHreachability H1) H H0 H3).
+    apply (rch_trans l1 l2 l3 C ω σ (IHreachability H1) H H0).
   Qed.
   Lemma reachability_hot: forall (σ: Store) (l l': Loc), σ ⊨ l: hot -> σ ⊨ l ⇝ l' -> σ ⊨ l': hot.
   Proof.
