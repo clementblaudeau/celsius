@@ -1,3 +1,5 @@
+![alt text](https://github.com/clementblaudeau/celsius/blob/master/logo.png)
+
 # Celsius Coq formalization
 
 Accessing uninitialized data during object initialization is a common and subtle programming error. This
