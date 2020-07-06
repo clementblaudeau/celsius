@@ -3,4 +3,4 @@
 *.glob
 *.aux
 *.d
-
+*.vio
