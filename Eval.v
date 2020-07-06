@@ -176,5 +176,38 @@ Module Evaluator.
     eapply H_fold; eauto using PeanoNat.Nat.lt_succ_l .
   Qed.
 
+  Lemma eval_init_prop : forall (P: Store -> Store -> Prop) n,
+      (forall σ, P σ σ) -> (* reflexivity *)
+      (forall σ1 σ2 σ3, P σ1 σ2 -> P σ2 σ3 -> P σ1 σ3) -> (* transitivity *)
+      (forall σ σ' l C ω ω',
+          getObj σ l = Some (C, ω) ->
+          length ω <= length ω' ->
+          σ' = [l ↦ (C, ω')]σ -> P σ σ' ) ->  (* Assignment *)
+      (forall k, (k < n) -> forall e σ σ' ρ v v',  ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> (P σ σ')) -> (* Strong induction *)
+      (forall k, (k < n) -> forall I σ σ' v C , (init I v C σ k) = Some σ' -> (P σ σ')).
+    Proof.
+    intros P n H_refl H_trans H_asgn H_strong.
+    destruct k; simpl; try discriminate.
+    intros Hn; intros.
+    repeat destruct_match; try discriminate. clear matched0. clear matched.
+    generalize dependent σ. generalize dependent σ'.
+      induction fields as [| [x e] fields]; simpl; intros.
+      + invert_constructor_equalities; eauto.
+      + destruct k; simpl in H. rewrite foldLeft_constant in H => //.
+        destruct ((⟦ e ⟧ (σ, v, I )( k))) eqn:E ; try solve [ rewrite foldLeft_constant in H => //] ; eauto; try eval_not_success_list.
+        unfold assign_new in H.
+        repeat destruct_match; try solve [rewrite foldLeft_constant in H => //].
+        subst.
+        move /(_ _ _ H):IHfields => IHfields.
+        apply PeanoNat.Nat.lt_succ_l in Hn.
+        apply PeanoNat.Nat.lt_succ_l in Hn.
+        move /(_ k Hn _ _ _ _ _ _ E):H_strong => H_strong.
+        apply (H_trans _ _ _ H_strong).
+        apply (H_trans _  [I ↦ (c0, e0 ++ [v0])] (s)  _ ) => //.
+        apply (H_asgn _ _ _ _ _ (e0 ++ [v0])  matched); eauto using app_length.
+        rewrite app_length.
+        rewrite PeanoNat.Nat.add_1_r. eauto.
+  Qed.
+
 
   End Evaluator.
