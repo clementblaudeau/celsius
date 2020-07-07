@@ -1,5 +1,6 @@
 From Celsius Require Export Trees Tactics.
 Require Import ssreflect ssrbool.
+Require Import Celsius.strongInduction.
 
 Require Import List.
 Import ListNotations.
@@ -156,10 +157,19 @@ Module Evaluator.
     simpl. rewrite H. apply IHl.
   Qed.
 
+  Definition Reflexive (P: Store -> Store -> Prop) : Prop := (forall σ, P σ σ).
+  Definition Transitive (P: Store -> Store -> Prop)  : Prop := forall (σ1 σ2 σ3: Store), P σ1 σ2 ->  P σ2 σ3 ->  P σ1 σ3.
+  Definition Assignment (P: Store -> Store -> Prop)  : Prop := forall σ σ' l C ω ω',
+          getObj σ l = Some (C, ω) ->
+          length ω <= length ω' ->
+          σ' = [l ↦ (C, ω')]σ -> P σ σ'.
+  Definition Freshness (P: Store -> Store -> Prop) : Prop := forall s c ω, P s (s ++ [(c, ω)]).
+  Definition EvalMaintained (P: Store -> Store -> Prop)  k : Prop := forall e σ σ' ρ v v',  ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> (P σ σ') .
+
+
+
   Lemma eval_list_prop : forall (P: Store -> Store -> Prop) n,
-      (forall σ, P σ σ) -> (* reflexivity *)
-      (forall σ1 σ2 σ3, P σ1 σ2 -> P σ2 σ3 -> P σ1 σ3) -> (* transitivity *)
-      (forall k, (k < n) -> forall e σ σ' ρ v v',  ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> (P σ σ')) -> (* Strong induction *)
+      Reflexive P -> Transitive P -> (forall k, (k < n) -> EvalMaintained P k) ->
       (forall k, (k < n) -> forall l σ σ' ρ v v_list,  ⟦_ l _⟧(σ, ρ, v)(k) = (Success_list v_list σ') -> (P σ σ')).
     intros P n H_refl H_trans H_strong.
     destruct k; simpl; try discriminate.
@@ -177,13 +187,7 @@ Module Evaluator.
   Qed.
 
   Lemma eval_init_prop : forall (P: Store -> Store -> Prop) n,
-      (forall σ, P σ σ) -> (* reflexivity *)
-      (forall σ1 σ2 σ3, P σ1 σ2 -> P σ2 σ3 -> P σ1 σ3) -> (* transitivity *)
-      (forall σ σ' l C ω ω',
-          getObj σ l = Some (C, ω) ->
-          length ω <= length ω' ->
-          σ' = [l ↦ (C, ω')]σ -> P σ σ' ) ->  (* Assignment *)
-      (forall k, (k < n) -> forall e σ σ' ρ v v',  ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> (P σ σ')) -> (* Strong induction *)
+      Reflexive P -> Transitive P -> Assignment P -> (forall k, (k < n) -> EvalMaintained P k) ->
       (forall k, (k < n) -> forall I σ σ' v C , (init I v C σ k) = Some σ' -> (P σ σ')).
     Proof.
     intros P n H_refl H_trans H_asgn H_strong.
@@ -207,7 +211,38 @@ Module Evaluator.
         apply (H_asgn _ _ _ _ _ (e0 ++ [v0])  matched); eauto using app_length.
         rewrite app_length.
         rewrite PeanoNat.Nat.add_1_r. eauto.
-  Qed.
+    Qed.
+
+    Lemma eval_prop : forall (P: Store -> Store -> Prop),
+        Reflexive P -> Transitive P -> Assignment P -> Freshness P -> forall n, EvalMaintained P n.
+      intros P H_refl H_trans H_assgn H_fresh.
+      apply strong_induction.
+      unfold EvalMaintained.
+      intros n H_strong.
+    (* To get one step of the evaluator, we destruct n *)
+    destruct n => //. (* n = 0 is discarded automatically *)
+    (* n > 0 - case analysis over e *)
+    move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
+    destruct e;
+      (* Trivial cases are handled automatically *)
+      repeat light || invert_constructor_equalities || destruct_match || eauto 3.
+    - (* case e = e0.m(ē) *)
+      apply (iff_sym (PeanoNat.Nat.le_succ_l n (S n))) in Hn.
+      pose proof (eval_list_prop P (S n) H_refl H_trans H_strong n Hn _ _ _ _ _ _ matched3); eauto.
+    - (* case e = new C(l) *)
+      apply (iff_sym (PeanoNat.Nat.le_succ_l n (S n))) in Hn.
+      pose proof (eval_list_prop P (S n) H_refl H_trans H_strong n Hn _ _ _ _ _ _ matched).
+      pose proof (eval_init_prop P (S n) H_refl H_trans H_assgn H_strong n Hn _ _ _ _ _ matched0).
+      eauto.
+    - (* case e1.v0 = e2 ; e3 *)
+      apply (H_trans σ s σ'); eauto.
+      apply (H_strong n Hn _ _ _ _ _ _ ) in matched0.
+      apply (H_trans s _ _ matched0).
+      apply (H_strong n Hn _ _ _ _ _ _ ) in H.
+      apply (H_trans s0 (assign v1 v v2 s0) σ') => //.
+      unfold assign. repeat destruct_match; eauto using PeanoNat.Nat.eq_le_incl, update_one3.
+      Qed.
+
 
 
   End Evaluator.
