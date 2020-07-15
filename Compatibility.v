@@ -60,7 +60,14 @@ Module Compatibility.
   Hint Resolve compatibility_freshness: cmpt.
 
 
-  Theorem Compatibility_theorem: forall (n : nat), forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
+  Lemma compatibility_InitMaintained: forall n,  InitMaintained compatible n.
+  Proof.
+    intros. apply freshnessInitMaintained; unfold Reflexive, Transitive, Assignment, Freshness; eauto with cmpt.
+  Qed.
+  Hint Resolve compatibility_InitMaintained: cmpt.
+
+
+  Theorem compatibility_theorem: forall (n : nat), forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
       ⟦e⟧(σ, ρ, v)(n) = (Success v' σ') -> σ ⊆ σ'.
   Proof.
     apply (eval_prop compatible); unfold Reflexive, Transitive, Assignment, Freshness; eauto with cmpt.

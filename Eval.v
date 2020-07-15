@@ -157,6 +157,7 @@ Module Evaluator.
     simpl. rewrite H. apply IHl.
   Qed.
 
+
   Definition Reflexive (P: Store -> Store -> Prop) : Prop := (forall σ, P σ σ).
   Definition Transitive (P: Store -> Store -> Prop)  : Prop := forall (σ1 σ2 σ3: Store), P σ1 σ2 ->  P σ2 σ3 ->  P σ1 σ3.
   Definition Assignment (P: Store -> Store -> Prop)  : Prop := forall σ σ' l C ω ω',
@@ -164,7 +165,16 @@ Module Evaluator.
           length ω <= length ω' ->
           σ' = [l ↦ (C, ω')]σ -> P σ σ'.
   Definition Freshness (P: Store -> Store -> Prop) : Prop := forall s c ω, P s (s ++ [(c, ω)]).
+
+
   Definition EvalMaintained (P: Store -> Store -> Prop)  k : Prop := forall e σ σ' ρ v v',  ⟦e⟧(σ, ρ, v)(k) = (Success v' σ') -> (P σ σ') .
+
+  Definition InitMaintained (P: Store -> Store -> Prop) (n:nat) : Prop :=
+    (forall (k: nat), (k < n) -> EvalMaintained P k) ->
+    (forall (k: nat), (k < n) ->
+               forall (l0: list Var) (s σ': Store) (c: ClN),
+                 init (length s) l0 c (s ++ [(c, [])]) k = Some σ' -> P s σ').
+
 
 
 
@@ -186,11 +196,13 @@ Module Evaluator.
     eapply H_fold; eauto using PeanoNat.Nat.lt_succ_l .
   Qed.
 
-  Lemma eval_init_prop : forall (P: Store -> Store -> Prop) n,
-      Reflexive P -> Transitive P -> Assignment P -> (forall k, (k < n) -> EvalMaintained P k) ->
-      (forall k, (k < n) -> forall I σ σ' v C , (init I v C σ k) = Some σ' -> (P σ σ')).
+  Lemma freshnessInitMaintained : forall (P: Store -> Store -> Prop) n,
+      Reflexive P -> Transitive P -> Assignment P -> Freshness P -> InitMaintained P n.
     Proof.
-    intros P n H_refl H_trans H_asgn H_strong.
+      intros P n H_refl H_trans H_asgn H_fresh H_strong.
+      assert ( forall k : nat,
+  k < n ->
+  forall (l0 : list Var) (σ σ' : Store) (c : ClN) I , init I l0 c σ k = Some σ' -> P σ σ'). {
     destruct k; simpl; try discriminate.
     intros Hn; intros.
     repeat destruct_match; try discriminate. clear matched0. clear matched.
@@ -198,7 +210,7 @@ Module Evaluator.
       induction fields as [| [x e] fields]; simpl; intros.
       + invert_constructor_equalities; eauto.
       + destruct k; simpl in H. rewrite foldLeft_constant in H => //.
-        destruct ((⟦ e ⟧ (σ, v, I )( k))) eqn:E ; try solve [ rewrite foldLeft_constant in H => //] ; eauto; try eval_not_success_list.
+        destruct ((⟦ e ⟧ (σ, l0, I )( k))) eqn:E ; try solve [ rewrite foldLeft_constant in H => //] ; eauto; try eval_not_success_list.
         unfold assign_new in H.
         repeat destruct_match; try solve [rewrite foldLeft_constant in H => //].
         subst.
@@ -207,18 +219,20 @@ Module Evaluator.
         apply PeanoNat.Nat.lt_succ_l in Hn.
         move /(_ k Hn _ _ _ _ _ _ E):H_strong => H_strong.
         apply (H_trans _ _ _ H_strong).
-        apply (H_trans _  [I ↦ (c0, e0 ++ [v0])] (s)  _ ) => //.
-        apply (H_asgn _ _ _ _ _ (e0 ++ [v0])  matched); eauto using app_length.
+        apply (H_trans _  [I ↦ (c1, e0 ++ [v])] (s)  _ ) => //.
+        apply (H_asgn _ _ _ _ _ (e0 ++ [v])  matched); eauto using app_length.
         rewrite app_length.
         rewrite PeanoNat.Nat.add_1_r. eauto.
+      } eauto.
     Qed.
 
     Lemma eval_prop : forall (P: Store -> Store -> Prop),
-        Reflexive P -> Transitive P -> Assignment P -> Freshness P -> forall n, EvalMaintained P n.
-      intros P H_refl H_trans H_assgn H_fresh.
+        Reflexive P -> Transitive P ->  Assignment P -> (forall n, InitMaintained P n) -> forall n, EvalMaintained P n.
+      intros P H_refl H_trans  H_asgn H_init.
       apply strong_induction.
       unfold EvalMaintained.
       intros n H_strong.
+      move /(_ n H_strong):H_init => H_init.
     (* To get one step of the evaluator, we destruct n *)
     destruct n => //. (* n = 0 is discarded automatically *)
     (* n > 0 - case analysis over e *)
@@ -231,8 +245,8 @@ Module Evaluator.
       pose proof (eval_list_prop P (S n) H_refl H_trans H_strong n Hn _ _ _ _ _ _ matched3); eauto.
     - (* case e = new C(l) *)
       apply (iff_sym (PeanoNat.Nat.le_succ_l n (S n))) in Hn.
+      move /(_ n Hn l0 s σ' c matched0):H_init => H_init.
       pose proof (eval_list_prop P (S n) H_refl H_trans H_strong n Hn _ _ _ _ _ _ matched).
-      pose proof (eval_init_prop P (S n) H_refl H_trans H_assgn H_strong n Hn _ _ _ _ _ matched0).
       eauto.
     - (* case e1.v0 = e2 ; e3 *)
       apply (H_trans σ s σ'); eauto.

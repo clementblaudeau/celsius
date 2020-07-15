@@ -30,6 +30,12 @@ match goal with
                   destruct H as [ freshX ] eqn:matched
 end.
 
+Ltac destruct_and :=
+  match goal with
+  | H: _ /\ _ |- _ => destruct H
+  end.
+
+
 Ltac destruct_match :=
 match goal with
 | [ |- context[match ?t with _ => _ end]] =>

@@ -45,11 +45,8 @@ Module PartialMonotonicity.
   Proof.
     unfold initializedFields.
     intros. exists [].
-    induction σ; intros ; simpl => //.
-    - apply le_0_n.
-    - destruct σ => //.
-      simpl.
-      destruct a. apply le_0_n.
+    induction σ; intros ; simpl ; eauto using le_0_n.
+    - destruct σ, a => //. apply le_0_n.
   Qed.
 
   Lemma partialMonotonicity_domains : forall (σ σ': Store), σ ⪯ σ' -> (dom σ) <= (dom σ').
@@ -57,11 +54,10 @@ Module PartialMonotonicity.
     intros.
     unfold partialMonotonicity in H.
     move : (initializedFields_dom σ') => Hσ'.
-    destruct (σ) eqn:Σ.
-    - apply le_0_n.
+    destruct (σ) eqn:Σ; eauto using le_0_n.
     - destruct o.
       case : (initializedFields_exists s c e) => f Hf.
-      apply (Lt.lt_le_S _ _ (Hσ' _ _ (H _ _ Hf)) )=> //.
+      eauto using Lt.lt_le_S.
   Qed.
   Hint Resolve partialMonotonicity_domains: pM.
 
@@ -88,8 +84,7 @@ Module PartialMonotonicity.
       rewrite -H4 H in H2 => //.
       apply: (PeanoNat.Nat.le_trans _ _ _ H2 H0).
     - move: (getObj_update2 σ (C, ω') l l0 ((getObj_dom σ (C,ω) l) H) H4)=>H5.
-      rewrite H1 H5.
-      apply H2.
+      rewrite H1 H5 => //.
   Qed.
   Hint Resolve partialMonotonicity_assignment: pM.
 
@@ -104,11 +99,17 @@ Module PartialMonotonicity.
   Qed.
   Hint Resolve partialMonotonicity_freshness: pM.
 
+  Lemma partialMonotonicity_InitMaintained: forall n,  InitMaintained partialMonotonicity n.
+  Proof.
+    intros. apply freshnessInitMaintained; unfold Reflexive, Transitive, Assignment, Freshness; eauto with pM.
+  Qed.
+  Hint Resolve partialMonotonicity_InitMaintained: pM.
 
   Theorem partialMonotonicity_theorem: forall (n : nat), forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
       ⟦e⟧(σ, ρ, v)(n) = (Success v' σ') -> σ ⪯ σ'.
   Proof.
     apply (eval_prop partialMonotonicity); unfold Reflexive, Transitive, Assignment, Freshness; eauto with pM.
+
   Qed.
 
 
