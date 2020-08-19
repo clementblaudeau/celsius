@@ -17,13 +17,6 @@ Module Reachability.
   |rch_trans : forall l0 l1 l2 C ω σ, (reachability σ l0 l1) -> (getObj σ l1 = Some (C, ω)) -> (exists f, (getVal ω f = Some l2)) -> (l2 < dom σ) -> (reachability σ l0 l2).
   Notation "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2) (at level 80, l1 at level 80, l2 at level 80).
 
-  (* To be moved to Trees.v at some point *)
-  Definition LocSet := (Ensemble Loc).
-  Notation "l ∈ L" := (In Loc L l) (at level 80).
-  Notation "L ⊆ L'" := (Included Loc L L') (at level 80).
-  Notation "L ∪ L'" := (Union Loc L L') (at level 80).
-  Notation "{ l }" := (Singleton Loc l).
-
 
   Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
   Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 99, L at level 99).
@@ -37,7 +30,7 @@ Module Reachability.
   Notation "σ ⊨ l : 'warm'" := (reachable_warm σ l) (at level 80, l at level 80).
   Notation "σ ⊫ L : 'warm'" := (forall l, (l ∈ L) -> reachable_warm σ l) (at level 80, L at level 99).
 
-  Definition reachable_hot  (σ: Store) (l: Loc) :=(forall (l': Loc), (σ ⊨ l ⇝ l') -> (σ ⊨ l' : cold)).
+  Definition reachable_hot  (σ: Store) (l: Loc) :=(forall (l': Loc), (σ ⊨ l ⇝ l') -> (σ ⊨ l' : warm)).
   Notation "σ ⊨ l : 'hot'"  := (reachable_hot σ l) (at level 80, l at level 80).
   Notation "σ ⊫ L : 'hot'" := (forall l, (l ∈ L) -> reachable_hot σ l) (at level 80, L at level 99).
 
@@ -52,6 +45,25 @@ Module Reachability.
     intros σ l l' H1 H2 l'' H3.
     apply (H1 l'' ((reachability_trans _ _ _ _) H2 H3)).
   Qed.
+
+  Lemma reachability_singleton : forall σ l1 l2, (σ ⊫ (Singleton Loc l1) ⇝ l2) <-> σ ⊨ l1 ⇝ l2.
+  Proof.
+    split; intros.
+    unfold reachability_set in H. repeat destruct H => //.
+    exists l1 => //.
+  Qed.
+
+  Lemma reachability_dom : forall σ l1 l2, (σ ⊨ l1 ⇝ l2) -> (l1 < (dom σ)) /\ (l2 < (dom σ)).
+    intros.
+    induction H; steps.
+  Qed.
+
+
+
+
+
+  (* Notions of path into the heap *)
+
 
 
 End Reachability.

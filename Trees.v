@@ -1,6 +1,7 @@
 From Coq Require Import Lists.List.
 Import ListNotations.
 Require Import ssreflect ssrbool.
+Require Import Sets.Ensembles.
 
 (* Read the pen/paper proofs of scopability *)
 (* Github repo  ? *)
@@ -52,6 +53,13 @@ Inductive Result : Type :=
   | Error
   | Success : Value -> Store -> Result
   | Success_list : (list Value) -> Store -> Result.
+
+Definition LocSet := (Ensemble Loc).
+Notation "l ∈ L" := (In Loc L l) (at level 80).
+Notation "L ⊆ L'" := (Included Loc L L') (at level 80).
+Notation "L ∪ L'" := (Union Loc L L') (at level 80).
+Notation "{ l }" := (Singleton Loc l).
+
 
 (* Helpers *)
 Definition dom {X: Type} (x: list X) : nat := (length x).
@@ -121,8 +129,8 @@ Lemma update_one2 : forall (X: Type) (p p': nat) (v: X) (l: list X),
       simpl in H.
       move : (Lt.lt_S_n p (length l) H) => H2.
       apply (IHp p' v)  => //.
-Qed.      
-      
+Qed.
+
   Lemma update_one3 : forall (X: Type) (p: nat) (v: X) (l: list X),
       length ([p ↦ v]l) = length l.
   Proof.
@@ -130,7 +138,7 @@ Qed.
     induction p; intros; destruct l => //.
     apply (eq_S _ _(IHp _ _ )).
 Qed.
-  
+
 Check [0].
 Check [0 ↦ 1] ∅.
 Check [[0] ⟼ [1]] [1 ; 2 ; 3].
@@ -142,8 +150,8 @@ Check [[0] ⟼ [1]] [1 ; 2 ; 3].
   Proof.
     rewrite /dom /getObj => σ o x.
     apply : (update_one1 Obj x o σ) => //.
-  Qed.  
-  
+  Qed.
+
   Lemma getObj_update2 : forall (σ: Store) (o: Obj) (x x': nat),
       x < dom σ ->
       x <> x' ->
@@ -158,7 +166,7 @@ Check [[0] ⟼ [1]] [1 ; 2 ; 3].
       l < (dom σ).
   Proof.
     intros σ o.
-    induction σ ; destruct l => //.    
+    induction σ ; destruct l => //.
     + move: (PeanoNat.Nat.lt_0_succ (dom σ)) => //.
-    + simpl => H. apply (Lt.lt_n_S _ _ (IHσ _ H)) . 
+    + simpl => H. apply (Lt.lt_n_S _ _ (IHσ _ H)) .
   Qed.

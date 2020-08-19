@@ -85,11 +85,11 @@ Module Scopability.
     move /(_ H1):H0 => H0.
     induction Hl'1 as [l' | l'].
     + apply H ; repeat exists l' ; auto => //.
-                         move => l'' Hl'' . apply (H2 l'').
-                         apply Union_introl => //.
+      move => l'' Hl'' . apply (H2 l'').
+      apply Union_introl => //.
     + apply H0 ; repeat exists l' ; auto => //.
-                         move => l'' Hl'' . apply (H2 l'').
-                         apply Union_intror => //.
+      move => l'' Hl'' . apply (H2 l'').
+      apply Union_intror => //.
   Qed.
 
 
@@ -99,8 +99,7 @@ Module Scopability.
     intros.
     move: H3 => [l' [Hl'1 Hl'2]].
     induction Hl'1.
-    exists l1 ; split => //.
-    apply (reachability_trans σ l1 l2 l H Hl'2).
+    exists l1 ; split; eauto using reachability_trans => //.
   Qed.
 
   Lemma scoping_transitivity: forall σ1 σ2 σ3 L1 L2 L3, (dom σ1) <= (dom σ2) ->
@@ -168,13 +167,10 @@ Module Scopability.
                                                  σ2 ⇝ σ3 ⋖ L1 ->
                                                  σ1 ⇝ σ3 ⋖ L1.
   Proof.
-    intros.
+    intros σ1 σ2 σ3 L1 [H_12_dom H_12] H_dom [H_23_dom H_23]. unfold scoping_preservation in *.
     apply (preserving_transitivity σ1 σ2 σ3 L1 L1) => //.
-    apply (scoping_transitivity σ1 σ2 σ2 L1 L1 L1) => //.
-    apply (proj1 H1).
-    apply (proj2 H) => //.
-    apply (proj1 H).
-    apply (proj1 H).
+    apply (scoping_transitivity σ1 σ2 σ2 L1 L1 L1); steps.
+    eapply H_12; steps; eauto.
   Qed.
 
   Lemma scopability_assignment: forall σ1 σ2 σ2' L1 l l' f C ω ω',
@@ -192,8 +188,67 @@ Module Scopability.
       move => σ0 L L0 H_dom1 H_dom2' H_subL H_subL0 A1 A2.
       assert (dom σ2 = dom σ2') as H_dom22'. rewrite /dom H4 update_one3 => //.
       move :(H_dom2') => H_dom2. rewrite -H_dom22' in H_dom2.
-      admit.
-      Admitted.
+      admit. (* Reasonning on graphs *)
+  Admitted.
+
+  Definition codom (ρ: Env) : (LocSet):=
+    fun (l: Loc) => (List.In l ρ).
+
+  Check forall (l : Loc), ~ (Singleton Loc l) = (Empty_set Loc).
+
+  Ltac inSingleton :=
+    match goal with
+    |H: ?a ∈ Singleton Loc ?b |- _ => induction H
+    end.
+
+  Lemma scopability_theorem:
+    forall e σ σ' ρ ψ l k,
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      ((σ, ((codom ρ) ∪ (Singleton Loc ψ))) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ (Singleton Loc ψ))) .
+    move => e σ σ' ρ ψ l k.
+    move: k e σ σ' ρ ψ l.
+    apply (strong_induction (fun k => forall e σ σ' ρ ψ l, ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      ((σ, ((codom ρ) ∪ (Singleton Loc ψ))) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ (Singleton Loc ψ))))).
+    intros n H_strong e σ σ' ρ ψ l H_success.
+    destruct n; simpl; try discriminate.
+    simpl in H_success; repeat destruct_match; try discriminate; try invert_constructor_equalities; subst.
+    + (* e = x *)
+      split.
+      unfold scoping; steps.
+      exists l; steps.
+      apply Union_introl.
+      unfold getVal in *.
+      pose proof (nth_error_In ρ v matched0). unfold codom.
+      unfold In => //. unfold reachability_set in *; steps. unfold In in H3. induction H3 => //.
+      unfold scoping_preservation.
+      steps.
+      admit. (* Stuck on "(codom ρ ∪ {ψ}) ⪽ σ'" *)
+    + (* e = this *)
+      split. unfold scoping; steps.
+      unfold reachability_set in *; steps. unfold In in H3. induction H3 => //.
+      exists l. steps; eauto using Union_intror.
+      unfold scoping_preservation.
+      steps.
+      admit. (* Stuck on "(codom ρ ∪ {ψ}) ⪽ σ'" *)
+    + (* e = e0.f *)
+      unfold scoping; intros.
+      move /(_ n (le_n (S n)) ) : H_strong => H_strong.
+      pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ matched0).
+      move : (H_strong _ _ _ _ _ _ matched0) => [A2 A3].
+      assert ((σ', {v0}) ⋖ (σ', {l})) as B1. {
+        apply scoping_reachability.
+        eapply rch_trans; eauto.
+        apply rch_heap; eauto using getObj_dom.
+
+        admit. }
+      assert ((σ,  (codom ρ) ∪ (Singleton Loc ψ)) ⋖ (σ', {l})) as C1.
+      apply (scoping_transitivity _ σ' _ _ {v0}) => //.
+      unfold storeSubset. intros. inSingleton. by apply (getObj_dom _ _ _ matched1).
+      split. intros.
+        by apply C1.
+          by apply A3.
+          Admitted.
+
 
 
 

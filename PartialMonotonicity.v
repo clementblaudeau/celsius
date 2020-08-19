@@ -113,6 +113,15 @@ Module PartialMonotonicity.
   Qed.
 
 
+  Theorem partialMonotonicity_theorem_dom: forall (n : nat), forall (e: Expr) (σ σ': Store) (ρ: Env) (v v': Value),
+      ⟦e⟧(σ, ρ, v)(n) = (Success v' σ') -> (dom σ) <= (dom σ').
+  Proof.
+    intros. apply partialMonotonicity_theorem in H.
+      by apply partialMonotonicity_domains.
+  Qed.
+
+
+
   Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> σ ⊆ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).
   Proof.
     unfold reachable_warm.
