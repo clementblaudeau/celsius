@@ -3,7 +3,9 @@ From Celsius Require Export Eval.
 From Celsius Require Export PartialMonotonicity.
 From Celsius Require Export Reachability.
 From Celsius Require Export Compatibility.
+From Celsius Require Export Wellformedness.
 Require Import ssreflect ssrbool.
+Require Import Psatz.
 
 Require Import List.
 Import ListNotations.
@@ -21,9 +23,7 @@ Require Import Sets.Ensembles.
 Module Scopability.
   Import Eval.Evaluator.
   Import Reachability.Reachability.
-
-  Definition storeSubset (σ: Store) L := (forall l, (l ∈ L) -> l < (dom σ)).
-  Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).
+  Import Wellformedness.Wellformedness.
 
   Definition scoping (σ σ': Store) (L L': Ensemble Loc) :=
     L ⪽ σ ->
@@ -201,53 +201,66 @@ Module Scopability.
     |H: ?a ∈ Singleton Loc ?b |- _ => induction H
     end.
 
+  Definition ScopabilityProp n :=
+    forall e σ σ' ρ ψ l,
+      ⟦e⟧(σ, ρ, ψ)(n) = (Success l σ') ->
+      wf σ -> (codom ρ) ∪ {ψ} ⪽ σ ->
+      ((σ, ((codom ρ) ∪ {ψ})) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ {ψ})) .
+
   Lemma scopability_theorem:
-    forall e σ σ' ρ ψ l k,
-      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
-      ((σ, ((codom ρ) ∪ (Singleton Loc ψ))) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ (Singleton Loc ψ))) .
-    move => e σ σ' ρ ψ l k.
-    move: k e σ σ' ρ ψ l.
-    apply (strong_induction (fun k => forall e σ σ' ρ ψ l, ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
-      ((σ, ((codom ρ) ∪ (Singleton Loc ψ))) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ (Singleton Loc ψ))))).
-    intros n H_strong e σ σ' ρ ψ l H_success.
-    destruct n; simpl; try discriminate.
-    simpl in H_success; repeat destruct_match; try discriminate; try invert_constructor_equalities; subst.
+    forall n, ScopabilityProp n.
+  Proof.
+    apply strong_induction. unfold ScopabilityProp.
+    intros n H_strong e σ σ' ρ ψ l H_success H_wf H_codom.
+    destruct n => //.
+    move /(_ n (le_n (S n)) ) : H_strong => H_strong.
+    destruct e as [x | this | e0 f | e0 m el | C el | e0 f e1 e2]; simpl in H_success; repeat destruct_match; try discriminate; try invert_constructor_equalities; subst.
     + (* e = x *)
       split.
       unfold scoping; steps.
       exists l; steps.
       apply Union_introl.
-      unfold getVal in *.
-      pose proof (nth_error_In ρ v matched0). unfold codom.
-      unfold In => //. unfold reachability_set in *; steps. unfold In in H3. induction H3 => //.
-      unfold scoping_preservation.
-      steps.
-      admit. (* Stuck on "(codom ρ ∪ {ψ}) ⪽ σ'" *)
+      unfold codom, In. eauto using nth_error_In.
+      apply_anywhere reachability_singleton => //.
+      unfold scoping_preservation; steps.
     + (* e = this *)
       split. unfold scoping; steps.
-      unfold reachability_set in *; steps. unfold In in H3. induction H3 => //.
+      unfold reachability_set in *; steps. inSingleton.
       exists l. steps; eauto using Union_intror.
-      unfold scoping_preservation.
-      steps.
-      admit. (* Stuck on "(codom ρ ∪ {ψ}) ⪽ σ'" *)
+      unfold scoping_preservation; steps.
     + (* e = e0.f *)
-      unfold scoping; intros.
-      move /(_ n (le_n (S n)) ) : H_strong => H_strong.
-      pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ matched0).
-      move : (H_strong _ _ _ _ _ _ matched0) => [A2 A3].
-      assert ((σ', {v0}) ⋖ (σ', {l})) as B1. {
+      unfold scoping; intros; simpl.
+      pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ matched).
+      move : (H_strong _ _ _ _ _ _ matched H_wf H_codom) => [A2 A3].
+      assert ((σ', {v}) ⋖ (σ', {l})) as B1. {
         apply scoping_reachability.
         eapply rch_trans; eauto.
         apply rch_heap; eauto using getObj_dom.
-
-        admit. }
-      assert ((σ,  (codom ρ) ∪ (Singleton Loc ψ)) ⋖ (σ', {l})) as C1.
-      apply (scoping_transitivity _ σ' _ _ {v0}) => //.
-      unfold storeSubset. intros. inSingleton. by apply (getObj_dom _ _ _ matched1).
+        eapply wellformedness_conserved in matched0; eauto.
+      }
+      assert ((σ,  (codom ρ) ∪ (Singleton Loc ψ)) ⋖ (σ', {l})) as C1. {
+      apply (scoping_transitivity _ σ' _ _ {v}) => //.
+      unfold storeSubset. intros. inSingleton. eauto using getObj_dom.
+      }
       split. intros.
         by apply C1.
           by apply A3.
-          Admitted.
+    + (* e = e0.m(l0) *)
+      rename matched into A1.
+      rename s into σ0. rename l0 into lv. rename v into l0. rename e into ω.
+      pose proof (H_strong _ _ _ _ _ _ A1 H_wf H_codom) as [A2 A3].
+      assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ0, (codom ρ) ∪ {ψ})) as A4
+          by eauto using  preserving_regularity_degenerate, PartialMonotonicity.partialMonotonicity_theorem_dom.
+      rename matched0 into A5. move: A1 A2 A3 A4 A5 => A1 A2 A3 A4 A5.
+      rename s0 into σ_n.
+      Admitted.
+
+
+
+
+
+
+
 
 
 

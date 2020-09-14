@@ -5,6 +5,7 @@ From Celsius Require Export Reachability.
 From Celsius Require Export Compatibility.
 From Celsius Require Export Scopability.
 From Celsius Require Export Stackability.
+From Celsius Require Export Wellformedness.
 Require Import ssreflect ssrbool.
 Require Import Psatz.
 
@@ -21,7 +22,7 @@ Module LocalReasoning.
   Import Compatibility.Compatibility.
   Import PartialMonotonicity.PartialMonotonicity.
   Import Stackability.Stackability.
-
+  Import Wellformedness.Wellformedness.
 
   Lemma local_reasoning:
     forall σ σ' L L',
@@ -56,22 +57,21 @@ Module LocalReasoning.
   Theorem Local_reasoning:
     forall e σ σ' ρ ψ l k,
       ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
-      (σ ⊫ ((codom ρ) ∪ (Singleton Loc ψ)) : hot) ->
+      wf σ -> (codom ρ ∪ {ψ}) ⪽ σ ->
+      (σ ⊫ ((codom ρ) ∪ {ψ}) : hot) ->
       σ' ⊨ l : hot.
   Proof.
     intros.
-    set A := ((codom ρ) ∪ (Singleton Loc ψ)).
-    (* rewrite -/A in H0. *)
     assert (σ' ⊫ (Singleton Loc l) : hot). {
       eapply local_reasoning;
         eauto using stackability_theorem, compatibility_theorem, partialMonotonicity_theorem.
 
-      admit. (*  (codom ρ ∪ {ψ}) ⪽ σ *)
-      admit. (* {l} ⪽ σ' *)
-      pose proof (scopability_theorem _ _ _ _ _ _ _ H) as [H2 H3] => //.
+      pose proof (wellformedness_conserved _ _ _ _ _ _ _ H H0 H1) as [A1 A2].
+      unfold storeSubset; intros. induction H3 => //.
+      pose proof (scopability_theorem _ _ _ _ _ _ _ H) as [A2 A3] => //.
     }
-      by apply (H1 l).
-  Admitted.
+      by apply (H3 l).
+    Qed.
 
 
   End LocalReasoning.

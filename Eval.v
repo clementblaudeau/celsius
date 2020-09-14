@@ -255,7 +255,14 @@ Module Evaluator.
       apply (H_strong n Hn _ _ _ _ _ _ ) in H.
       apply (H_trans s0 (assign v1 v v2 s0) σ') => //.
       unfold assign. repeat destruct_match; eauto using PeanoNat.Nat.eq_le_incl, update_one3.
-      Qed.
+    Qed.
+
+    Lemma eval_list_length : forall el σ σ' ρ ψ l k,
+        ⟦_ el _⟧(σ, ρ, ψ)(k) = Success_list l σ' ->
+        length el = length l.
+    Proof.
+    Admitted.
+
 
 
 

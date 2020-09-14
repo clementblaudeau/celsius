@@ -3,6 +3,8 @@ Require Import Coq.Lists.List.
 Require Import Omega.
 Require Import Psatz.
 
+(* Borrowed from SystemFR project : https://github.com/epfl-lara/SystemFR *)
+
 Open Scope string.
 
 Hint Extern 50 => omega: omega.
@@ -138,3 +140,49 @@ Ltac step_gen := match goal with
 
 Ltac step := step_gen || step_inversion (List.Forall, List.In).
 Ltac steps := repeat step.
+
+
+Ltac apply_any :=
+  match goal with
+  | H: _ |- _ => apply H
+  end.
+
+Ltac rewrite_any :=
+  match goal with
+  | H: _ |- _ => rewrite H in *
+  end.
+
+Ltac erewrite_any :=
+  match goal with
+  | H: _ |- _ => erewrite H in *
+  end.
+
+Ltac rewrite_back_any :=
+  match goal with
+  | H: _ |- _ => rewrite <- H in *
+  end.
+
+Ltac eapply_any :=
+  match goal with
+  | H: _ |- _ => eapply H
+  end.
+
+Ltac apply_anywhere f :=
+  match goal with
+  | H: _ |- _ => apply f in H
+  end.
+
+Ltac eapply_anywhere f :=
+  match goal with
+  | H: _ |- _ => eapply f in H
+  end.
+
+Ltac rewrite_anywhere f :=
+  match goal with
+  | H: _ |- _ => rewrite f in H
+  end.
+
+Ltac erewrite_anywhere f :=
+  match goal with
+  | H: _ |- _ => erewrite f in H
+  end.
