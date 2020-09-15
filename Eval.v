@@ -269,12 +269,15 @@ Module Evaluator.
             -> length l + length v_list1 = length v_list2) as H_fold. {
         induction l as [| e l] ; steps.
         destruct n; simpl in H. rewrite foldLeft_constant in H => //.
-        destruct (⟦ e ⟧ (σ, ρ, v )( n)) eqn: E; try solve [ rewrite foldLeft_constant in H => //] ; eauto; try eval_not_success_list.
+        destruct (⟦ e ⟧ (σ, ρ, v )( n)) eqn: E;
+          try solve [ rewrite foldLeft_constant in H => //] ;
+          eauto; try eval_not_success_list.
         apply IHl in H.
         simpl in H.
         rewrite plus_n_Sm => //. }
       intros.
-      pose proof (H_fold _ _ _ _ _ _ _ H); simpl in H0. rewrite PeanoNat.Nat.add_0_r in H0 => //.
+      pose proof (H_fold _ _ _ _ _ _ _ H); simpl in H0.
+      rewrite PeanoNat.Nat.add_0_r in H0 => //.
     Qed.
 
 

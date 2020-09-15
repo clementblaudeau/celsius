@@ -45,13 +45,14 @@ Module Wellformedness.
     destruct_and.
     destruct n => //.
     move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
-    destruct e ;
-      repeat light || invert_constructor_equalities || destruct_match ||
+    destruct e ; simpl in H0 ;
+      repeat discriminate || subst || invert_constructor_equalities || destruct_match ||
              match goal with
              | H1 : ⟦ _ ⟧ ( _, _, _)( _ ) = Success _ _ |- _ =>
-               pose proof (H n Hn _ _ _ _ _ _ H1); clear H1 end ||
-             eauto 3 using nth_error_In.
-    unfold wf in H5. eapply H5; eauto.
+               pose proof (H n Hn _ _ _ _ _ _ H1); clear H1 end; eauto.
+    + intuition auto. eauto using nth_error_In.
+    + intuition auto. unfold wf in H5. eapply H5; eauto.
+    +
     destruct l1 => //. destruct l0, n => //. simpl in *. invert_constructor_equalities; subst.  apply H5 => //.
     intros l' Hl'. induction Hl' => //. induction H0. admit.
     simpl in *.
