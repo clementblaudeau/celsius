@@ -117,18 +117,13 @@ Lemma update_one1 : forall (X: Type) (p: nat) (v: X) (l: list X),
 Qed.
 
 Lemma update_one2 : forall (X: Type) (p p': nat) (v: X) (l: list X),
-    p < (length l) ->
     p <> p' ->
     (nth_error [p ↦ v]l p') = (nth_error l p').
   Proof.
     intros X p.
     generalize dependent p.
     induction p; intros; destruct l ; destruct p' => //.
-    - simpl in H.
-      move : (iffLR (PeanoNat.Nat.succ_inj_wd_neg p p') H0) => H1.
-      simpl in H.
-      move : (Lt.lt_S_n p (length l) H) => H2.
-      apply (IHp p' v)  => //.
+    - simpl; apply IHp. eauto.
 Qed.
 
   Lemma update_one3 : forall (X: Type) (p: nat) (v: X) (l: list X),
@@ -169,4 +164,17 @@ Check [[0] ⟼ [1]] [1 ; 2 ; 3].
     induction σ ; destruct l => //.
     + move: (PeanoNat.Nat.lt_0_succ (dom σ)) => //.
     + simpl => H. apply (Lt.lt_n_S _ _ (IHσ _ H)) .
+  Qed.
+
+  Lemma nth_error_Some2 : forall {T:Type} e (v:T) f l,
+      nth_error (e ++ [v]) f = Some l ->
+      v = l \/ nth_error e f = Some l.
+  Proof.
+    intros.
+    assert (f < length (e++[v])) by (apply nth_error_Some; rewrite H; discriminate).
+    move: H0; rewrite app_length; simpl; rewrite PeanoNat.Nat.add_1_r => H0.
+    apply Lt.le_lt_or_eq in H0. destruct H0 as [H0 | H0].
+    right. apply Lt.lt_S_n in H0. rewrite nth_error_app1 in H => //.
+    left. injection H0 => H1; subst. rewrite nth_error_app2 in H => //.
+    rewrite <- Minus.minus_diag_reverse in H. simpl in H. injection H => //.
   Qed.
