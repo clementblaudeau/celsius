@@ -18,6 +18,69 @@ Module Reachability.
   Notation "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2) (at level 80, l1 at level 80, l2 at level 80).
 
 
+  Definition reachable_one_step σ l0 l1 :=
+    exists C ω, (getObj σ l0 = Some (C, ω)) /\ (exists f, (getVal ω f = Some l1)) /\ (l1 < dom σ).
+
+  Lemma reachable_one_step_reachability :
+    forall σ l0 l1, reachable_one_step σ l0 l1 -> σ ⊨ l0 ⇝ l1.
+  Proof.
+    unfold reachable_one_step; steps.
+    eauto using rch_trans, rch_heap, getObj_dom.
+  Qed.
+
+  (* Path in σ to e (p is in reverse order) *)
+  Fixpoint reachable_path σ e p :=
+    match p with
+    | l::nil => (* p = [l] *)
+      l = e /\ e < dom σ
+    | l::p' => (* p = p'++[l] *)
+      (reachable_one_step σ l e) /\ (reachable_path σ l p')
+    | _ => False
+    end.
+
+  Lemma reachable_path_reachability:
+    forall σ s e,
+      (exists p, reachable_path σ e (p++[s])) <-> σ ⊨ s ⇝ e.
+  Proof.
+    split.
+    + intros [p Hp].
+      generalize dependent e.
+      induction p; repeat light; eauto using rch_heap.
+      destruct_match; [destruct p; steps | repeat light].
+      unfold reachable_one_step in H. move: H => [C [ω H]]. light.
+      eapply rch_trans; eauto.
+    + induction 1; steps.
+      ++ exists []; simpl; eauto.
+      ++ exists (l1::p); simpl. destruct (p++[l0]) eqn:P ; [destruct p ; steps | idtac].
+         rewrite P; rewrite <- P.
+         split; eauto.
+         unfold reachable_one_step.
+         eexists; eexists; eauto.
+  Qed.
+
+  Lemma reachable_path_is_reachable:
+    forall σ e p l,
+      reachable_path σ e p ->
+      List.In l p ->
+      σ ⊨ l ⇝ e.
+  Proof.
+    intros σ e p.
+    generalize dependent e.
+    induction p ; try solve [repeat light].
+    intros. simpl in H0. destruct H0 as [H0 | H0].
+    + subst; simpl in H.
+      destruct p eqn:P ; repeat light; eauto using rch_heap, reachable_one_step_reachability.
+    + simpl in H.
+      destruct p eqn:P; eauto using in_nil.
+      rewrite <- P in *.
+      destruct_and.
+      unfold reachable_one_step in *.
+      Opaque reachable_path.
+      move: H => [C [ ω [ Hobj [[f H] Hdom]] ] ] .
+      eapply IHp in H1; eauto using rch_trans.
+  Qed.
+
+
   Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
   Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 99, L at level 99).
 

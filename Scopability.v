@@ -188,6 +188,14 @@ Module Scopability.
       move => σ0 L L0 H_dom1 H_dom2' H_subL H_subL0 A1 A2.
       assert (dom σ2 = dom σ2') as H_dom22'. rewrite /dom H4 update_one3 => //.
       move :(H_dom2') => H_dom2. rewrite -H_dom22' in H_dom2.
+      unfold scoping; simpl.
+      intros. move: H8 => [l2 [Hl2 D1]].
+      apply (reachable_path_reachability σ2' l2 l0) in D1.
+      move: D1 => [p D1].
+      pose proof (in_dec EqNat.eq_nat_decide l
+
+
+      intros _ _ l2 _ D1. simpl in D1. simpl.
       admit. (* Reasonning on graphs *)
   Admitted.
 
