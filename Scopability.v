@@ -173,6 +173,12 @@ Module Scopability.
     eapply H_12; steps; eauto.
   Qed.
 
+  Ltac inSingleton :=
+    match goal with
+    |H: ?a ∈ Singleton Loc ?b |- _ => induction H
+    end.
+
+
   Lemma scopability_assignment: forall σ1 σ2 σ2' L1 l l' f C ω ω',
       σ1 ⇝ σ2 ⋖ L1 ->
       (σ1, L1) ⋖ (σ2, {l}) ->
@@ -195,17 +201,51 @@ Module Scopability.
       }
       unfold scoping; simpl.
       intros. move: H8 => [l2 [Hl2 D1]].
-      move: (proj2 (iff_and (reachable_path_reachability σ2' l2 l0)) D1) => [[D2 D3] | [p D2]].
-      ++ rewrite <- D2 in *. apply B1; simpl; eauto.
-         intros l3 Hl3. unfold dom in *. erewrite <- update_one3; steps; eauto.
-         eexists; split; eauto; try apply rch_heap. unfold dom in *. erewrite <- update_one3; steps; eauto.
-      ++ destruct (reachable_path_assignment _ _ _ _ _ _ _ _ _ H2 H3 H4 D2).
-         +++ pose proof (reachable_path_split_on_edge). admit.
-         +++ apply B1; simpl; eauto.
+      destruct (PeanoNat.Nat.eq_dec l l'); subst.
+      (* if l = l', the assignment is weakening *)
+      ++ apply B1; simpl; eauto.
+         intros l3 Hl3; unfold dom in *; erewrite <- update_one3; steps; eauto.
+         exists l2; split; eauto. eapply reachability_weaken_assignment; eauto.
+      ++ move: (proj2 (iff_and (reachable_path_reachability _ l2 l0)) D1) => [[D2 D3] | [p D2]].
+         +++ rewrite <- D2 in *. apply B1; simpl; eauto.
              intros l3 Hl3. unfold dom in *. erewrite <- update_one3; steps; eauto.
-             exists l2 ; split => // .
-             apply reachable_path_reachability; right; eauto.
-
+             eexists; split; eauto; try apply rch_heap. unfold dom in *. erewrite <- update_one3; steps; eauto.
+         +++ destruct (reachable_path_assignment σ2 _ C ω _ _ f l l' H2 eq_refl eq_refl D2) as [Hedge | Hpath].
+             ++++ pose proof (contains_edge_last_edge _ _ _ Hedge) as [p2 [p3 [H9 H10]]].
+                  rewrite H9 in D2.
+                  assert (σ2 ⊨ l' ⇝ l0). {
+                    apply reachable_path_reachability.
+                    destruct (PeanoNat.Nat.eq_dec l' l0); [left; split; lia | right].
+                    Opaque reachable_path.
+                    destruct p2; steps.
+                    exists p2. eapply contains_edge_assignment with (l' := l'); eauto.
+                    + clear D2 Hedge. intros [p21 [p22 Hedge]]; steps.
+                      destruct p22; steps.
+                      apply H10. clear H10. unfold contains_edge.
+                      destruct p21.
+                      ++ exfalso. apply n. symmetry.
+                         eapply (app_inj_tail p2 (p22++[l'])).
+                         rewrite app_assoc_reverse; steps.
+                      ++ pose proof (app_exists_last p21 l1); steps.
+                         exists p', (l0::p22); steps.
+                         apply (app_inv_tail [l']).
+                         simpl. rewrite H4. rewrite H5.
+                         rewrite H5 in H4.
+                         repeat rewrite app_comm_cons in H4. rewrite app_assoc in H4.
+                         apply app_inj_tail in H4; steps.
+                         repeat rewrite <- app_comm_cons || rewrite app_assoc_reverse.
+                         steps.
+                    + eapply (reachable_path_app2 _ l'(l::p3) (l1::p2)).
+                      rewrite <- app_comm_cons; eauto.
+                  }
+                  apply C1; simpl; eauto.
+                  apply_anywhere reachability_dom.
+                  unfold storeSubset; intros; inSingleton; steps.
+                  exists l'; split; eauto using In_singleton.
+             ++++ apply B1; simpl; eauto.
+                  intros l3 Hl3. unfold dom in *. erewrite <- update_one3; steps; eauto.
+                  exists l2 ; split => // .
+                  apply reachable_path_reachability; right; eauto.
     + admit.
 
   Admitted.
@@ -213,12 +253,6 @@ Module Scopability.
   Definition codom (ρ: Env) : (LocSet):=
     fun (l: Loc) => (List.In l ρ).
 
-  Check forall (l : Loc), ~ (Singleton Loc l) = (Empty_set Loc).
-
-  Ltac inSingleton :=
-    match goal with
-    |H: ?a ∈ Singleton Loc ?b |- _ => induction H
-    end.
 
   Definition ScopabilityProp n :=
     forall e σ σ' ρ ψ l,

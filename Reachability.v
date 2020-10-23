@@ -2,6 +2,8 @@ From Celsius Require Export Trees.
 From Celsius Require Export Eval.
 Require Import ssreflect ssrbool.
 
+Require Import Coq.Arith.Wf_nat.
+Require Import Coq.Wellfounded.Wellfounded.
 Require Import List.
 Import ListNotations.
 Open Scope nat_scope.
@@ -56,9 +58,29 @@ Module Reachability.
     induction H; steps.
   Qed.
 
+
+  Lemma reachability_weaken_assignment :
+    forall σ σ' C ω ω' s e f l l',
+      (getObj σ l) = Some (C, ω) ->
+      ω' = [f ↦ l']ω ->
+      σ' = [l ↦ (C, ω')]σ ->
+      (l = l') ->
+      σ' ⊨ s ⇝ e ->
+      σ ⊨ s ⇝ e.
+  Proof.
+    intros. move: H3. move: s e. induction 1; repeat steps || rewrite_anywhere update_dom.
+    + apply rch_heap => //.
+    + eapply reachability_trans; eauto.
+      destruct (PeanoNat.Nat.eq_dec l1 l'); subst; [apply_anywhere update_one4; steps |].
+      ++ destruct (PeanoNat.Nat.eq_dec f f0); subst; [apply_anywhere update_one4; steps |]; eauto using rch_heap.
+         unfold getVal in *.
+         rewrite update_one2 in H0; eauto.
+         eapply rch_trans; try apply rch_heap; eauto using getObj_dom.
+      ++ rewrite getObj_update2 in H4; eauto using getObj_dom.
+         eapply rch_trans; try apply rch_heap; eauto using getObj_dom.
+  Qed.
+
   (* Notions of path into the heap *)
-
-
 
   Definition reachable_one_step σ l0 l1 :=
     exists C ω, (getObj σ l0 = Some (C, ω)) /\ (exists f, (getVal ω f = Some l1)) /\ (l1 < dom σ).
@@ -170,8 +192,36 @@ Module Reachability.
       simpl in *; eauto.
   Qed.
 
+  Lemma app_exists_last:
+    forall p (x:Loc),
+    exists y p', x::p = p'++[y].
+  Proof.
+      induction p; steps.
+      + exists x, []; steps.
+      + move /(_ a):IHp => IHp. steps.
+        exists y, (x::p'); steps.
+  Qed.
+
+
+  Lemma reachable_path_app2:
+    forall σ s p1 p2,
+      reachable_path σ (p2++s::p1) ->
+      reachable_path σ (p2++[s]).
+  Proof.
+    assert (
+        forall (σ : list Obj) (s s': nat) (p1 p2 : list nat),
+          reachable_path σ (p2 ++ s :: p1++[s']) -> reachable_path σ (p2 ++ [s])) by
+        repeat steps || eapply_anywhere reachable_path_app.
+    intros.
+    pose proof app_exists_last.
+    destruct p1 => //.
+    move /(_ p1 n):H1 => H1; steps.
+    rewrite H1 in H0; eauto.
+  Qed.
+
   Definition contains_edge p (l1 l2 :Loc) :=
     exists p1 p2, p = p2 ++ l2::l1::p1.
+
 
   Lemma contains_edge_dec :
     forall p l1 l2, contains_edge p l1 l2 \/ not (contains_edge p l1 l2).
@@ -191,6 +241,16 @@ Module Reachability.
             ++++ right; steps. destruct p2; steps; eauto.
       ++ right; steps.
          destruct p2; steps; eauto.
+  Qed.
+
+  Lemma contains_edge_cons :
+    forall p l l' l0,
+      contains_edge (l0::p) l l' ->
+      l' <> l0 ->
+      contains_edge p l l'.
+  Proof.
+    unfold contains_edge; steps.
+    destruct p2; steps; eauto.
   Qed.
 
 
@@ -215,6 +275,70 @@ Module Reachability.
   Qed.
 
 
+  Lemma contains_edge_assignment :
+    forall σ σ' C ω ω' p f l l',
+      (getObj σ l) = Some (C, ω) ->
+      ω' = [f ↦ l']ω ->
+      σ' = [l ↦ (C, ω')]σ ->
+      not (contains_edge p l l') ->
+      reachable_path σ' p ->
+      reachable_path σ p.
+  Proof.
+    intros.
+    generalize dependent p.
+    induction p as [| l2 p]; intros; simpl; eauto.
+    destruct p as [| l1 p]; [ simpl in *; subst; unfold dom in *; rewrite_anywhere update_one3; eauto |].
+    simpl in H3. destruct_and.
+    split.
+    + unfold reachable_one_step in *; destructs.
+      destruct H3 as [C0 [ω0 [H31 [[f0 H32] H33]]]].
+      epose proof (getObj_dom _ _ _ H31).
+      repeat rewrite_anywhere update_dom.
+      destruct (PeanoNat.Nat.eq_dec l1 l); subst.
+      ++ rewrite_anywhere getObj_update1; eauto. invert_constructor_equalities; subst.
+         destruct (PeanoNat.Nat.eq_dec l2 l'); subst ; [exfalso; apply H2; exists p, []  ; steps |].
+         unfold getVal in *. exists C0, ω; repeat split; eauto.
+         destruct (PeanoNat.Nat.eq_dec f f0); subst; rewrite_anywhere  update_one2; eauto.
+         apply_anywhere update_one4; subst. congruence.
+      ++ rewrite_anywhere getObj_update2; eauto using getObj_dom.
+         repeat eexists || split || eauto.
+    + apply IHp; eauto.
+      intros [p1 [p2 Hedge]].
+      apply H2. exists p1, (l2::p2).
+      rewrite Hedge; eauto.
+  Qed.
+
+  Lemma contains_edge_first_edge :
+    forall p l l',
+      contains_edge p l l' ->
+      exists p1 p2, p = p1++(l'::l::p2) /\ not (contains_edge p2 l l').
+  Proof.
+    induction p as [p IHp] using (induction_ltof1 _ (fun x => length x)); unfold ltof in IHp.
+    intros l l' [p1 [p2 H]].
+    destruct (contains_edge_dec p1 l l').
+    + apply IHp in H0.
+      destruct H0 as [p3 [p4 [H01 H02]]].
+      subst. exists (p2 ++ l' :: l :: p3), p4; split; eauto.
+      repeat rewrite app_comm_cons || rewrite app_assoc => //.
+      subst. rewrite app_length; simpl. Psatz.lia.
+    + exists p2, p1; split; eauto.
+  Qed.
+
+  Lemma contains_edge_last_edge :
+    forall p l l',
+      contains_edge p l l' ->
+      exists p1 p2, p = p1++(l'::l::p2) /\ not (contains_edge p1 l l').
+  Proof.
+    induction p as [p IHp] using (induction_ltof1 _ (fun x => length x)); unfold ltof in IHp.
+    intros l l' [p1 [p2 H]].
+    destruct (contains_edge_dec p2 l l').
+    + apply IHp in H0.
+      destruct H0 as [p3 [p4 [H01 H02]]].
+      subst. exists p3 , (p4 ++ l' :: l :: p1) ; split; eauto.
+      repeat rewrite app_comm_cons || rewrite app_assoc => //.
+      subst. rewrite app_length; simpl. Psatz.lia.
+    + exists p2, p1; split; eauto.
+  Qed.
 
   Lemma reachable_path_assignment :
     forall σ σ' C ω ω' p f l l',

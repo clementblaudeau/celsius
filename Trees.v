@@ -134,6 +134,23 @@ Qed.
     apply (eq_S _ _(IHp _ _ )).
 Qed.
 
+  Lemma update_dom : forall (σ:Store) p v,
+      dom [p ↦ v]σ = dom σ.
+  Proof.
+    unfold dom; eauto using update_one3.
+  Qed.
+
+  Lemma update_one4 : forall (X:Type) (p:nat) (v v': X) l,
+      nth_error [p ↦ v]l p = Some v' -> v = v'.
+  Proof.
+    intros.
+    assert (p < length l). {
+      pose proof (nth_error_Some [p↦v]l p).
+      rewrite update_one3 in H0. apply H0. rewrite H. discriminate.
+    }
+    rewrite update_one1 in H; eauto. injection H => //.
+  Qed.
+
 Check [0].
 Check [0 ↦ 1] ∅.
 Check [[0] ⟼ [1]] [1 ; 2 ; 3].
