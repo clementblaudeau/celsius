@@ -246,9 +246,64 @@ Module Scopability.
                   intros l3 Hl3. unfold dom in *. erewrite <- update_one3; steps; eauto.
                   exists l2 ; split => // .
                   apply reachable_path_reachability; right; eauto.
-    + admit.
+    + (* (σ1, L1) ⋖ (σ2', {l}) *)
+      unfold scoping; simpl. intros H5 H6 l1.
+      steps. destruct H8; steps; inSingleton.
+      destruct (PeanoNat.Nat.eq_dec l l'); subst.
+      ++ (* if l = l', the assignment is weakening *)
+        apply H0; unfold storeSubset in *; steps;
+          try inSingleton; repeat rewrite_anywhere update_dom; eauto using In_singleton.
+         eexists; split; eauto using In_singleton, reachability_weaken_assignment.
+      ++ move: (proj2 (iff_and (reachable_path_reachability _ l l1)) H8) => [[D1 D2] | [p D1]]; subst.
+      +++ assert (σ2 ⊨ l1 ⇝ l1) by eauto using rch_heap, getObj_dom.
+         apply H0; unfold storeSubset; steps; try inSingleton; rewrite_anywhere update_dom; eauto.
+         eexists; split; eauto using In_singleton.
+      +++ destruct (reachable_path_assignment σ2 _ C ω _ _ f l l' H2 eq_refl eq_refl D1) as [Hedge | Hpath].
+          ++++ (* path contains the edge *)
+            assert (l' < dom σ2). {
+              unfold contains_edge in Hedge. steps.
+              eapply reachable_path_is_reachable in D1.
+              eapply reachability_dom in D1. rewrite_anywhere update_dom; steps; eauto.
+              rewrite H3. apply in_app_iff; steps.
+            }
+            apply H1; eauto.
+            +++++ intros l3 Hl3. inSingleton => //.
+            +++++ exists l'. steps.
+            pose proof (contains_edge_last_edge _ _ _ Hedge) as [p2 [p3 [H9 H10]]].
+            apply reachable_path_reachability.
+            destruct (PeanoNat.Nat.eq_dec l' l1); [left; split; eauto | right].
+            Opaque reachable_path.
+            destruct p2; steps.
+            exists p2.
+            eapply contains_edge_assignment with (l' := l'); eauto.
+            { clear D1 Hedge. intros [p21 [p22 Hedge]]; steps.
+              destruct p22; steps.
+              apply H10. clear H10. unfold contains_edge.
+              destruct p21.
+              ++ exfalso. apply n. symmetry.
+                 eapply (app_inj_tail p2 (p22++[l'])).
+                 rewrite app_assoc_reverse; steps.
+              ++ pose proof (app_exists_last p21 l0); steps.
+                 exists p', (l1::p22); steps.
+                 apply (app_inv_tail [l']).
+                 simpl. rewrite H9. rewrite H10.
+                 rewrite H10 in H9.
+                 repeat rewrite app_comm_cons in H9. rewrite app_assoc in H9.
+                 apply app_inj_tail in H9; steps.
+                 repeat rewrite <- app_comm_cons || rewrite app_assoc_reverse.
+                 steps.
+            } {
+              eapply (reachable_path_app2 _ l'(l::p3) (l0::p2)).
+              rewrite H4 in D1.
+              rewrite <- app_comm_cons; eauto.
+            }
+          ++++ (* path does not contain the edge *)
+            apply H0; simpl; eauto.
+            +++++ intros l3 Hl3. inSingleton; eauto using reachability_dom, getObj_dom.
+            +++++ exists l. steps.
+                  apply reachable_path_reachability; right; eauto.
+  Qed.
 
-  Admitted.
 
   Definition codom (ρ: Env) : (LocSet):=
     fun (l: Loc) => (List.In l ρ).

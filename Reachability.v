@@ -134,22 +134,23 @@ Module Reachability.
   Lemma reachable_path_is_reachable:
     forall σ e p l,
       reachable_path σ (e::p) ->
-      List.In l p ->
+      List.In l (e::p) ->
       σ ⊨ l ⇝ e.
   Proof.
     intros σ e p.
     generalize dependent e.
-    induction p ; try solve [repeat light].
-    intros. simpl in H0. destruct H0 as [H0 | H0].
+    induction p ; try solve [repeat light ; eauto using rch_heap].
+    intros. simpl in H0. destruct H0 as [H0 | H0]; subst.
     + subst; simpl in H.
-      destruct p eqn:P ; repeat light; eauto using rch_heap, reachable_one_step_reachability.
+      destruct p eqn:P ; repeat light; eauto using rch_heap, reachable_one_step_reachability, reachability_dom;
+      apply reachable_one_step_reachability, reachability_dom in H0; apply rch_heap; steps.
     + specialize (IHp a l).
-      destruct p eqn:P; try solve [exfalso; eauto using in_nil].
+      destruct p eqn:P; [steps; eauto using reachable_one_step_reachability |].
       rewrite <- P in *. simpl in H.
       destruct_and.
       unfold reachable_one_step in H.
-      destructs.
-      eapply rch_trans; eauto.
+      destructs;
+      eapply rch_trans; eauto;
       eapply IHp; simpl; eauto.
   Qed.
 
@@ -268,7 +269,7 @@ Module Reachability.
     + rewrite_anywhere app_nil_l.
       simpl in *.
       eapply reachable_path_is_reachable; destructs; eauto.
-      apply in_app_iff; steps.
+      rewrite app_comm_cons. apply in_app_iff; steps.
     + simpl in H.
       destruct_match; [apply_anywhere app_eq_nil; steps |].
       rewrite <- matched in *. destructs; eauto.
