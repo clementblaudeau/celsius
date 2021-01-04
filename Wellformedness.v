@@ -92,6 +92,30 @@ Module Wellformedness.
   Qed.
 
 
+  Lemma wf_assign: forall σ σ' ω ω' l v f C,
+      (getObj σ l) = Some (C, ω) ->
+      σ' = [l ↦ (C, ω')]σ ->
+      ω' = [f ↦ v]ω ->
+      v < dom σ ->
+      wf σ -> wf σ'.
+  Proof.
+    unfold wf; steps. rewrite update_dom.
+    pose proof (PeanoNat.Nat.eq_dec l l0) as [Hl0 | Hl0]; subst.
+    + rewrite getObj_update1 in H4; eauto using getObj_dom.
+      unfold getVal in *.
+      assert (f0 < length ω0). {
+        pose proof (nth_error_Some ω0 f0);
+        destruct (nth_error ω0 f0); eapply_any; steps.
+      }
+      invert_constructor_equalities; subst.
+      pose proof (PeanoNat.Nat.eq_dec f f0) as [Hf | Hf]; subst.
+      ++ rewrite_anywhere update_one3.
+         rewrite update_one1 in H5 => // .
+         invert_constructor_equalities; steps.
+      ++ erewrite update_one2 in H5; eauto.
+    + unfold getObj in *.
+      rewrite update_one2 in H4; eauto using PeanoNat.Nat.neq_sym.
+  Qed.
 
 
 
@@ -194,35 +218,10 @@ Module Wellformedness.
     + unfold assign in *.
       destruct (getObj s0 v0) eqn:G.
       ++ destruct o.
-         apply H6.
-         +++ unfold wf. intros.
-             intuition auto.
-             assert (wf s0) by (apply H9; eauto using storeSubset_trans).
-             pose proof (PeanoNat.Nat.eq_dec l0 v0) as [Hl0 | Hl0]; subst.
-             ++++ rewrite getObj_update1 in H10; eauto using getObj_dom.
-                  invert_constructor_equalities; subst.
-                  unfold getVal in *.
-                  assert (f < length e). {
-                    pose proof (nth_error_Some [v ↦ v1] (e) f).
-                    rewrite update_one3 in H10.
-                    apply H10; rewrite H11 => //.
-                  }
-                  pose proof (PeanoNat.Nat.eq_dec f v) as [Hl1 | Hl1]; subst.
-
-                  +++++  rewrite update_one1 in H11 => //; invert_constructor_equalities; subst.
-                  intuition auto. unfold dom in *.
-                  rewrite update_one3. apply H9.
-                  eauto using storeSubset_trans.
-                  +++++  unfold getVal in *. rewrite update_one2 in H11; eauto using PeanoNat.Nat.neq_sym.
-                  unfold dom. rewrite update_one3.
-                  eapply H7; eauto.
-             ++++ unfold getObj in *. rewrite update_one2 in H10; eauto using PeanoNat.Nat.neq_sym.
-                  unfold dom. rewrite update_one3.
-                  eapply H7; eauto.
-         +++ apply (storeSubset_trans _ σ _) => //.
-             unfold dom in *.
-             rewrite update_one3.
-             eauto using PeanoNat.Nat.le_trans.
+         apply H6. intuition auto.
+         eapply wf_assign; eauto; try eapply H9; eauto using storeSubset_trans.
+         apply (storeSubset_trans _ σ _) => //.
+         unfold dom in *; rewrite update_one3. lia.
       ++ repeat apply_any; eauto using storeSubset_trans.
   Qed.
 

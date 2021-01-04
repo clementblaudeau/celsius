@@ -11,6 +11,7 @@ Module PartialMonotonicity.
   Import Eval.Evaluator.
   Import Compatibility.Compatibility.
   Create HintDb pM.
+  Hint Extern 1 => unfold dom in *: dm.
 
   (* Definitions and notations : *)
   Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=

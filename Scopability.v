@@ -350,9 +350,7 @@ Module Scopability.
       apply (scoping_transitivity _ σ' _ _ {v}) => //.
       unfold storeSubset. intros. inSingleton. eauto using getObj_dom.
       }
-      split. intros.
-        by apply C1.
-          by apply A3.
+      steps.
     + (* e = e0.m(l0) *)
       rename matched into A1.
       rename s into σ0. rename l0 into lv. rename v into l0. rename e into ω.
@@ -360,8 +358,40 @@ Module Scopability.
       assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ0, (codom ρ) ∪ {ψ})) as A4
           by eauto using  preserving_regularity_degenerate, PartialMonotonicity.partialMonotonicity_theorem_dom.
       rename matched0 into A5. move: A1 A2 A3 A4 A5 => A1 A2 A3 A4 A5.
-      rename s0 into σ_n.
-      Admitted.
+      rename s0 into σ_n. admit.
+    + (* e = new C(l0) *)
+      admit.
+    + (* e = e0.f = e1; e2 *)
+      rename matched into A0, s into σ0, v into l0, s0 into σ1, v0 into l1, matched0 into B0, H_success into E0.
+      move: (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ A0) => A_dom.
+      move: (H_strong _ _ _ _ _ _ A0 H_wf H_codom) => [A1 A2].
+      move: (preserving_regularity_degenerate _ _ _ A2 A_dom) => A3.
+      move: (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ B0) => B_dom.
+      move: (wellformedness_conserved _ _ _ _ _ _ _ A0 H_wf H_codom) => [H_wf0 H_l0].
+      assert ((codom ρ ∪ {ψ}) ⪽ σ0) as H_codom0 by eauto using storeSubset_trans.
+      move: (H_strong _ _ _ _ _ _ B0 H_wf0 H_codom0) => [B1 B2].
+      assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ1, {l1})) as B3 by eauto using scoping_transitivity.
+      assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ1, {l0})) as B4 by (eapply B2; eauto; try lia; unfold storeSubset; intros; inSingleton; steps).
+      unfold assign in E0.
+      assert (dom σ0 <= dom σ1) by eauto with pM.
+      repeat destruct_match; try solve [  eapply nth_error_None in matched; unfold dom in *; lia].
+
+      set (σ1' :=  ([l0 ↦ (c, [f ↦ l1] (e))] (σ1))) in E0.
+      assert (dom σ0 <= dom σ1') by (rewrite update_dom; lia).
+      assert (dom σ <= dom σ1') by (rewrite update_dom; lia).
+      assert (σ ⇝ σ1 ⋖ codom ρ ∪ {ψ}) as B5 by eauto using preserving_transitivity_degenerate.
+      move: (scopability_assignment _ _ σ1' _ _ _ _ _ _ _ B5 B4 B3 matched eq_refl eq_refl) => [D2 D1].
+      assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ1', codom ρ ∪ {ψ})) as D3 by
+            (eapply D2; try eapply scoping_reflexivity; steps; eauto using PeanoNat.Nat.le_trans with lia).
+      assert ((codom ρ ∪ {ψ}) ⪽ σ1') as H_codom1' by eauto using storeSubset_trans.
+      assert (wf σ1') as H_wf1'. {
+        assert (wf σ1) by (eapply wellformedness_conserved; eauto).
+        eapply wf_assign; eauto. steps.
+        eapply wellformedness_conserved; eauto.
+      }
+      move: (H_strong _ _ _ _ _ _ E0 H_wf1' H_codom1') => [E1 E2].
+      split; eauto using scoping_transitivity, preserving_transitivity.
+  Admitted.
 
 
 
