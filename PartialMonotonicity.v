@@ -121,6 +121,17 @@ Module PartialMonotonicity.
       by apply partialMonotonicity_domains.
   Qed.
 
+  Hint Resolve partialMonotonicity_theorem_dom: pM.
+
+  Theorem partialMonotonicity_theorem_list_dom: forall n el σ σ' ρ ψ ρ',
+      ⟦_ el _⟧(σ, ρ, ψ)(n) = (Success_list ρ' σ') -> (dom σ) <= (dom σ').
+  Proof.
+    intros.
+    eapply (eval_list_prop (fun σ σ' => dom σ <= dom σ') (S n)); intros;
+      unfold Reflexive, Transitive, Assignment, Freshness, EvalMaintained; eauto with pM lia.
+  Qed.
+  Hint Resolve partialMonotonicity_theorem_list_dom: pM.
+
 
 
   Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> σ ⊆ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).

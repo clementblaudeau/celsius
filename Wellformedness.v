@@ -20,6 +20,7 @@ Require Import Sets.Ensembles.
 
 Module Wellformedness.
   Import Eval.Evaluator.
+  Create HintDb wf.
 
   Definition wf σ := forall l C ω, getObj σ l = Some(C,ω) -> forall f l, getVal ω f = Some l -> l < dom σ.
 
@@ -28,19 +29,36 @@ Module Wellformedness.
   Definition codom (ρ: Env) : (LocSet):=
     fun (l: Loc) => (List.In l ρ).
 
+
+
   Lemma storeSubset_trans : forall a s s', dom s <= dom s' -> a ⪽ s -> a ⪽ s'.
   Proof.
     intros. intros l Hl.
     pose proof (H0 l Hl).
     lia.
   Qed.
+  Hint Resolve storeSubset_trans: wf.
 
   Lemma storeSubset_union : forall a b s, a ⪽ s -> b ⪽ s -> (a∪b) ⪽ s.
   Proof.
     unfold storeSubset; intros.
     induction H1; eauto.
   Qed.
+  Hint Resolve storeSubset_union: wf.
 
+  Lemma storeSubset_union_l : forall a b s, (a∪b) ⪽ s -> a ⪽ s.
+  Proof.
+    unfold storeSubset; intros.
+    apply H. eauto using Union_introl.
+  Qed.
+  Hint Resolve storeSubset_union_l: wf.
+
+  Lemma storeSubset_union_r : forall a b s, (a∪b) ⪽ s -> b ⪽ s.
+  Proof.
+    unfold storeSubset; intros.
+    apply H. eauto using Union_intror.
+  Qed.
+  Hint Resolve storeSubset_union_r: wf.
 
   Lemma storeSubset_add : forall v a s,
       codom (v :: a) ⪽ s <-> v < dom s /\ codom a ⪽ s.
@@ -53,6 +71,7 @@ Module Wellformedness.
       unfold codom, List.In, In; right => //.
     + intros l Hl. unfold codom, List.In, In in Hl. move: Hl=> [Hl|Hl]; steps.
   Qed.
+  Hint Resolve storeSubset_add: wf.
 
   Notation " a ∪ { b } " := (Union Loc a (Singleton Loc b)) (at level 80).
   Lemma storeSubset_singleton : forall a b σ, a ∪ {b} ⪽ σ -> b < dom σ.
@@ -60,12 +79,30 @@ Module Wellformedness.
     intros. apply (H b).
     eauto using Union_intror, In_singleton.
   Qed.
+  Hint Resolve storeSubset_singleton: wf.
+
+  Lemma storeSubset_singleton2 : forall a σ, (Singleton Loc a) ⪽ σ <-> a < dom σ.
+  Proof.
+    unfold storeSubset; steps;
+    [induction (H a) | induction H0] ; steps.
+  Qed.
+  Hint Resolve storeSubset_singleton2: wf.
 
   Lemma storeSubset_codom_empty : forall s, codom [] ⪽ s.
   Proof.
     intros s l Hl.
     steps.
   Qed.
+  Hint Resolve storeSubset_codom_empty: wf.
+
+  Lemma codom_empty_union: forall a, (codom [] ∪ a) = a.
+  Proof.
+    intros.
+    apply Extensionality_Ensembles.
+    unfold Same_set. unfold Included; repeat steps || destruct H.
+    eapply Union_intror => //.
+  Qed.
+
 
   Lemma wf_add : forall s c ρ, wf s -> codom ρ ⪽ s -> wf (s ++ [(c,ρ)]).
   Proof.
@@ -85,11 +122,13 @@ Module Wellformedness.
       rewrite nth_error_app1 in H1 => //.
       apply (H _ _ _ H1) in H2. lia.
   Qed.
+  Hint Resolve wf_add: wf.
 
   Lemma wf_add_empty : forall s c, wf s -> wf (s ++ [(c,[])]).
   Proof.
     eauto using wf_add, storeSubset_codom_empty.
   Qed.
+  Hint Resolve wf_add_empty: wf.
 
 
   Lemma wf_assign: forall σ σ' ω ω' l v f C,
@@ -116,6 +155,7 @@ Module Wellformedness.
     + unfold getObj in *.
       rewrite update_one2 in H4; eauto using PeanoNat.Nat.neq_sym.
   Qed.
+  Hint Resolve wf_assign: wf.
 
 
 
@@ -148,7 +188,12 @@ Module Wellformedness.
 
 
   Theorem wellformedness_conserved :
-    forall k e σ σ' ρ ψ l, ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') -> wf σ -> (codom ρ) ∪ {ψ} ⪽ σ -> (wf σ' /\ l < dom σ').
+    forall k e σ σ' ρ ψ l,
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      wf σ ->
+      (codom ρ) ∪ {ψ} ⪽ σ ->
+      (wf σ' /\ l < dom σ').
+  Proof.
     apply (strong_induction (fun k => forall e σ σ' ρ ψ l, ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') -> wf σ -> (codom ρ) ∪ {ψ} ⪽ σ ->  (wf σ' /\ l < dom σ'))). intros.
     assert (ψ < dom σ /\ forall l', List.In l' ρ -> l' < dom σ). {
       unfold storeSubset in *.
@@ -224,7 +269,30 @@ Module Wellformedness.
          unfold dom in *; rewrite update_one3. lia.
       ++ repeat apply_any; eauto using storeSubset_trans.
   Qed.
+  Hint Resolve wellformedness_conserved: wf.
 
 
+  Theorem wf_conserved :
+    forall k e σ σ' ρ ψ l,
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      wf σ ->
+      (codom ρ) ∪ {ψ} ⪽ σ ->
+      wf σ'.
+  Proof.
+    intros. eapply wellformedness_conserved; eauto.
+  Qed.
+
+  Theorem correct_value :
+    forall k e σ σ' ρ ψ l,
+      ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
+      wf σ ->
+      (codom ρ) ∪ {ψ} ⪽ σ ->
+      l < dom σ'.
+  Proof.
+    intros. eapply wellformedness_conserved; eauto.
+  Qed.
+
+  Hint Resolve wf_conserved: wf.
+  Hint Resolve correct_value: wf.
 
 End Wellformedness.

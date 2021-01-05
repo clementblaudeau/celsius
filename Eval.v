@@ -75,7 +75,7 @@ Module Evaluator.
                             | Some (method μ x _ e1) => (
                                 match (⟦_ el _⟧(σ1, ρ, v)(n)) with
                                 | Success_list args_val σ2 =>
-                                  let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v)(n)
+                                  let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0)(n)
                                 | _ => Error end)
                             | _ => Error end)
                         | _ => Error end)
