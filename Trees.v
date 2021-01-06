@@ -2,6 +2,7 @@ From Coq Require Import Lists.List.
 Import ListNotations.
 Require Import ssreflect ssrbool.
 Require Import Sets.Ensembles.
+Require Import Celsius.Tactics.
 
 (* Read the pen/paper proofs of scopability *)
 (* Github repo  ? *)
@@ -71,6 +72,39 @@ Lemma getObj_last : forall (σ: Store) (C: ClN) (ρ: Env), getObj (σ++[(C,ρ)])
 Proof.
   induction σ; simpl; intros => //.
   Qed.
+
+Lemma getObj_last2 : forall σ C ρ l, l < dom σ -> getObj (σ++[(C,ρ)]) l = getObj σ l.
+Proof.
+  induction σ; simpl; intros => //; try Psatz.lia.
+  destruct l; steps; eauto.
+  apply IHσ. Psatz.lia.
+Qed.
+
+Lemma getObj_last_empty : forall σ C C' ω l f v,
+    getObj (σ++[(C,[])]) l = Some (C', ω) ->
+    getVal ω f = Some v ->
+    getObj σ l = Some (C', ω) /\ l < dom σ.
+Proof.
+  intros.
+  assert (l <= (length σ)). {
+    unfold getObj in *.
+    epose proof (nth_error_Some (σ ++ [(C, [])]) l).
+    rewrite_anywhere app_length.
+    rewrite_anywhere PeanoNat.Nat.add_1_r.
+    steps.
+    apply le_S_n.
+    apply_any.
+    steps.
+    rewrite H in H1.
+    discriminate.
+  }
+  apply Lt.le_lt_or_eq in H1 as [H1 | H1]; unfold dom in *.
+  + split => //.
+    rewrite getObj_last2 in H => //.
+  + rewrite H1 getObj_last in H.
+    invert_constructor_equalities; steps;
+      destruct f; steps.
+Qed.
 
 Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
   match l with

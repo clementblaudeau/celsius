@@ -105,6 +105,32 @@ Module Scopability.
 
   Hint Resolve scoping_union: scoping.
 
+  Lemma scoping_union_introl :
+    forall σ1 σ2 L L1 L2,
+      (L1 ∪ L2) ⪽ σ2 ->
+      (σ1, L)  ⋖ (σ2, L1∪L2) ->
+      (σ1, L)  ⋖ (σ2, L1).
+  Proof.
+    unfold scoping, reachability_set; simpl; steps.
+    eapply_any; eauto.
+    eexists; eauto using Union_introl.
+  Qed.
+
+  Hint Resolve scoping_union_introl: scoping.
+
+  Lemma scoping_union_intror :
+    forall σ1 σ2 L L1 L2,
+      (L1 ∪ L2) ⪽ σ2 ->
+      (σ1, L)  ⋖ (σ2, L1∪L2) ->
+      (σ1, L)  ⋖ (σ2, L2).
+  Proof.
+    unfold scoping, reachability_set; simpl; steps.
+    eapply_any; eauto.
+    eexists; eauto using Union_intror.
+  Qed.
+
+  Hint Resolve scoping_union_intror: scoping.
+
 
   Lemma scoping_reachability: forall σ l1 l2, ( σ ⊨ l1 ⇝ l2) -> (σ, {l1}) ⋖ (σ, {l2}).
   Proof.
@@ -325,16 +351,29 @@ Module Scopability.
   Qed.
 
   Lemma scopability_add:
-    forall σ σ' ρ ρ' l0 l ψ,
-      (σ, codom ρ ∪ {ψ}) ⋖ (σ', {l}) ->
-      (σ, codom ρ ∪ {ψ}) ⋖ (σ', codom ρ' ∪ {l0}) ->
-      (σ, codom ρ ∪ {ψ}) ⋖ (σ', codom (l::ρ') ∪ {l0}).
+    forall σ σ' ρ' l0 l a,
+      (σ, a) ⋖ (σ', {l}) ->
+      (σ, a) ⋖ (σ', codom ρ' ∪ {l0}) ->
+      (σ, a) ⋖ (σ', codom (l::ρ') ∪ {l0}).
   Proof.
-    admit.
-  Admitted.
-
-
-
+    intros.
+    assert ((codom (l :: ρ') ∪ {l0}) = Union Loc (Singleton Loc l) ( codom ρ' ∪ {l0})). {
+      apply Extensionality_Ensembles.
+      unfold Same_set; steps; intros l'; steps.
+      + inversion H1. steps.
+        apply Union_intror, Union_introl; steps.
+        inSingleton; subst.
+        apply Union_intror, Union_intror; steps.
+      + inversion H1. inSingleton; subst.
+        apply Union_introl; steps.
+        inversion H2. steps.
+        apply Union_introl; steps.
+        steps. inSingleton.
+        apply Union_intror; steps.
+    }
+    rewrite H1.
+    apply scoping_union; eauto.
+  Qed.
 
 
   Definition ScopabilityProp n :=
@@ -395,8 +434,150 @@ Module Scopability.
     rewrite storeSubset_singleton2; eauto with wf.
   Qed.
 
+  Lemma scopability_list_aux2:
+    forall n : nat,
+      (forall k : nat,
+          k < S (S n) ->
+          forall (e : Expr) (σ σ' : Store) (ρ : Env) (ψ l : Value),
+            (⟦ e ⟧ (σ, ρ, ψ )( k)) = Success l σ' ->
+            wf σ -> (codom ρ ∪ {ψ}) ⪽ σ -> ((σ, codom ρ ∪ {ψ}) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ codom ρ ∪ {ψ})) ->
+      forall  σ ρ ψ ,
+        wf σ ->
+        (codom ρ ∪ {ψ}) ⪽ σ ->
+        forall el σ1 σ2 L acc,
+          fold_left (eval_list_aux ρ ψ n) el (Success_list acc σ1) = Success_list L σ2 ->
+          wf σ1 ->
+          dom σ <= dom σ1 ->
+          (σ, codom ρ ∪ {ψ}) ⋖ (σ1, codom acc) ->
+          (codom acc) ⪽ σ1 ->
+          σ ⇝ σ1 ⋖ (codom ρ ∪ {ψ}) ->
+
+          ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, codom L)) /\
+          (σ ⇝ σ2 ⋖ codom ρ ∪ {ψ}) /\
+          (dom σ <= dom σ2) /\
+          (codom L ⪽ σ2) /\
+          (wf σ2).
+  Proof.
+    intros n H_strong σ ρ ψ H_wf H_codom.
+    induction el; intros; simpl in H.
+    + invert_constructor_equalities; subst => //.
+    + destruct n; [rewrite_anywhere foldLeft_constant => // |].
+      simpl in H.
+      destruct (⟦ a ⟧ (σ1, ρ, ψ )( n)) eqn:A;
+        try solve [rewrite_anywhere foldLeft_constant => //; try eval_not_success_list].
+      unshelve epose proof (H_strong n _ _ _ _ _ _ _ A _ _); try lia ; eauto with wf; destruct_and.
+      assert (dom σ1 <= dom s) by eauto with pM.
+      assert (dom σ <= dom s) by lia.
+      apply IHel in H; eauto using PeanoNat.Nat.le_trans, preserving_transitivity_degenerate with wf pM.
+      ++ assert (codom (v::acc) = Union Loc (Singleton Loc v) (codom acc)). {
+           apply Extensionality_Ensembles.
+           unfold Same_set; steps; intros l'; steps; eauto using Union_introl, Union_intror.
+           inversion H9; try inSingleton; steps.
+         }
+         rewrite_any.
+         apply scoping_union; eauto.
+         +++ eapply scoping_transitivity with σ1 (codom ρ ∪ {ψ}) ; eauto with wf.
+             apply H4; eauto with wf pM scoping.
+         +++ apply H6; eauto with wf pM.
+             apply H4; eauto with wf pM scoping.
+      ++ apply storeSubset_add; split; eauto with wf.
+  Qed.
+
+  Lemma scopability_add_env:
+    forall I v s c e0,
+      getObj s I = Some (c, e0) ->
+      v < dom s ->
+      forall σ0 L0 L2 ,
+        L0 ⪽ σ0 ->
+        L2 ⪽ s ->
+        (σ0, L0) ⋖ (s, {v}) ->
+        (σ0, L0) ⋖ (s, L2) ->
+
+        (σ0, L0) ⋖ ([I ↦ (c, e0 ++ [v])] (s), L2).
+  Proof.
+    intros.
+    unfold scoping; simpl; intros.
+    unfold reachability_set in *. destruct H8 as [l2 [Hl2 Hrch]].
+    assert (reachability s l2 l \/ (reachability s l2 I /\ reachability s v l)) as [Hrch2 | [HrchI Hrchl]] by
+          eauto using reachability_add_env, getObj_dom.
+    + eapply_any; simpl; eauto with wf.
+      exists l2; steps.
+    + eapply H3; simpl; eauto with wf.
+      eapply storeSubset_singleton2 => //.
+      exists v; steps.
+  Qed.
 
 
+  Lemma scopability_init:
+    forall n,
+      (forall k,
+          k < S (S n) ->
+          forall (e : Expr) (σ σ' : Store) (ρ : Env) (ψ l : Value),
+            (⟦ e ⟧ (σ, ρ, ψ )( k)) = Success l σ' ->
+            wf σ -> (codom ρ ∪ {ψ}) ⪽ σ -> ((σ, codom ρ ∪ {ψ}) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ codom ρ ∪ {ψ})) ->
+      forall σ L L1 I fields σ1 σ2,
+        fold_left (init_field L1 I n) fields (Some σ1) = Some σ2 ->
+
+        dom σ <= dom σ1 ->
+        I < dom σ1 ->
+        wf σ1 ->
+        (codom L1 ∪ {I}) ⪽ σ1 ->
+        ((σ, L) ⋖ (σ1, (codom L1) ∪ {I})) ->
+        (σ ⇝ σ1 ⋖ L) ->
+
+        ((σ, L) ⋖ (σ2, (codom L1) ∪ {I})) /\ (σ ⇝ σ2 ⋖ L) /\ (dom σ1 <= dom σ2).
+  Proof.
+    intros n H_strong σ L L1 I.
+    induction fields; intros; simpl in H.
+    + invert_constructor_equalities; steps.
+    + destruct n; [rewrite_anywhere foldLeft_constant => // |].
+      simpl in H.
+      destruct a as [_ e].
+      destruct (⟦ e ⟧ (σ1, L1, I )( n)) eqn:E; try solve [rewrite_anywhere  foldLeft_constant => //].
+      rewrite {2}/assign_new in H.
+      destruct (getObj s I) eqn:G; try solve [rewrite_anywhere  foldLeft_constant => //].
+      destruct o.
+      unshelve epose proof (H_strong n _ _ _ _ _ _ _ E _ _); try lia ; eauto with wf; destruct_and.
+      assert (dom [I ↦ (c, e0 ++ [v])] (s) = dom s) as H_dom_s by eauto using update_dom.
+      assert (dom σ1 <= dom s) by eauto with pM.
+      assert (wf s) by eauto with wf.
+      eapply IHfields in H as [A1 [A2 A3]];
+        repeat split; eauto with wf pM;
+          try solve [eapply_any; eauto];
+          try solve [rewrite H_dom_s || rewrite H_dom_s in A3; lia].
+      ++ unfold wf; intros. rewrite H_dom_s.
+         assert (I < dom s) by lia.
+         destruct (PeanoNat.Nat.eq_dec l I) as [Heq | Hneq].
+         +++ (* l = I *)
+           subst.
+           rewrite (getObj_update1 s (c, e0 ++ [v]) I _) in H10 => //.
+           invert_constructor_equalities; subst.
+           assert (f < length e0 \/ f = length e0) as Hf . {
+             apply Lt.le_lt_or_eq, Lt.lt_n_Sm_le.
+             pose proof (nth_error_Some (e0 ++ [v]) f) as Hf.
+             rewrite app_length PeanoNat.Nat.add_1_r in Hf.
+             apply Hf.
+             unfold getVal in *.
+             rewrite H11. steps.
+           }
+           destruct Hf; unfold getVal in *.
+           ++++ rewrite_anywhere nth_error_app1; steps.
+                eapply_any; eauto.
+           ++++ rewrite nth_error_app2 in H11 ; steps.
+                rewrite PeanoNat.Nat.sub_diag in H11. simpl in H11. invert_constructor_equalities; subst.
+                eapply correct_value; eauto.
+         +++ (* l <> I *)
+           rewrite getObj_update2 in H10 => //. steps.
+           eapply_any; eauto.
+      ++ eapply storeSubset_trans with s; eauto with pM wf. rewrite H_dom_s => //.
+      ++ eapply scoping_transitivity with σ1 _; try solve [eapply_any]; eauto with scoping.
+         apply scopability_add_env; try lia; eauto with wf.
+         eapply H7; eauto with scoping.
+      ++ eapply preserving_transitivity; eauto.
+         eapply preserving_transitivity; eauto.
+         unfold scoping_preservation; split; intros; eauto using scopability_add_env with wf.
+         eapply storeSubset_singleton2; eauto with wf.
+  Qed.
 
 
   Lemma scopability_theorem:
@@ -406,7 +587,10 @@ Module Scopability.
     intros n H_strong2 e σ σ' ρ ψ l H_success H_wf H_codom.
     destruct n => //.
     move: (H_strong2 n (le_n (S n)) ) => H_strong.
-    destruct e as [x | this | e0 f | e0 m el | C el | e0 f e1 e2]; simpl in H_success; repeat destruct_match; try discriminate; try invert_constructor_equalities; subst.
+    destruct e as [x | this | e0 f | e0 m el | C el | e0 f e1 e2];
+      simpl in H_success; repeat destruct_match;
+        try discriminate;
+        try invert_constructor_equalities; subst.
     + (* e = x *)
       split.
       unfold scoping; steps.
@@ -437,7 +621,8 @@ Module Scopability.
       steps.
     + (* e = e0.m(l0) *)
       destruct n; try discriminate.
-      rename matched into A1, s into σ0, l0 into ρ', v into l0, e into ω, matched0 into A5, s0 into σ_n, body into e_m, H_success into E0, l into l_m, σ' into σ_m, matched6 into B0.
+      rename matched into A1, s into σ0, l0 into ρ', v into l0, e into ω, matched0 into A5,
+      s0 into σ_n, body into e_m, H_success into E0, l into l_m, σ' into σ_m, matched6 into B0.
       assert (dom σ <= dom σ_n) by eauto using PeanoNat.Nat.le_trans with pM.
       pose proof (H_strong _ _ _ _ _ _ A1 H_wf H_codom) as [A2 A3].
       assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ0, (codom ρ) ∪ {ψ})) as A4
@@ -453,9 +638,53 @@ Module Scopability.
       }
       move: (H_strong _ _ _ _ _ _ E0 H_wf_n H_codom') => [E1 E2].
       move: (scopability_list_aux _ H_strong2 _ _ _ _ _ _ _ _ _ B0 H_wf H_codom A1) => [F1 F2].
-      split; eauto with scoping.
+      split ; eauto with scoping.
     + (* e = new C(l0) *)
-      admit.
+      destruct n; try discriminate.
+      simpl in matched0. repeat (destruct_match; try discriminate).
+      simpl in matched.
+
+
+      rename matched into C0, s into σ_n, l0 into L.
+
+      assert (((σ, codom ρ ∪ {ψ}) ⋖ (σ_n, codom L)) /\
+              (σ ⇝ σ_n ⋖ codom ρ ∪ {ψ}) /\
+              (dom σ <= dom σ_n) /\ (codom L ⪽ σ_n) /\ wf σ_n) as [C1 [C2 [C3 [C4 C5]]]]. {
+        eapply scopability_list_aux2; eauto with wf.
+        + unfold scoping; simpl; intros. unfold reachability_set in *. destruct_exists. steps.
+        + unfold scoping_preservation; steps.
+      }
+      assert (dom (σ_n++[(C,[])]) = S (dom σ_n)) by (unfold dom; rewrite app_length; steps; lia).
+      assert (((σ, codom ρ ∪ {ψ}) ⋖ (σ', codom L ∪ {length σ_n})) /\
+              (σ ⇝ σ' ⋖ codom ρ ∪ {ψ}) /\
+              dom (σ_n ++ [(C, [])]) <= dom σ')
+        as [D1 [D2 D3]]. {
+        apply (scopability_init n H_strong2 σ (codom ρ ∪ {ψ}) _ _ _ _ _ matched0); eauto with wf; try lia.
+        ++ unfold dom; rewrite app_length; steps; lia.
+        ++ apply storeSubset_union; eauto with wf.
+           eapply storeSubset_trans with (σ_n); eauto; try (rewrite H; lia).
+           apply storeSubset_singleton2. rewrite H; unfold dom in *; lia.
+        ++ unfold scoping; simpl; intros.
+           unfold reachability_set in *. Opaque eval. steps.
+           inversion H4.
+           +++ apply C1; steps.
+               eapply reachability_empty; eauto using PeanoNat.Nat.lt_le_trans.
+               eexists; split; eauto using Union_introl.
+           +++ inSingleton. apply C1; eauto using reachability_empty.
+               apply_anywhere reachability_not_empty => //.
+               eauto using PeanoNat.Nat.lt_le_trans.
+        ++ eapply preserving_transitivity; eauto.
+           unfold scoping_preservation; split; intros; eauto.
+           unfold scoping; simpl; intros.
+           assert (reachability_set σ_n L1 l) by eauto using PeanoNat.Nat.lt_le_trans, reachability_empty.
+           steps.
+      }
+      rewrite H in D3.
+      split => //.
+      eapply scoping_union_intror; eauto with wf scoping.
+      eapply storeSubset_union; [
+        eapply storeSubset_trans with σ_n => //; lia |
+        apply storeSubset_singleton2; unfold dom in *; lia ].
     + (* e = e0.f = e1; e2 *)
       rename matched into A0, s into σ0, v into l0, s0 into σ1, v0 into l1, matched0 into B0, H_success into E0.
       move: (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ A0) => A_dom.
@@ -486,23 +715,6 @@ Module Scopability.
       }
       move: (H_strong _ _ _ _ _ _ E0 H_wf1' H_codom1') => [E1 E2].
       split; eauto using scoping_transitivity, preserving_transitivity.
-  Admitted.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  Qed.
 
 End Scopability.

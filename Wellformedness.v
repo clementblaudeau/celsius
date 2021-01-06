@@ -20,6 +20,7 @@ Require Import Sets.Ensembles.
 
 Module Wellformedness.
   Import Eval.Evaluator.
+  Import Reachability.
   Create HintDb wf.
 
   Definition wf σ := forall l C ω, getObj σ l = Some(C,ω) -> forall f l, getVal ω f = Some l -> l < dom σ.
@@ -294,5 +295,6 @@ Module Wellformedness.
 
   Hint Resolve wf_conserved: wf.
   Hint Resolve correct_value: wf.
+
 
 End Wellformedness.

@@ -1,5 +1,6 @@
 From Celsius Require Export Trees.
 From Celsius Require Export Eval.
+
 Require Import ssreflect ssrbool.
 
 Require Import Coq.Arith.Wf_nat.
@@ -9,6 +10,7 @@ Import ListNotations.
 Open Scope nat_scope.
 Open Scope list_scope.
 Require Import Sets.Ensembles.
+Require Import Psatz.
 
 Module Reachability.
   Import Eval.Evaluator.
@@ -57,6 +59,71 @@ Module Reachability.
     intros.
     induction H; steps.
   Qed.
+
+
+  Lemma reachability_rev:
+    forall σ l l',
+              σ ⊨ l ⇝ l' ->
+              (l = l' /\ l < dom σ) \/
+              (exists C ω f l0, getObj σ l = Some(C, ω) /\ getVal ω f = Some l0 /\ σ ⊨ l0 ⇝ l').
+  Proof.
+    intros.
+    induction H; steps.
+    + right. repeat eexists; eauto using rch_heap.
+    + right. repeat eexists; eauto using rch_heap, rch_trans.
+  Qed.
+
+  Lemma reachability_rev_ind:
+    forall (P: Loc -> Loc -> Prop) σ,
+      (forall l, l < dom σ -> P l l) ->
+      (forall l1 l2 l3, P l1 l2 -> P l2 l3 -> P l1 l3) ->
+      (forall l l' C ω f , l' < dom σ -> getObj σ l = Some(C, ω) /\ getVal ω f = Some l' -> P l l') ->
+      (forall l l', σ ⊨ l ⇝ l' -> P l l').
+  Proof.
+    intros.
+    induction H2; eauto.
+    steps.
+    pose proof (H1 l1 l2 C ω f).
+    eapply H0; eauto.
+  Qed.
+
+  Lemma reachability_add_env:
+    forall σ x C ω l,
+      x < dom σ ->
+      getObj σ x = Some(C, ω) ->
+      forall l1 l2,
+      ([x ↦ (C, ω ++ [l])]σ) ⊨ l1 ⇝ l2 ->
+      σ ⊨ l1 ⇝ l2 \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
+  Proof.
+    intros σ x C ω l Hx Hobj.
+    apply reachability_rev_ind; intros.
+    + left; rewrite_anywhere update_dom; eauto using rch_heap.
+    + steps; eauto using reachability_trans.
+    + destruct (PeanoNat.Nat.eq_dec l0 x) as [Heq | Hneq]; steps.
+      ++ move: (H1) => H1cp.
+         rewrite_anywhere getObj_update1 => //.
+         invert_constructor_equalities; subst.
+         unfold getVal in *.
+         assert (f < length ω \/ f = length ω) as [Hf | Hf] . {
+           apply Lt.le_lt_or_eq, Lt.lt_n_Sm_le.
+           pose proof (nth_error_Some (ω ++ [l]) f) as Hf.
+           rewrite app_length PeanoNat.Nat.add_1_r in Hf.
+           apply Hf. steps.
+         }
+         +++ rewrite_anywhere nth_error_app1; steps.
+             rewrite_anywhere update_dom.
+             left. eapply rch_trans; eauto using rch_heap.
+         +++ rewrite nth_error_app2 in H2; steps.
+             rewrite PeanoNat.Nat.sub_diag in H2. simpl in H2.
+             steps. rewrite_anywhere update_dom.
+             right;
+             eauto using rch_heap.
+      ++ rewrite_anywhere getObj_update2; steps.
+         rewrite_anywhere update_dom.
+         left. eapply rch_trans; eauto using rch_heap, getObj_dom.
+  Qed.
+
+
 
 
   Lemma reachability_weaken_assignment :
@@ -385,6 +452,59 @@ Module Reachability.
 
 
 
+  Lemma reachability_not_empty:
+    forall σ C l, l < dom σ -> (σ++[(C, [])]) ⊨ (length σ) ⇝ l -> False .
+  Proof.
+    intros.
+    apply reachable_path_reachability in H0;
+      light; unfold dom in *; try lia.
+    destruct H1 as [p H1].
+    destruct p.
+    + steps.
+      unfold reachable_one_step in *.
+      steps.
+      rewrite getObj_last in H1.
+      destruct f; steps.
+    + pose proof (app_exists_last p n).
+      destruct H0 as [y [p' H0]].
+      rewrite H0 in H1.
+      rewrite app_assoc_reverse in H1. pose proof (app_exists_last p' l).
+      destruct H2 as [y2 [p'' H2]].
+      rewrite app_comm_cons in H1.
+      rewrite H2 in H1.
+      rewrite app_assoc_reverse in H1.
+      simpl in H1.
+      pose proof (reachable_path_app (σ++[(C,[])]) (length σ) y2 ([y]) p'' H1).
+      steps.
+      unfold reachable_one_step in *.
+      steps.
+      rewrite getObj_last in H6.
+      invert_constructor_equalities; subst.
+      destruct f; steps.
+  Qed.
+
+
+  Lemma reachability_empty:
+    forall σ C L l, l < dom σ -> ((σ++[(C, [])]) ⊫ L ⇝ l) -> (σ ⊫ L ⇝ l).
+  Proof.
+    intros.
+    inversion H0 as [l1 [Hl1 Hrch]].
+    exists l1; split => //.
+    apply reachable_path_reachability in Hrch as [Hrch | [p Hrch]].
+    + steps; eauto using rch_heap.
+    + clear Hl1 H0. generalize dependent l. generalize dependent l1.
+      induction p; intros.
+      ++ steps; unfold reachable_one_step in *; steps.
+         unfold dom in H1. repeat rewrite_anywhere app_length ; steps.
+         pose proof (getObj_last_empty _ _ _ _ _ _ _ H2 H0) as [Hobj Hl1].
+         eapply rch_trans; eauto using rch_trans, rch_heap.
+      ++ move: (app_cons_not_nil p nil l1) => Hp.
+         simpl in Hrch. destruct (p ++ [l1]) eqn:P; [exfalso; eauto |]. light.
+         unfold reachable_one_step in H0.
+         move: H0 => [C' [ω' [Hobja [[f Hval] Hdom]]]].
+         pose proof (getObj_last_empty _ _ _ _ _ _ _ Hobja Hval) as [Hobj Hl1].
+         light. eauto using rch_trans.
+  Qed.
 
 
 End Reachability.
