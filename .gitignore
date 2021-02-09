@@ -4,3 +4,6 @@
 *.aux
 *.d
 *.vio
+*.vok
+*.vos
+.lia.cache
