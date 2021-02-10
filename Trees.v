@@ -185,9 +185,13 @@ Qed.
     rewrite update_one1 in H; eauto. injection H => //.
   Qed.
 
-Check [0].
-Check [0 ↦ 1] ∅.
-Check [[0] ⟼ [1]] [1 ; 2 ; 3].
+  Lemma dom_app: forall σ (C: ClN) (ω: Env), dom (σ ++ ((C, ω)::nil)) = S (dom σ).
+  Proof.
+    intros.
+    unfold dom; rewrite app_length; simpl.
+    Psatz.lia.
+  Qed.
+
 
 
 
@@ -206,6 +210,18 @@ Check [[0] ⟼ [1]] [1 ; 2 ; 3].
     rewrite /dom /getObj => σ o x x'.
     move : (update_one2 Obj x x' o σ) => //.
   Qed.
+
+  Lemma getObj_update3: forall σ o o' x x',
+      getObj [x ↦ o]σ x' = Some o' ->
+      x < dom σ ->
+      ((x = x' /\ o = o') \/ (x <> x' /\ (getObj σ x' = Some o'))).
+  Proof.
+    steps;
+    destruct (PeanoNat.Nat.eq_dec x x') as [Heq | Hneq]; subst;
+     [ rewrite getObj_update1 in H |
+       rewrite getObj_update2 in H ]; steps.
+  Qed.
+
 
   Lemma getObj_dom : forall (σ: Store) (o: Obj) (l: nat),
       (getObj σ l) = Some o ->
@@ -228,4 +244,34 @@ Check [[0] ⟼ [1]] [1 ; 2 ; 3].
     right. apply Lt.lt_S_n in H0. rewrite nth_error_app1 in H => //.
     left. injection H0 => H1; subst. rewrite nth_error_app2 in H => //.
     rewrite <- Minus.minus_diag_reverse in H. simpl in H. injection H => //.
+  Qed.
+
+  Lemma getVal_add:
+    forall ω l l' f,
+      getVal (ω ++ [l]) f = Some l' ->
+      (f = length ω /\ l = l') \/ (f < length ω /\ getVal ω f = Some l').
+  Proof.
+    unfold getVal.
+    steps.
+    assert (f < length ω \/ f = length ω) as [Hf | Hf];
+      [
+        apply Lt.le_lt_or_eq, Lt.lt_n_Sm_le;
+        pose proof (nth_error_Some (ω ++ [l]) f) as Hf;
+        rewrite app_length PeanoNat.Nat.add_1_r in Hf;
+        apply Hf
+      | rewrite_anywhere nth_error_app1
+      | rewrite_anywhere nth_error_app2 ] ;
+      steps;
+      rewrite_anywhere PeanoNat.Nat.sub_diag; steps.
+  Qed.
+
+  Lemma getVal_update:
+    forall ω l l' f f',
+      getVal ([f ↦ l] ω) f' = Some l' ->
+      (f = f' /\ l = l') \/ (f <> f' /\ getVal ω f' = Some l').
+  Proof.
+    unfold getVal; steps.
+    destruct (PeanoNat.Nat.eq_dec f f') as [Heq | Hneq]; subst.
+     + apply update_one4 in H ; steps.
+     + rewrite update_one2 in H; eauto ; steps.
   Qed.

@@ -48,6 +48,18 @@ let matched := fresh "matched" in
 destruct t eqn:matched
 end.
 
+
+Ltac destructs :=
+  repeat subst ||
+         match goal with
+         | H : _ \/ _ |- _ => let fresh1 := fresh H in
+                           let fresh2 := fresh H in destruct H as [fresh1 | fresh2]
+         | H : _ /\ _ |- _ => let fresh1 := fresh H in
+                           let fresh2 := fresh H in destruct H as [fresh1 fresh2]
+         | H : exists a, _  |- _ => let fresh_a := fresh a in destruct H as [fresh_a H]
+         end.
+
+
 Ltac light :=
   (intros) ||
   (intuition auto) ||

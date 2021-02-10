@@ -611,7 +611,8 @@ Module Scopability.
       assert ((σ', {v}) ⋖ (σ', {l})) as B1. {
         apply scoping_reachability.
         eapply rch_trans; eauto.
-        apply rch_heap; eauto using getObj_dom.
+        eauto using getObj_dom with rch.
+        eapply rch_step; eauto.
         eapply wellformedness_conserved in matched0; eauto.
       }
       assert ((σ,  (codom ρ) ∪ (Singleton Loc ψ)) ⋖ (σ', {l})) as C1. {

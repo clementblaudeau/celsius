@@ -15,18 +15,33 @@ Require Import Psatz.
 Module Reachability.
   Import Eval.Evaluator.
 
-  (* Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80). *)
+  Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80, l1 at level 80, l2 at level 80).
   Inductive reachability : Store -> Loc -> Loc ->Prop :=
-  |rch_heap  : forall l σ,  l < (dom σ) -> (reachability σ l l)
-  |rch_trans : forall l0 l1 l2 C ω σ, (reachability σ l0 l1) -> (getObj σ l1 = Some (C, ω)) -> (exists f, (getVal ω f = Some l2)) -> (l2 < dom σ) -> (reachability σ l0 l2).
-  Notation "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2) (at level 80, l1 at level 80, l2 at level 80).
+  | rch_heap:
+      forall l σ,
+        l < (dom σ) ->
+        σ ⊨ l ⇝ l
+  | rch_step:
+      forall l0 l1 C f ω σ,
+        l1 < (dom σ) ->
+        getObj σ l0 = Some (C, ω) ->
+        getVal ω f = Some l1 ->
+        σ ⊨ l0 ⇝ l1
+  | rch_trans:
+      forall l0 l1 l2 σ,
+        σ ⊨ l0 ⇝ l1 ->
+        σ ⊨ l1 ⇝ l2 ->
+        σ ⊨ l0 ⇝ l2
+  where "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2).
+  Hint Resolve rch_heap rch_step rch_trans: rch.
+  Hint Rewrite update_dom: rch.
 
   Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
   Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 99, L at level 99).
 
   Definition reachable_cold (σ: Store) (l: Loc) := (l < dom σ).
   Notation "σ ⊨ l : 'cold'" := (reachable_cold σ l) (at level 80, l at level 80).
-   Notation "σ ⊫ L : 'cold'" := (forall l, (l ∈ L) -> reachable_cold σ l) (at level 80, L at level 99).
+  Notation "σ ⊫ L : 'cold'" := (forall l, (l ∈ L) -> reachable_cold σ l) (at level 80, L at level 99).
 
   Definition reachable_warm (σ: Store) (l: Loc) := (exists C ω args fields methods , (getObj σ l) = Some (C, ω) /\ ((ct C) = Some (class args fields methods)) /\ (length fields <= length ω)).
   Notation "σ ⊨ l : 'warm'" := (reachable_warm σ l) (at level 80, l at level 80).
@@ -38,10 +53,9 @@ Module Reachability.
 
   Lemma reachability_trans: (forall σ l1 l2 l3, (σ ⊨ l1 ⇝ l2) -> (σ ⊨ l2 ⇝ l3) -> (σ ⊨ l1 ⇝ l3)).
   Proof.
-    intros σ l1 l2 l3 H1 H2.
-    induction H2 => //.
-    apply (rch_trans l1 l2 l3 C ω σ (IHreachability H1) H H0 H3).
+    eauto using rch_trans.
   Qed.
+
   Lemma reachability_hot: forall (σ: Store) (l l': Loc), σ ⊨ l: hot -> σ ⊨ l ⇝ l' -> σ ⊨ l': hot.
   Proof.
     intros σ l l' H1 H2 l'' H3.
@@ -57,21 +71,21 @@ Module Reachability.
 
   Lemma reachability_dom : forall σ l1 l2, (σ ⊨ l1 ⇝ l2) -> (l1 < (dom σ)) /\ (l2 < (dom σ)).
     intros.
-    induction H; steps.
+    induction H; repeat steps || eapply_anywhere getObj_dom.
   Qed.
 
-
+  (*
   Lemma reachability_rev:
     forall σ l l',
-              σ ⊨ l ⇝ l' ->
-              (l = l' /\ l < dom σ) \/
-              (exists C ω f l0, getObj σ l = Some(C, ω) /\ getVal ω f = Some l0 /\ σ ⊨ l0 ⇝ l').
+      σ ⊨ l ⇝ l' ->
+      (l = l' /\ l < dom σ) \/
+      (exists C ω f l0, getObj σ l = Some(C, ω) /\ getVal ω f = Some l0 /\ σ ⊨ l0 ⇝ l').
   Proof.
     intros.
     induction H; steps.
     + right. repeat eexists; eauto using rch_heap.
     + right. repeat eexists; eauto using rch_heap, rch_trans.
-  Qed.
+  Qed. *)
 
   Lemma reachability_rev_ind:
     forall (P: Loc -> Loc -> Prop) σ,
@@ -82,9 +96,6 @@ Module Reachability.
   Proof.
     intros.
     induction H2; eauto.
-    steps.
-    pose proof (H1 l1 l2 C ω f).
-    eapply H0; eauto.
   Qed.
 
   Lemma reachability_add_env:
@@ -92,38 +103,15 @@ Module Reachability.
       x < dom σ ->
       getObj σ x = Some(C, ω) ->
       forall l1 l2,
-      ([x ↦ (C, ω ++ [l])]σ) ⊨ l1 ⇝ l2 ->
-      σ ⊨ l1 ⇝ l2 \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
+        ([x ↦ (C, ω ++ [l])]σ) ⊨ l1 ⇝ l2 ->
+        σ ⊨ l1 ⇝ l2 \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
   Proof.
     intros σ x C ω l Hx Hobj.
-    apply reachability_rev_ind; intros.
-    + left; rewrite_anywhere update_dom; eauto using rch_heap.
-    + steps; eauto using reachability_trans.
-    + destruct (PeanoNat.Nat.eq_dec l0 x) as [Heq | Hneq]; steps.
-      ++ move: (H1) => H1cp.
-         rewrite_anywhere getObj_update1 => //.
-         invert_constructor_equalities; subst.
-         unfold getVal in *.
-         assert (f < length ω \/ f = length ω) as [Hf | Hf] . {
-           apply Lt.le_lt_or_eq, Lt.lt_n_Sm_le.
-           pose proof (nth_error_Some (ω ++ [l]) f) as Hf.
-           rewrite app_length PeanoNat.Nat.add_1_r in Hf.
-           apply Hf. steps.
-         }
-         +++ rewrite_anywhere nth_error_app1; steps.
-             rewrite_anywhere update_dom.
-             left. eapply rch_trans; eauto using rch_heap.
-         +++ rewrite nth_error_app2 in H2; steps.
-             rewrite PeanoNat.Nat.sub_diag in H2. simpl in H2.
-             steps. rewrite_anywhere update_dom.
-             right;
-             eauto using rch_heap.
-      ++ rewrite_anywhere getObj_update2; steps.
-         rewrite_anywhere update_dom.
-         left. eapply rch_trans; eauto using rch_heap, getObj_dom.
+    apply reachability_rev_ind; steps; eauto with rch;
+      rewrite_anywhere update_dom; eauto with rch.
+    eapply_anywhere getObj_update3; steps; eauto with rch.
+    eapply_anywhere getVal_add; steps; eauto with rch.
   Qed.
-
-
 
 
   Lemma reachability_weaken_assignment :
@@ -135,16 +123,9 @@ Module Reachability.
       σ' ⊨ s ⇝ e ->
       σ ⊨ s ⇝ e.
   Proof.
-    intros. move: H3. move: s e. induction 1; repeat steps || rewrite_anywhere update_dom.
-    + apply rch_heap => //.
-    + eapply reachability_trans; eauto.
-      destruct (PeanoNat.Nat.eq_dec l1 l'); subst; [apply_anywhere update_one4; steps |].
-      ++ destruct (PeanoNat.Nat.eq_dec f f0); subst; [apply_anywhere update_one4; steps |]; eauto using rch_heap.
-         unfold getVal in *.
-         rewrite update_one2 in H0; eauto.
-         eapply rch_trans; try apply rch_heap; eauto using getObj_dom.
-      ++ rewrite getObj_update2 in H4; eauto using getObj_dom.
-         eapply rch_trans; try apply rch_heap; eauto using getObj_dom.
+    intros. move: H3. move: s e. induction 1; repeat steps || rewrite_anywhere update_dom; eauto with rch.
+    eapply_anywhere getObj_update3; eauto using getObj_dom; steps; eauto with rch.
+    eapply_anywhere getVal_update; steps;  eauto with rch.
   Qed.
 
   (* Notions of path into the heap *)
@@ -152,12 +133,14 @@ Module Reachability.
   Definition reachable_one_step σ l0 l1 :=
     exists C ω, (getObj σ l0 = Some (C, ω)) /\ (exists f, (getVal ω f = Some l1)) /\ (l1 < dom σ).
 
+
   Lemma reachable_one_step_reachability :
     forall σ l0 l1, reachable_one_step σ l0 l1 -> σ ⊨ l0 ⇝ l1.
   Proof.
     unfold reachable_one_step; steps.
-    eauto using rch_trans, rch_heap, getObj_dom.
+    eauto with rch.
   Qed.
+  Hint Resolve reachable_one_step_reachability : rch.
 
   (* Path in σ (p is in reverse order) *)
   Fixpoint reachable_path σ p {struct p}:=
@@ -167,15 +150,25 @@ Module Reachability.
     | l2::((l1::_) as p') => reachable_one_step σ l1 l2 /\ reachable_path σ p'
     end.
 
-  Ltac destructs :=
-    repeat subst ||
-    match goal with
-    | H : _ \/ _ |- _ => let fresh1 := fresh H in
-                      let fresh2 := fresh H in destruct H as [fresh1 | fresh2]
-    | H : _ /\ _ |- _ => let fresh1 := fresh H in
-                      let fresh2 := fresh H in destruct H as [fresh1 fresh2]
-    | H : exists a, _  |- _ => let fresh a := fresh a in destruct H as [a H]
-    end.
+  Definition contains_edge p (l1 l2 :Loc) :=
+    exists p1 p2, p = p2 ++ l2::l1::p1.
+
+
+  Lemma reachable_path_trans:
+    forall σ p1 p2 l,
+      reachable_path σ (p1++[l]) ->
+      reachable_path σ (l::p2) ->
+      reachable_path σ (p1++(l::p2)).
+  Proof.
+    induction p1; [steps | intros].
+    simpl. simpl in H.
+    repeat (destruct_match; [destruct p1; steps |]).
+    assert (n0 = n) by (destruct p1; steps); subst.
+    destruct_and.
+    split; eauto.
+    rewrite_back_any.
+    eapply IHp1; eauto. rewrite_any => //.
+  Qed.
 
 
   Lemma reachable_path_reachability:
@@ -183,54 +176,51 @@ Module Reachability.
       ((s = e /\ s < dom σ) \/ exists p, reachable_path σ (e :: (p++[s]))) <-> σ ⊨ s ⇝ e.
   Proof.
     split.
-    + intros [[H1 H2] | [p Hp]]; subst; eauto using rch_heap.
+    + intros [[H1 H2] | [p Hp]]; subst; eauto with rch.
       generalize dependent e.
-      generalize dependent s.
       induction p; repeat light; eauto using reachable_one_step_reachability.
-      specialize (IHp s a).
-         unfold reachable_one_step in H. destructs.
-         eapply rch_trans; eauto.
-    + induction 1 ; [steps | destructs].
-      ++ right. exists []. simpl; unfold reachable_one_step; steps.
-         repeat eexists; eauto.
-      ++ right. exists (l1::p); simpl.
-         split; eauto.
-         eexists; eexists; eauto.
+      specialize (IHp a).
+      unfold reachable_one_step in H. destructs.
+      eauto with rch.
+    + induction 1; destructs; eauto; right.
+      ++ exists []; simpl; unfold reachable_one_step.
+         repeat eexists; eauto using getObj_dom.
+      ++ exists (p++(l1::p0)).
+         rewrite <- app_assoc, app_comm_cons.
+         eauto using reachable_path_trans, app_comm_cons.
   Qed.
 
+
   Lemma reachable_path_is_reachable:
-    forall σ e p l,
+    forall σ p e l,
       reachable_path σ (e::p) ->
       List.In l (e::p) ->
       σ ⊨ l ⇝ e.
   Proof.
-    intros σ e p.
-    generalize dependent e.
     induction p ; try solve [repeat light ; eauto using rch_heap].
-    intros. simpl in H0. destruct H0 as [H0 | H0]; subst.
-    + subst; simpl in H.
-      destruct p eqn:P ; repeat light; eauto using rch_heap, reachable_one_step_reachability, reachability_dom;
-      apply reachable_one_step_reachability, reachability_dom in H0; apply rch_heap; steps.
-    + specialize (IHp a l).
-      destruct p eqn:P; [steps; eauto using reachable_one_step_reachability |].
+    intros. destruct H0 as [H0 | H0]; subst.
+    + destruct p eqn:P ; repeat light;
+        apply reachable_one_step_reachability, reachability_dom in H0;
+        apply rch_heap; steps.
+    + move /(_ a l):IHp => IHp.
+      destruct p eqn:P; [steps; eauto with rch|].
       rewrite <- P in *. simpl in H.
       destruct_and.
       unfold reachable_one_step in H.
-      destructs;
-      eapply rch_trans; eauto;
-      eapply IHp; simpl; eauto.
+      destructs.
+        eapply rch_trans with a; eauto with rch.
+        eapply IHp => //.
   Qed.
+
 
   Lemma reachable_path_last:
     forall σ s1 s2 p,
       reachable_path σ (p++[s2;s1]) ->
       reachable_path σ (p++[s2]).
   Proof.
-    intros.
     induction p; simpl in *.
     + unfold reachable_one_step in * ; steps.
-    + destruct_match; [ apply_anywhere app_eq_nil; steps | ].
-      destruct_match; [ apply_anywhere app_eq_nil; steps | ].
+    + repeat (destruct_match; [ apply_anywhere app_eq_nil; steps | ]).
       assert ( n = n0) by (destruct p; steps); steps.
   Qed.
 
@@ -240,18 +230,13 @@ Module Reachability.
       reachable_path σ (p2++s2::p1++[s1]) ->
       reachable_path σ (s2::p1++[s1]) /\ reachable_path σ (p2++[s2]).
   Proof.
-    split; intros.
-    + generalize dependent s1.
-      generalize dependent s2.
-      generalize dependent p1.
+    split.
+    + move: H. move: s1 s2 p1.
       induction p2; simpl.
       ++ destruct p1; steps.
       ++ intros. repeat ( destruct_match; [apply_anywhere app_eq_nil; steps |]).
-         rewrite <- matched in *.
-         rewrite <- matched0 in *.
-         destructs.
-         apply IHp2 in H1. simpl in H1.
-         steps.
+         repeat rewrite_back_any.
+         steps; eapply_anywhere IHp2; steps.
     + assert (forall l p s, reachable_path σ (p++s::l) -> reachable_path σ (p++[s])); eauto.
       induction l; steps.
       specialize (IHl (p++[s]) a).
@@ -264,10 +249,10 @@ Module Reachability.
     forall p (x:Loc),
     exists y p', x::p = p'++[y].
   Proof.
-      induction p; steps.
-      + exists x, []; steps.
-      + move /(_ a):IHp => IHp. steps.
-        exists y, (x::p'); steps.
+    induction p; steps.
+    + exists x, []; steps.
+    + move /(_ a):IHp => IHp. steps.
+      exists y, (x::p'); steps.
   Qed.
 
 
@@ -281,14 +266,11 @@ Module Reachability.
           reachable_path σ (p2 ++ s :: p1++[s']) -> reachable_path σ (p2 ++ [s])) by
         repeat steps || eapply_anywhere reachable_path_app.
     intros.
-    pose proof app_exists_last.
     destruct p1 => //.
-    move /(_ p1 n):H1 => H1; steps.
+    pose proof (app_exists_last p1 n) ; steps.
     rewrite H1 in H0; eauto.
   Qed.
 
-  Definition contains_edge p (l1 l2 :Loc) :=
-    exists p1 p2, p = p2 ++ l2::l1::p1.
 
 
   Lemma contains_edge_dec :
@@ -298,18 +280,17 @@ Module Reachability.
     induction p; steps.
     + right. steps. symmetry in H. apply app_eq_nil in H. steps.
     + left. exists p1, (a::p2); steps.
-    + pose proof (PeanoNat.Nat.eq_dec a l2) as [Ha | Ha].
+    + destruct (PeanoNat.Nat.eq_dec a l2) as [Ha | Ha]; subst.
       ++ (* a = l2 *)
-        subst.
         destruct p; steps.
         +++ right; steps. symmetry in H0. apply app_eq_unit in H0; steps.
-        +++ pose proof (PeanoNat.Nat.eq_dec l l1) as [Hl | Hl].
-            ++++ left; steps.
-                 exists p, []; steps.
-            ++++ right; steps. destruct p2; steps; eauto.
+        +++ destruct (PeanoNat.Nat.eq_dec l l1) as [Hl | Hl];
+              [ left | right]; steps;
+                [ exists p, [] | destruct p2] ; steps; eauto.
       ++ right; steps.
          destruct p2; steps; eauto.
   Qed.
+
 
   Lemma contains_edge_cons :
     forall p l l' l0,
@@ -329,16 +310,11 @@ Module Reachability.
       σ ⊨ s ⇝ l1.
   Proof.
     unfold contains_edge; steps.
-    generalize dependent l1.
-    generalize dependent l2.
-    generalize dependent p1.
-    induction p2; intros.
-    + rewrite_anywhere app_nil_l.
-      simpl in *.
-      eapply reachable_path_is_reachable; destructs; eauto.
+    move: H. move: l1 l2 p1.
+    induction p2; intros; simpl in *.
+    + eapply reachable_path_is_reachable; destructs; eauto.
       rewrite app_comm_cons. apply in_app_iff; steps.
-    + simpl in H.
-      destruct_match; [apply_anywhere app_eq_nil; steps |].
+    + destruct_match; [apply_anywhere app_eq_nil; steps |].
       rewrite <- matched in *. destructs; eauto.
   Qed.
 
@@ -359,11 +335,10 @@ Module Reachability.
     simpl in H3. destruct_and.
     split.
     + unfold reachable_one_step in *; destructs.
-      destruct H3 as [C0 [ω0 [H31 [[f0 H32] H33]]]].
-      epose proof (getObj_dom _ _ _ H31).
       repeat rewrite_anywhere update_dom.
       destruct (PeanoNat.Nat.eq_dec l1 l); subst.
-      ++ rewrite_anywhere getObj_update1; eauto. invert_constructor_equalities; subst.
+      ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
+         invert_constructor_equalities; subst.
          destruct (PeanoNat.Nat.eq_dec l2 l'); subst ; [exfalso; apply H2; exists p, []  ; steps |].
          unfold getVal in *. exists C0, ω; repeat split; eauto.
          destruct (PeanoNat.Nat.eq_dec f f0); subst; rewrite_anywhere  update_one2; eauto.
@@ -375,6 +350,7 @@ Module Reachability.
       apply H2. exists p1, (l2::p2).
       rewrite Hedge; eauto.
   Qed.
+
 
   Lemma contains_edge_first_edge :
     forall p l l',
@@ -417,14 +393,12 @@ Module Reachability.
       contains_edge p l l' \/ reachable_path σ p.
   Proof.
     intros.
-    pose proof (contains_edge_dec p l l') as [Hedge | Hedge]; eauto.
+    destruct (contains_edge_dec p l l') as [Hedge | Hedge]; eauto.
     right.
     induction p; eauto.
-    (* pose proof (PeanoNat.Nat.eq_dec a l') as [Ha | Ha]. *)
-    simpl in H2.
+    simpl in *.
     destruct_match; [steps ; unfold dom in *; rewrite_anywhere update_one3 => // |].
-    subst. destructs. intuition auto. simpl.
-    split.
+    subst. destructs. intuition auto.
     + clear H2. clear H1. unfold reachable_one_step in *; steps.
       destruct (PeanoNat.Nat.eq_dec l n); steps.
       ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
@@ -451,37 +425,38 @@ Module Reachability.
   Qed.
 
 
+  Lemma reachability_first_step:
+    forall σ l1 l2,
+      σ ⊨ l1 ⇝ l2 ->
+      l1 = l2 \/ exists l0, reachable_one_step σ l1 l0.
+  Proof.
+    unfold reachable_one_step.
+    intros.
+    induction H; steps.
+    right.  repeat eexists; eauto.
+  Qed.
+
 
   Lemma reachability_not_empty:
     forall σ C l, l < dom σ -> (σ++[(C, [])]) ⊨ (length σ) ⇝ l -> False .
   Proof.
     intros.
-    apply reachable_path_reachability in H0;
-      light; unfold dom in *; try lia.
-    destruct H1 as [p H1].
-    destruct p.
-    + steps.
-      unfold reachable_one_step in *.
-      steps.
-      rewrite getObj_last in H1.
-      destruct f; steps.
-    + pose proof (app_exists_last p n).
-      destruct H0 as [y [p' H0]].
-      rewrite H0 in H1.
-      rewrite app_assoc_reverse in H1. pose proof (app_exists_last p' l).
-      destruct H2 as [y2 [p'' H2]].
-      rewrite app_comm_cons in H1.
-      rewrite H2 in H1.
-      rewrite app_assoc_reverse in H1.
-      simpl in H1.
-      pose proof (reachable_path_app (σ++[(C,[])]) (length σ) y2 ([y]) p'' H1).
-      steps.
-      unfold reachable_one_step in *.
-      steps.
-      rewrite getObj_last in H6.
-      invert_constructor_equalities; subst.
-      destruct f; steps.
+    apply reachability_first_step in H0; unfold dom in *; steps; try lia.
+    unfold reachable_one_step in *; steps.
+    rewrite_anywhere getObj_last; invert_constructor_equalities; destruct f; steps.
   Qed.
+
+  Lemma reachability_ind2:
+    forall σ (P: Loc -> Loc -> Prop),
+      (forall l, P l l) ->
+      (forall l0 l1 C f ω, l1 < dom σ -> getObj σ l0 = Some (C, ω) -> getVal ω f = Some l1 -> P l0 l1) ->
+      (forall l0 l1 l2, σ ⊨ l0 ⇝ l1 -> P l0 l1 -> σ ⊨ l1 ⇝ l2 -> P l1 l2 -> P l0 l2) ->
+      forall l0 l1, σ ⊨ l0 ⇝ l1 -> P l0 l1.
+  Proof.
+    intros.
+    induction H2; eauto.
+  Qed.
+
 
 
   Lemma reachability_empty:
@@ -491,19 +466,19 @@ Module Reachability.
     inversion H0 as [l1 [Hl1 Hrch]].
     exists l1; split => //.
     apply reachable_path_reachability in Hrch as [Hrch | [p Hrch]].
-    + steps; eauto using rch_heap.
+    + steps; eauto with rch.
     + clear Hl1 H0. generalize dependent l. generalize dependent l1.
       induction p; intros.
       ++ steps; unfold reachable_one_step in *; steps.
-         unfold dom in H1. repeat rewrite_anywhere app_length ; steps.
-         pose proof (getObj_last_empty _ _ _ _ _ _ _ H2 H0) as [Hobj Hl1].
-         eapply rch_trans; eauto using rch_trans, rch_heap.
+         repeat rewrite_anywhere dom_app.
+         eapply getObj_last_empty in H2; eauto; steps.
+         eapply rch_trans with l1; eauto using getObj_dom with rch.
       ++ move: (app_cons_not_nil p nil l1) => Hp.
          simpl in Hrch. destruct (p ++ [l1]) eqn:P; [exfalso; eauto |]. light.
          unfold reachable_one_step in H0.
          move: H0 => [C' [ω' [Hobja [[f Hval] Hdom]]]].
          pose proof (getObj_last_empty _ _ _ _ _ _ _ Hobja Hval) as [Hobj Hl1].
-         light. eauto using rch_trans.
+         light. eauto with rch.
   Qed.
 
 
