@@ -1,44 +1,53 @@
+(* Celsius project *)
+(* Clément Blaudeau *)
+
+(** Definition of the evaluator of the Celsius Model *)
 From Celsius Require Export Trees Tactics.
 Require Import ssreflect ssrbool.
 Require Import Celsius.strongInduction.
-
 Require Import List.
 Import ListNotations.
 Open Scope nat_scope.
 
+
+(** * Evaluator Module  *)
 Module Evaluator.
+  (** The classtable is assumed generaly accessible *)
   Parameter ct: ClassTable.
 
-  (* Update store with new value in local env *)
+  (** ** Helper functions *)
+
+  (** Update store with new value in local env : adds a new field to an existing object *)
   Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
     match (getObj σ obj) with
     | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
     | None => None (* ? *)
     end.
 
-  (* Update store with update in local env *)
+  (** Update store with update in local env : update an already-existing field of an existing object*)
   Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
     match (getObj σ obj) with
     | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
     | None => σ (* ? *)
     end.
 
-  (* Update store with new values *)
+  (** Update store with new values : update already existing fields of an existing object*)
   Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
     match (getObj σ v0) with
     | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
     | None => σ
     end.
 
+  (** ** Main small-step evaluator *)
+
   Reserved Notation "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"   (at level 80).
   Reserved Notation "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" (at level 80).
-
   Fixpoint eval (e: Expr) (σ: Store) (ρ: Env) (v: Value) (k: nat) : Result :=
     match k with
     | 0 => Timeout
     | S n => match e with
-            (* e = x *)
-            (* Var: simple lookup of the store *)
+            (**r e = x *)
+            (**r Var: simple lookup of the store *)
             | var x => (
                 match (getVal ρ x) with
                 | Some v => (Success v σ)

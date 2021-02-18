@@ -6,19 +6,12 @@ From Celsius Require Export Compatibility.
 From Celsius Require Export Wellformedness.
 Require Import ssreflect ssrbool.
 Require Import Psatz.
+Require Import Sets.Ensembles.
 
 Require Import List.
 Import ListNotations.
 Open Scope nat_scope.
-Require Import Sets.Ensembles.
 
-(*
-  Notation "σ ⊨ l1 ⇝ l2" := (σ + l1 + l2) (at level 80, l1 at level 80, l2 at level 80).
-  Notation "σ1 ⇝ σ2 ⋖ L" := (σ1 * σ2 * L) (at level 81, σ2 at level 81).
-  Eval compute in (2 ⊨ 2 ⇝ 3) + (1 ⇝ 2 ⋖ 3).
-  Check (1 ⊨ 2 ⇝ 3).
-  Check (2 ⇝ 3 ⋖ 4).
- *)
 
 Module Scopability.
   Import Eval.Evaluator.
@@ -596,7 +589,8 @@ Module Scopability.
       unfold scoping; steps.
       exists l; steps.
       apply Union_introl.
-      unfold codom, In. eauto using nth_error_In.
+      unfold codom, Ensembles.In.
+      eauto using nth_error_In.
       apply_anywhere reachability_singleton => //.
       unfold scoping_preservation; steps.
     + (* e = this *)
