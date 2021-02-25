@@ -40,6 +40,19 @@ Module Evaluator.
 
   (** ** Main small-step evaluator *)
 
+  (* Evaluation result *)
+  Inductive Result : Type :=
+  | Timeout
+  | Error
+  | Success : Value -> Store -> Result
+  .
+  Inductive Result_l : Type :=
+  | Timeout_l
+  | Error_l
+  | Success_l : (list Value) -> Store -> Result_l
+  .
+
+
   Reserved Notation "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"   (at level 80).
   Reserved Notation "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" (at level 80).
   Fixpoint eval (e: Expr) (σ: Store) (ρ: Env) (v: Value) (k: nat) : Result :=
@@ -83,7 +96,7 @@ Module Evaluator.
                             match methods m with
                             | Some (method μ x _ e1) => (
                                 match (⟦_ el _⟧(σ1, ρ, v)(n)) with
-                                | Success_list args_val σ2 =>
+                                | Success_l args_val σ2 =>
                                   let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0)(n)
                                 | _ => Error end)
                             | _ => Error end)
@@ -95,7 +108,7 @@ Module Evaluator.
             (* New class *)
             | new C args => (
                 match (⟦_ args _⟧(σ, ρ, v)(n)) with
-                | Success_list args_val σ1 => (
+                | Success_l args_val σ1 => (
                     let I := (length σ1) in (* Fresh location for new object *)
                     let ρ_init := args_val in (* Local env during initialisation *)
                     let σ2 := σ1 ++ [(C, ∅)] in (* New object with empty local env *)
@@ -117,18 +130,20 @@ Module Evaluator.
             end
     end
   where "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"  := (eval e σ ρ v k)
-  with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (v: Value) (k: nat) :  Result :=
+  with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (v: Value) (k: nat): Result_l :=
          match k with
-         | 0 => Timeout
-         | S n => fold_left (eval_list_aux ρ v n) e_l (Success_list [] σ) end
+         | 0 => Timeout_l
+         | S n => fold_left (eval_list_aux ρ v n) e_l (Success_l [] σ) end
   where  "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" := (eval_list e σ ρ v k)
-  with eval_list_aux (ρ: Env) (v: Value) (k: nat) (acc: Result) (e: Expr) :=
+  with eval_list_aux (ρ: Env) (v: Value) (k: nat) acc (e: Expr) :=
          match k with
-         | 0 => Timeout
+         | 0 => Timeout_l
          | S n => match acc with
-                 | Success_list vs σ1 => match (⟦e⟧(σ1, ρ, v)(n)) with
-                                        | Success v σ2 => Success_list (v::vs) σ2
-                                        | z => z end
+                 | Success_l vs σ1 => match (⟦e⟧(σ1, ρ, v)(n)) with
+                                        | Success v σ2 => Success_l (v::vs) σ2
+                                        | Timeout => Timeout_l
+                                        | Error => Error_l
+                                     end
                  | z => z end end
   with init (I : Var) (args_values: list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
          match k with | 0 => None | S n =>
@@ -151,22 +166,20 @@ Module Evaluator.
                             end) end) end end.
 
 
-
-  Lemma eval_not_success_list: forall  (k: nat) (e: Expr) (σ σ': Store) (ρ: Env) (v: Value) (l: list Value),
-      not (⟦e⟧(σ, ρ, v)(k) = Success_list l σ').
-    induction k; repeat light || eauto || destruct_match. Qed.
-
-  Ltac eval_not_success_list :=
-    match goal with
-    | H:⟦?e⟧(?σ, ?ρ, ?v)(?k) = Success_list ?l ?σ' |- _ => apply eval_not_success_list in H => //
-    end.
-
   Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
       (forall (y:B), f res y = res) -> fold_left f l res = res.
     intros.
     induction l => //.
     simpl. rewrite H. apply IHl.
   Qed.
+
+  Ltac destruct_eval :=
+    match goal with
+    | H: context[⟦ ?e ⟧ (?σ, ?ρ, ?ψ )( ?k)] |- _ =>
+      let fresh_H := fresh H in
+      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
+      try solve [rewrite foldLeft_constant in H => //]
+    end.
 
 
   Definition Reflexive (P: Store -> Store -> Prop) : Prop := (forall σ, P σ σ).
@@ -191,51 +204,54 @@ Module Evaluator.
 
   Lemma eval_list_prop : forall (P: Store -> Store -> Prop) n,
       Reflexive P -> Transitive P -> (forall k, (k < n) -> EvalMaintained P k) ->
-      (forall k, (k < n) -> forall l σ σ' ρ v v_list,  ⟦_ l _⟧(σ, ρ, v)(k) = (Success_list v_list σ') -> (P σ σ')).
+      (forall k, (k < n) -> forall l σ σ' ρ v v_list,  ⟦_ l _⟧(σ, ρ, v)(k) = (Success_l v_list σ') -> (P σ σ')).
     intros P n H_refl H_trans H_strong.
     destruct k; simpl; try discriminate.
-    assert (forall (l : list Expr) (σ σ' : Store) (ρ : Env) (v : Value) (v_list1 v_list2 : list Value),
-               (k < n) -> fold_left (eval_list_aux ρ v k) l (Success_list v_list1 σ) = Success_list v_list2 σ' -> P σ σ') as H_fold . {
+    assert (forall l σ σ' ρ v v_list1 v_list2,
+               (k < n) ->
+               fold_left (eval_list_aux ρ v k) l (Success_l v_list1 σ) = Success_l v_list2 σ' ->
+               P σ σ');
+      eauto using PeanoNat.Nat.lt_succ_l. {
       induction l as [| e l]; simpl; intros.
       + invert_constructor_equalities; eauto.
       + destruct k; simpl in H0. rewrite foldLeft_constant in H0 => //.
         move /(_ _ _ _ _ _ _ H):IHl => IHl.
         move /(_ _ (PeanoNat.Nat.lt_succ_l k n H)):H_strong => H_strong.
-        destruct (⟦ e ⟧ (σ, ρ, v )( k)) eqn: E; try solve [ rewrite foldLeft_constant in H0 => //] ; eauto; try eval_not_success_list.
+        destruct_eval ; eauto.
     }
-    intros.
-    eapply H_fold; eauto using PeanoNat.Nat.lt_succ_l .
   Qed.
 
   Lemma freshnessInitMaintained : forall (P: Store -> Store -> Prop) n,
       Reflexive P -> Transitive P -> Assignment P -> Freshness P -> InitMaintained P n.
-    Proof.
-      intros P n H_refl H_trans H_asgn H_fresh H_strong.
-      assert ( forall k : nat,
-  k < n ->
-  forall (l0 : list Var) (σ σ' : Store) (c : ClN) I , init I l0 c σ k = Some σ' -> P σ σ'). {
-    destruct k; simpl; try discriminate.
-    intros Hn; intros.
-    repeat destruct_match; try discriminate. clear matched0. clear matched.
-    generalize dependent σ. generalize dependent σ'.
+  Proof.
+    intros P n H_refl H_trans H_asgn H_fresh H_strong.
+    assert ( forall k : nat,
+               k < n ->
+               forall (l0 : list Var) (σ σ' : Store) (c : ClN) I , init I l0 c σ k = Some σ' -> P σ σ');
+      eauto.
+    {
+      destruct k; simpl; try discriminate.
+      intros Hn; intros.
+      repeat destruct_match; try discriminate. clear matched0. clear matched.
+      generalize dependent σ. generalize dependent σ'.
       induction fields as [| [x e] fields]; simpl; intros.
       + invert_constructor_equalities; eauto.
       + destruct k; simpl in H. rewrite foldLeft_constant in H => //.
-        destruct ((⟦ e ⟧ (σ, l0, I )( k))) eqn:E ; try solve [ rewrite foldLeft_constant in H => //] ; eauto; try eval_not_success_list.
+        destruct_eval; eauto.
         unfold assign_new in H.
         repeat destruct_match; try solve [rewrite foldLeft_constant in H => //].
         subst.
         move /(_ _ _ H):IHfields => IHfields.
         apply PeanoNat.Nat.lt_succ_l in Hn.
         apply PeanoNat.Nat.lt_succ_l in Hn.
-        move /(_ k Hn _ _ _ _ _ _ E):H_strong => H_strong.
+        move /(_ k Hn _ _ _ _ _ _ H0):H_strong => H_strong.
         apply (H_trans _ _ _ H_strong).
         apply (H_trans _  [I ↦ (c1, e0 ++ [v])] (s)  _ ) => //.
         apply (H_asgn _ _ _ _ _ (e0 ++ [v])  matched); eauto using app_length.
         rewrite app_length.
         rewrite PeanoNat.Nat.add_1_r. eauto.
-      } eauto.
-    Qed.
+    }
+  Qed.
 
     Lemma eval_prop : forall (P: Store -> Store -> Prop),
         Reflexive P -> Transitive P ->  Assignment P -> (forall n, InitMaintained P n) -> forall n, EvalMaintained P n.
@@ -269,20 +285,18 @@ Module Evaluator.
     Qed.
 
     Lemma eval_list_length : forall n el σ σ' ρ ψ l ,
-        ⟦_ el _⟧(σ, ρ, ψ)(n) = Success_list l σ' ->
+        ⟦_ el _⟧(σ, ρ, ψ)(n) = Success_l l σ' ->
         length el = length l.
     Proof.
       intros n.
       destruct n; simpl; try discriminate.
       assert
         (forall (l : list Expr) (σ σ' : Store) (ρ : Env) (v : Value) (v_list1 v_list2 : list Value),
-            fold_left (eval_list_aux ρ v n) l (Success_list v_list1 σ) = Success_list v_list2 σ'
+            fold_left (eval_list_aux ρ v n) l (Success_l v_list1 σ) = Success_l v_list2 σ'
             -> length l + length v_list1 = length v_list2) as H_fold. {
         induction l as [| e l] ; steps.
         destruct n; simpl in H. rewrite foldLeft_constant in H => //.
-        destruct (⟦ e ⟧ (σ, ρ, v )( n)) eqn: E;
-          try solve [ rewrite foldLeft_constant in H => //] ;
-          eauto; try eval_not_success_list.
+       destruct_eval.
         apply IHl in H.
         simpl in H.
         rewrite plus_n_Sm => //. }
@@ -290,49 +304,6 @@ Module Evaluator.
       pose proof (H_fold _ _ _ _ _ _ _ H); simpl in H0.
       rewrite PeanoNat.Nat.add_0_r in H0 => //.
     Qed.
-
-(*
-    Lemma eval_list_prop2 : forall (P: Store -> Store -> Env ->Loc -> Loc -> Prop) n,
-      (* (forall s v1 v2 ρ, P s s ρ v1 v2) -> *)
-      (forall k, (k < n) -> forall e  σ σ' ρ ψ v, ⟦e⟧(σ, ρ, ψ)(k) = Success v σ' -> P σ σ' ρ ψ v) ->
-      (forall k, (k < n) -> forall el σ σ' ρ ψ v2 vl1 vl2,
-           ⟦e⟧(σ', ρ, ψ)(k) = Success v σ' ->
-           fold_left (eval_list_aux ρ ψ k) el (Success_list (vl1) σ) = Success_list (v2::vl2) σ' -> P σ σ' ρ ψ v2).
-      intros P n H_strong k Hk.
-      induction el as [| e el].
-      + simpl; intros.
-        invert_constructor_equalities; subst; eauto.
-      + intros. simpl in H.
-        set (eval_list_aux ρ ψ k) as f.
-        rewrite -{1}/f in H. rewrite -/f in IHel.
-        destruct k; simpl in H; try solve [rewrite foldLeft_constant in H => //].
-        destruct ( ⟦ e ⟧ (σ, ρ, ψ )( k) ) eqn:E; try solve [rewrite foldLeft_constant in H => //]; eauto; try eval_not_success_list.
-        apply H_strong in E; eauto using PeanoNat.Nat.lt_succ_l.
-
-
-
-
-    intros P n H_refl H_strong k Hk. intros.
-    destruct k; simpl; try discriminate.
-    assert (forall  (el : list Expr) (σ σ' : Store) (ρ : Env) (ψ v : Value) (v_list1 v_list2 : list Value),
-               (k < n) -> fold_left (eval_list_aux σ ρ ψ k) el (Success_list v_list1 σ) = Success_list (v::v_list2) σ' -> P σ σ' v) as H_fold . {
-      induction el0 as [| e1 el0]; simpl; intros.
-      + invert_constructor_equalities; eauto.
-      + destruct k; simpl in H1. rewrite foldLeft_constant in H1 => //.
-        move /(_ _ _ _ _ _ _ _ H0):IHel0 => IHel0.
-        move /(_ _ (PeanoNat.Nat.lt_succ_l k n H0)):H_strong => H_strong.
-        destruct (⟦ e1 ⟧ (σ0, ρ0, ψ0 )( k)) eqn: E; try solve [ rewrite foldLeft_constant in H1 => //] ; eauto; try eval_not_success_list.
-        pose proof (IHel0 σ σ0 ρ ψ0 v0 (v1::v_list1) v_list2 H1).
-    }
-    intros.
-    eapply H_fold; eauto using PeanoNat.Nat.lt_succ_l .
-  Qed.
-*)
-
-
-
-
-
 
 
 

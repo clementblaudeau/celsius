@@ -167,7 +167,7 @@ Module Wellformedness.
             (⟦ e ⟧ (σ, ρ, ψ )( k)) = Success l σ' -> wf σ -> (codom ρ ∪ {ψ}) ⪽ σ -> wf σ' /\ l < dom σ') ->
       k < n ->
       forall el s s' vl1 vl2,
-        fold_left (eval_list_aux ρ ψ k) el (Success_list vl1 s) = Success_list vl2 s' ->
+        fold_left (eval_list_aux ρ ψ k) el (Success_l vl1 s) = Success_l vl2 s' ->
         wf s ->
         codom vl1 ⪽ s ->
         (codom ρ ∪ {ψ}) ⪽ s ->
@@ -177,13 +177,12 @@ Module Wellformedness.
     induction el; simpl; intros; try solve [steps].
     destruct k => //; try solve [rewrite foldLeft_constant in H => //].
     simpl in H.
-    destruct (⟦ a ⟧ (s, ρ, ψ )( k)) eqn:A ; try solve [rewrite foldLeft_constant in H => //] ;
-      try solve [eval_not_success_list].
+    destruct_eval.
     apply PeanoNat.Nat.lt_succ_l in Hn.
-    pose proof (H_strong k Hn _ _ _ _ _ _ A H0 H2) as [Hwfs2 Hv0].
-    pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ A).
-    assert (codom (v :: vl1) ⪽ s0). by (apply storeSubset_add; eauto using storeSubset_trans).
-    move /(_ _ _ _ _ H Hwfs2 H4 (storeSubset_trans _ s s0 H3 H2)): IHel => IHel.
+    pose proof (H_strong k Hn _ _ _ _ _ _ H3 H0 H2) as [Hwfs2 Hv0].
+    pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ H3).
+    assert (codom (v :: vl1) ⪽ s0) by (apply storeSubset_add; eauto using storeSubset_trans).
+    move /(_ _ _ _ _ H Hwfs2 H5 (storeSubset_trans _ s s0 H4 H2)): IHel => IHel.
     steps; try lia.
   Qed.
 
@@ -233,11 +232,11 @@ Module Wellformedness.
         induction fields0; simpl; intros; try solve [steps].
         destruct k; simpl in H5; try solve [rewrite_anywhere foldLeft_constant  => //].
         destruct a.
-        destruct (⟦ expr ⟧ (σ1, l1, l )(k)) eqn: E; try solve [rewrite_anywhere foldLeft_constant  => //].
+        destruct_eval.
         unfold assign_new in *. destruct_match; try solve [rewrite_anywhere foldLeft_constant  => //].
         destruct o.
-        pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ E).
-        apply H in E => // ; try lia. destruct E as [E1 E2].
+        pose proof (PartialMonotonicity.partialMonotonicity_theorem_dom _ _ _ _ _ _ _ H8).
+        apply H in H8 => // ; try lia. destruct H8 as [E1 E2].
         apply IHfields0 in H5; clear IHfields0 => //.
         ++ steps. unfold dom in *; rewrite_anywhere update_one3. eauto using PeanoNat.Nat.le_trans.
         ++ apply (storeSubset_trans _ σ1 s0) in H6 => //.
@@ -251,7 +250,7 @@ Module Wellformedness.
            +++ (* l = l' *)
              subst.
              rewrite getObj_update1 in H5; eauto using getObj_dom. invert_constructor_equalities; subst.
-             unfold getVal in *. apply nth_error_Some2 in H9. destruct H9 as [H9 | H9]; subst; eauto.
+             unfold getVal in *. apply nth_error_Some2 in H8. destruct H8 as [H8 | H8]; subst; eauto.
            +++ (* l ≠ l' *)
              unfold getObj in *.
              rewrite update_one2 in H5 => //. eapply E1; eauto.

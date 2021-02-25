@@ -169,9 +169,7 @@ Module Stackability.
       pose proof (partialMonotonicity_InitMaintained n Hpart k H _ _ _ _ H0).
       pose proof (compatibility_InitMaintained n Hcmpt k H _ _ _ _ H0).
       pose proof (stackability_init_fresh k l0 s σ' c).
-      repeat split ; eauto using stackability_init_fresh with pM cmpt.
-      apply H3 => //.
-      intros. apply Hstck. lia.
+      repeat split ; eauto using stackability_init_fresh with pM cmpt lia.
   Qed.
 
 End Stackability.

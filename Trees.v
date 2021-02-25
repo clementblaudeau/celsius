@@ -48,13 +48,6 @@ Definition Env: Type   := list Value.
 Definition Obj: Type   := (ClN * Env).
 Definition Store: Type := list Obj.
 
-(* Evaluation result *)
-Inductive Result : Type :=
-  | Timeout
-  | Error
-  | Success : Value -> Store -> Result
-  | Success_list : (list Value) -> Store -> Result.
-
 Definition LocSet := (Ensemble Loc).
 Notation "l ∈ L" := (In Loc L l) (at level 80).
 Notation "L ⊆ L'" := (Included Loc L L') (at level 80).

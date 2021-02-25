@@ -383,7 +383,7 @@ Module Scopability.
             (⟦ e ⟧ (σ, ρ, ψ )( k)) = Success l σ' ->
             wf σ -> (codom ρ ∪ {ψ}) ⪽ σ -> ((σ, codom ρ ∪ {ψ}) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ codom ρ ∪ {ψ})) ->
       forall e0 el σ ρ ψ l0 σ0 ρ' σ_n ,
-        (⟦_ el _⟧ (σ0, ρ, ψ )(n)) = Success_list ρ' σ_n ->
+        (⟦_ el _⟧ (σ0, ρ, ψ )(n)) = Success_l ρ' σ_n ->
         wf σ ->
         (codom ρ ∪ {ψ}) ⪽ σ ->
         (⟦ e0 ⟧ (σ, ρ, ψ )(n)) = Success l0 σ0 ->
@@ -394,7 +394,7 @@ Module Scopability.
     simpl in H0.
     pose proof (H (S n) (le_n (S (S n))) _ _ _ _ _ _ H3 H1 H2) as [H_scope H_preserv].
     assert (forall el ρ' σ1 σ2 acc,
-               fold_left (eval_list_aux ρ ψ n) el (Success_list acc σ1) = Success_list ρ' σ2 ->
+               fold_left (eval_list_aux ρ ψ n) el (Success_l acc σ1) = Success_l ρ' σ2 ->
                wf σ1 ->
                dom σ <= dom σ1 ->
                σ ⇝ σ1 ⋖ (codom ρ ∪ {ψ}) ->
@@ -406,9 +406,8 @@ Module Scopability.
       + invert_constructor_equalities; subst; split => //.
       + destruct n; [rewrite_anywhere foldLeft_constant => // |].
         simpl in H4.
-        destruct (⟦ a ⟧ (σ1, ρ, ψ )( n)) eqn:A;
-          try solve [rewrite_anywhere foldLeft_constant => //; try eval_not_success_list].
-        unshelve epose proof (H n _ _ _ _ _ _ _ A _ _); try lia ; eauto with wf; destruct_and.
+        destruct_eval.
+        unshelve epose proof (H n _ _ _ _ _ _ _ H10 _ _); try lia ; eauto with wf; destruct_and.
         assert (dom σ <= dom s) by eauto using PeanoNat.Nat.le_trans with pM.
         assert ((codom (v :: acc) ∪ {l0}) ⪽ s). {
           apply storeSubset_union; eauto with wf.
@@ -420,7 +419,7 @@ Module Scopability.
         apply scopability_add ; eauto.
         ++ apply scoping_transitivity with σ1 (codom ρ ∪ {ψ}); eauto with pM wf.
            apply H7; eauto with pM wf scoping.
-        ++ apply H11; eauto with pM wf .
+        ++ apply H12; eauto with pM wf .
            apply H7; eauto with pM wf scoping.
     }
     eapply H4 in H0; eauto with wf pM; try rewrite codom_empty_union => //.
@@ -438,7 +437,7 @@ Module Scopability.
         wf σ ->
         (codom ρ ∪ {ψ}) ⪽ σ ->
         forall el σ1 σ2 L acc,
-          fold_left (eval_list_aux ρ ψ n) el (Success_list acc σ1) = Success_list L σ2 ->
+          fold_left (eval_list_aux ρ ψ n) el (Success_l acc σ1) = Success_l L σ2 ->
           wf σ1 ->
           dom σ <= dom σ1 ->
           (σ, codom ρ ∪ {ψ}) ⋖ (σ1, codom acc) ->
@@ -456,22 +455,21 @@ Module Scopability.
     + invert_constructor_equalities; subst => //.
     + destruct n; [rewrite_anywhere foldLeft_constant => // |].
       simpl in H.
-      destruct (⟦ a ⟧ (σ1, ρ, ψ )( n)) eqn:A;
-        try solve [rewrite_anywhere foldLeft_constant => //; try eval_not_success_list].
-      unshelve epose proof (H_strong n _ _ _ _ _ _ _ A _ _); try lia ; eauto with wf; destruct_and.
+      destruct_eval.
+      unshelve epose proof (H_strong n _ _ _ _ _ _ _ H5 _ _); try lia ; eauto with wf; destruct_and.
       assert (dom σ1 <= dom s) by eauto with pM.
       assert (dom σ <= dom s) by lia.
       apply IHel in H; eauto using PeanoNat.Nat.le_trans, preserving_transitivity_degenerate with wf pM.
       ++ assert (codom (v::acc) = Union Loc (Singleton Loc v) (codom acc)). {
            apply Extensionality_Ensembles.
            unfold Same_set; steps; intros l'; steps; eauto using Union_introl, Union_intror.
-           inversion H9; try inSingleton; steps.
+           inversion H10; try inSingleton; steps.
          }
          rewrite_any.
          apply scoping_union; eauto.
          +++ eapply scoping_transitivity with σ1 (codom ρ ∪ {ψ}) ; eauto with wf.
              apply H4; eauto with wf pM scoping.
-         +++ apply H6; eauto with wf pM.
+         +++ apply H7; eauto with wf pM.
              apply H4; eauto with wf pM scoping.
       ++ apply storeSubset_add; split; eauto with wf.
   Qed.
@@ -526,11 +524,11 @@ Module Scopability.
     + destruct n; [rewrite_anywhere foldLeft_constant => // |].
       simpl in H.
       destruct a as [_ e].
-      destruct (⟦ e ⟧ (σ1, L1, I )( n)) eqn:E; try solve [rewrite_anywhere  foldLeft_constant => //].
+      destruct_eval.
       rewrite {2}/assign_new in H.
       destruct (getObj s I) eqn:G; try solve [rewrite_anywhere  foldLeft_constant => //].
       destruct o.
-      unshelve epose proof (H_strong n _ _ _ _ _ _ _ E _ _); try lia ; eauto with wf; destruct_and.
+      unshelve epose proof (H_strong n _ _ _ _ _ _ _ H6 _ _); try lia ; eauto with wf; destruct_and.
       assert (dom [I ↦ (c, e0 ++ [v])] (s) = dom s) as H_dom_s by eauto using update_dom.
       assert (dom σ1 <= dom s) by eauto with pM.
       assert (wf s) by eauto with wf.
@@ -543,7 +541,7 @@ Module Scopability.
          destruct (PeanoNat.Nat.eq_dec l I) as [Heq | Hneq].
          +++ (* l = I *)
            subst.
-           rewrite (getObj_update1 s (c, e0 ++ [v]) I _) in H10 => //.
+           rewrite (getObj_update1 s (c, e0 ++ [v]) I _) in H11 => //.
            invert_constructor_equalities; subst.
            assert (f < length e0 \/ f = length e0) as Hf . {
              apply Lt.le_lt_or_eq, Lt.lt_n_Sm_le.
@@ -551,21 +549,21 @@ Module Scopability.
              rewrite app_length PeanoNat.Nat.add_1_r in Hf.
              apply Hf.
              unfold getVal in *.
-             rewrite H11. steps.
+             rewrite H12. steps.
            }
            destruct Hf; unfold getVal in *.
            ++++ rewrite_anywhere nth_error_app1; steps.
                 eapply_any; eauto.
-           ++++ rewrite nth_error_app2 in H11 ; steps.
-                rewrite PeanoNat.Nat.sub_diag in H11. simpl in H11. invert_constructor_equalities; subst.
+           ++++ rewrite nth_error_app2 in H12 ; steps.
+                rewrite PeanoNat.Nat.sub_diag in H12. simpl in H12. invert_constructor_equalities; subst.
                 eapply correct_value; eauto.
          +++ (* l <> I *)
-           rewrite getObj_update2 in H10 => //. steps.
+           rewrite getObj_update2 in H11 => //. steps.
            eapply_any; eauto.
       ++ eapply storeSubset_trans with s; eauto with pM wf. rewrite H_dom_s => //.
       ++ eapply scoping_transitivity with σ1 _; try solve [eapply_any]; eauto with scoping.
          apply scopability_add_env; try lia; eauto with wf.
-         eapply H7; eauto with scoping.
+         eapply H8; eauto with scoping.
       ++ eapply preserving_transitivity; eauto.
          eapply preserving_transitivity; eauto.
          unfold scoping_preservation; split; intros; eauto using scopability_add_env with wf.
