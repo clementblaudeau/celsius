@@ -71,7 +71,9 @@ Module LocalReasoning.
       pose proof (scopability_theorem _ _ _ _ _ _ _ H) as [A2 A3] => //.
     }
       by apply (H3 l).
-    Qed.
+  Qed.
+
+  Print DependGraph Local_reasoning.
 
 
   End LocalReasoning.
