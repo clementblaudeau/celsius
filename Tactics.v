@@ -198,3 +198,8 @@ Ltac erewrite_anywhere f :=
   match goal with
   | H: _ |- _ => erewrite f in H
   end.
+
+Ltac destruct_eq H :=
+  match H with
+  | ?a = ?b => let fresh_H := fresh "Heq" in pose proof (PeanoNat.Nat.eq_dec a b) as [Heq | Heq]
+  end.

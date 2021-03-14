@@ -226,6 +226,9 @@ Definition Assignment (P: Store -> Store -> Prop)  : Prop :=
 Definition Freshness (P: Store -> Store -> Prop) : Prop :=
   forall s c ω, P s (s ++ [(c, ω)]).
 
+Ltac unfoldProps :=
+   unfold Reflexive, Transitive, Assignment, Freshness.
+
 (** A relation maintained by the evaluator. All local-reasoning theorems are about showing that some relations are eval maintained. *)
 Definition EvalMaintained (P: Store -> Store -> Prop)  k : Prop :=
   forall e σ σ' ρ v v',
