@@ -1,13 +1,15 @@
+(* Celsius project *)
+(* Clément Blaudeau - LAMP@EPFL 2021 *)
+(** This file defines the notion of reachability of a location in a given store. The set of reachable locations, starting from a given one l is transitively defined as the ones that can be accessed by following pointers in object local environments. We then define and prove basic properties around this notion. In the second part, we show the equivalence between the inductive definition and a path-based definition. This allows us to reason about paths from one location to another, especially for scopability results.  *)
+
 From Celsius Require Export Trees Eval Reachability Tactics Compatibility strongInduction.
 Require Import ssreflect ssrbool List.
-
 Import ListNotations.
 Open Scope nat_scope.
 
-Create HintDb pM.
 Hint Extern 1 => unfold dom in *: dm.
 
-(* Definitions and notations : *)
+(** ** Definitions and notations *)
 Definition initializedFields (σ: Store) (l: Loc) (f: list Field) : Prop :=
   match (getObj σ l) with
   | Some (C, ω) => ((length f) <= (length ω))

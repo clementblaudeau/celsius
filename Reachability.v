@@ -1,30 +1,29 @@
+(* Celsius project *)
+(* Clément Blaudeau - LAMP@EPFL 2021 *)
+(** This file defines the notion of reachability of a location in a given store. The set of reachable locations, starting from a given one l is transitively defined as the ones that can be accessed by following pointers in object local environments. We then define and prove basic properties around this notion. In the second part, we show the equivalence between the inductive definition and a path-based definition. This allows us to reason about paths from one location to another, especially for scopability results.  *)
+
 From Celsius Require Export Trees Eval.
-
-Require Import ssreflect ssrbool.
-Require Import Coq.Arith.Wf_nat.
-Require Import Coq.Wellfounded.Wellfounded.
-Require Import List.
-Require Import Sets.Ensembles.
-Require Import Psatz.
-
+Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Sets.Ensembles Psatz.
 Import ListNotations.
 Open Scope nat_scope.
 Open Scope list_scope.
 
 
+(** ** Definitions and notations *)
+(** We first define the reachability predicate between two individual locations *)
 Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80, l1 at level 80, l2 at level 80).
 Inductive reachability : Store -> Loc -> Loc ->Prop :=
-| rch_heap:
+| rch_heap: (**r we can access the current location *)
     forall l σ,
       l < (dom σ) ->
       σ ⊨ l ⇝ l
-| rch_step:
+| rch_step: (**r we can access a location in the local environment of the object at l0 *)
     forall l0 l1 C f ω σ,
       l1 < (dom σ) ->
       getObj σ l0 = Some (C, ω) ->
       getVal ω f = Some l1 ->
       σ ⊨ l0 ⇝ l1
-| rch_trans:
+| rch_trans: (**r transitive case *)
     forall l0 l1 l2 σ,
       σ ⊨ l0 ⇝ l1 ->
       σ ⊨ l1 ⇝ l2 ->
@@ -34,9 +33,14 @@ where "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2).
 Hint Resolve rch_heap rch_step rch_trans: rch.
 Hint Rewrite update_dom: rch.
 
+(** We then extend the definition for a set of locations *)
 Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
 Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 99, L at level 99).
 
+(** Depending on the temperature of objects we can reach, we have three predicates about the store (plus the set version for each). Inside a store [σ], a location [l] is said to be:
+- [reachable_cold]: if the location is in the heap (but might point to an object with unitialized fields)
+- [reachable_warm]: if the location points to an object with all initialized fields (but those might point to cold objects)
+- [reachable_hot]: if the location points to a hot object (transitively all initialized) *)
 Definition reachable_cold (σ: Store) (l: Loc) := (l < dom σ).
 Notation "σ ⊨ l : 'cold'" := (reachable_cold σ l) (at level 80, l at level 80).
 Notation "σ ⊫ L : 'cold'" := (forall l, (l ∈ L) -> reachable_cold σ l) (at level 80, L at level 99).
@@ -49,53 +53,59 @@ Definition reachable_hot  (σ: Store) (l: Loc) :=(forall (l': Loc), (σ ⊨ l �
 Notation "σ ⊨ l : 'hot'"  := (reachable_hot σ l) (at level 80, l at level 80).
 Notation "σ ⊫ L : 'hot'" := (forall l, (l ∈ L) -> reachable_hot σ l) (at level 80, L at level 99).
 
-Lemma reachability_trans: (forall σ l1 l2 l3, (σ ⊨ l1 ⇝ l2) -> (σ ⊨ l2 ⇝ l3) -> (σ ⊨ l1 ⇝ l3)).
+(** A usefull rewrite *)
+Ltac rch_singleton:=
+  match goal with
+  | H: ?s ⊫ (Singleton Loc ?l1) ⇝ ?l2 |- _ =>
+    let freshH := fresh "H" in
+    unfold reachability_set in H;
+    destruct H as [l' [freshH H] ]; induction freshH
+  end.
+
+
+(** *** Basic results *)
+(** Rechable locations from a hot location lead to other hot locations *)
+Lemma reachability_hot:
+  forall σ l l',
+    (σ ⊨ l: hot) ->
+    σ ⊨ l ⇝ l' ->
+    σ ⊨ l': hot.
 Proof.
-  eauto using rch_trans.
+  unfold reachable_hot; eauto with rch.
 Qed.
 
-Lemma reachability_hot: forall (σ: Store) (l l': Loc), σ ⊨ l: hot -> σ ⊨ l ⇝ l' -> σ ⊨ l': hot.
+(** Reaching from a singleton is the same as reaching from the only element of the singleton *)
+Lemma reachability_singleton :
+  forall σ l1 l2,
+    (σ ⊫ (Singleton Loc l1) ⇝ l2) <-> σ ⊨ l1 ⇝ l2.
 Proof.
-  intros σ l l' H1 H2 l'' H3.
-  apply (H1 l'' ((reachability_trans _ _ _ _) H2 H3)).
+  split; intros; [rch_singleton | exists l1]; eauto => //.
 Qed.
 
-Lemma reachability_singleton : forall σ l1 l2, (σ ⊫ (Singleton Loc l1) ⇝ l2) <-> σ ⊨ l1 ⇝ l2.
+(* Reachable objects are inside the store *)
+Lemma reachability_dom :
+  forall σ l1 l2,
+    (σ ⊨ l1 ⇝ l2) ->
+    (l1 < (dom σ)) /\ (l2 < (dom σ)).
 Proof.
-  split; intros.
-  unfold reachability_set in H. repeat destruct H => //.
-  exists l1 => //.
-Qed.
-
-Lemma reachability_dom : forall σ l1 l2, (σ ⊨ l1 ⇝ l2) -> (l1 < (dom σ)) /\ (l2 < (dom σ)).
   intros.
-  induction H; repeat steps || eapply_anywhere getObj_dom.
+  induction H;
+    repeat steps || eapply_anywhere getObj_dom.
 Qed.
 
-(*
-  Lemma reachability_rev:
-    forall σ l l',
-      σ ⊨ l ⇝ l' ->
-      (l = l' /\ l < dom σ) \/
-      (exists C ω f l0, getObj σ l = Some(C, ω) /\ getVal ω f = Some l0 /\ σ ⊨ l0 ⇝ l').
-  Proof.
-    intros.
-    induction H; steps.
-    + right. repeat eexists; eauto using rch_heap.
-    + right. repeat eexists; eauto using rch_heap, rch_trans.
-  Qed. *)
-
+(** We define a custom induction predicate. If a transitive property is true along heap paths, then it is true between any two reachable locations. *)
 Lemma reachability_rev_ind:
   forall (P: Loc -> Loc -> Prop) σ,
-    (forall l, l < dom σ -> P l l) ->
-    (forall l1 l2 l3, P l1 l2 -> P l2 l3 -> P l1 l3) ->
-    (forall l l' C ω f , l' < dom σ -> getObj σ l = Some(C, ω) /\ getVal ω f = Some l' -> P l l') ->
+    (forall l, l < dom σ -> P l l) -> (**r Heap case *)
+    (forall l1 l2 l3, P l1 l2 -> P l2 l3 -> P l1 l3) -> (**r Transitive case *)
+    (forall l l' C ω f , l' < dom σ -> getObj σ l = Some(C, ω) /\ getVal ω f = Some l' -> P l l') -> (**r Hop case *)
     (forall l l', σ ⊨ l ⇝ l' -> P l l').
 Proof.
   intros.
   induction H2; eauto.
 Qed.
 
+(** When we ad a new location inside a local environment of an object, any new paths were either already in the previous store, or go through the added location *)
 Lemma reachability_add_env:
   forall σ x C ω l,
     x < dom σ ->
@@ -111,26 +121,13 @@ Proof.
   eapply_anywhere getVal_add; steps; eauto with rch.
 Qed.
 
+(** ** Notions of path into the heap *)
 
-Lemma reachability_weaken_assignment :
-  forall σ σ' C ω ω' s e f l l',
-    (getObj σ l) = Some (C, ω) ->
-    ω' = [f ↦ l']ω ->
-    σ' = [l ↦ (C, ω')]σ ->
-    (l = l') ->
-    σ' ⊨ s ⇝ e ->
-    σ ⊨ s ⇝ e.
-Proof.
-  intros. move: H3. move: s e. induction 1; repeat steps || rewrite_anywhere update_dom; eauto with rch.
-  eapply_anywhere getObj_update3; eauto using getObj_dom; steps; eauto with rch.
-  eapply_anywhere getVal_update; steps;  eauto with rch.
-Qed.
-
-(* Notions of path into the heap *)
-
+(** We define an existential predicate corresponding to the [rch_step] case *)
 Definition reachable_one_step σ l0 l1 :=
-  exists C ω, (getObj σ l0 = Some (C, ω)) /\ (exists f, (getVal ω f = Some l1)) /\ (l1 < dom σ).
-
+  exists C ω f, getObj σ l0 = Some (C, ω) /\
+           getVal ω f = Some l1 /\
+           l1 < dom σ.
 
 Lemma reachable_one_step_reachability :
   forall σ l0 l1, reachable_one_step σ l0 l1 -> σ ⊨ l0 ⇝ l1.
@@ -140,7 +137,7 @@ Proof.
 Qed.
 Hint Resolve reachable_one_step_reachability : rch.
 
-(* Path in σ (p is in reverse order) *)
+(** We define the notion of [reachable_path] in σ. The list of points are in reverse order (the head of the list is the end of the path) *)
 Fixpoint reachable_path σ p {struct p}:=
   match p with
   | [] => True
@@ -148,10 +145,12 @@ Fixpoint reachable_path σ p {struct p}:=
   | l2::((l1::_) as p') => reachable_one_step σ l1 l2 /\ reachable_path σ p'
   end.
 
+(** A key notion for scopability proofs is to know if a path contains a given edge *)
 Definition contains_edge p (l1 l2 :Loc) :=
   exists p1 p2, p = p2 ++ l2::l1::p1.
 
-
+(** *** Basic properties of paths *)
+(** Transitivity: *)
 Lemma reachable_path_trans:
   forall σ p1 p2 l,
     reachable_path σ (p1++[l]) ->
@@ -159,36 +158,16 @@ Lemma reachable_path_trans:
     reachable_path σ (p1++(l::p2)).
 Proof.
   induction p1; [steps | intros].
-  simpl. simpl in H.
+  simpl in H |- *.
   repeat (destruct_match; [destruct p1; steps |]).
   assert (n0 = n) by (destruct p1; steps); subst.
   destruct_and.
   split; eauto.
   rewrite_back_any.
-  eapply IHp1; eauto. rewrite_any => //.
+  eapply IHp1; eauto; steps.
 Qed.
 
-
-Lemma reachable_path_reachability:
-  forall σ s e,
-    ((s = e /\ s < dom σ) \/ exists p, reachable_path σ (e :: (p++[s]))) <-> σ ⊨ s ⇝ e.
-Proof.
-  split.
-  + intros [[H1 H2] | [p Hp]]; subst; eauto with rch.
-    generalize dependent e.
-    induction p; repeat light; eauto using reachable_one_step_reachability.
-    specialize (IHp a).
-    unfold reachable_one_step in H. destructs.
-    eauto with rch.
-  + induction 1; destructs; eauto; right.
-    ++ exists []; simpl; unfold reachable_one_step.
-       repeat eexists; eauto using getObj_dom.
-    ++ exists (p++(l1::p0)).
-       rewrite <- app_assoc, app_comm_cons.
-       eauto using reachable_path_trans, app_comm_cons.
-Qed.
-
-
+(** All elements along a path are reachable from the start: *)
 Lemma reachable_path_is_reachable:
   forall σ p e l,
     reachable_path σ (e::p) ->
@@ -196,21 +175,21 @@ Lemma reachable_path_is_reachable:
     σ ⊨ l ⇝ e.
 Proof.
   induction p ; try solve [repeat light ; eauto using rch_heap].
-  intros. destruct H0 as [H0 | H0]; subst.
+  intros.
+  destruct H0 as [H0 | H0]; subst.
   + destruct p eqn:P ; repeat light;
       apply reachable_one_step_reachability, reachability_dom in H0;
       apply rch_heap; steps.
-  + move /(_ a l):IHp => IHp.
-    destruct p eqn:P; [steps; eauto with rch|].
+  + destruct p eqn:P; [steps; eauto with rch|].
     rewrite <- P in *. simpl in H.
     destruct_and.
     unfold reachable_one_step in H.
     destructs.
-    eapply rch_trans with a; eauto with rch.
+    eapply rch_trans with a; eauto with rch => //.
     eapply IHp => //.
 Qed.
 
-
+(** The last element in the path is also reachable: *)
 Lemma reachable_path_last:
   forall σ s1 s2 p,
     reachable_path σ (p++[s2;s1]) ->
@@ -222,7 +201,7 @@ Proof.
     assert ( n = n0) by (destruct p; steps); steps.
 Qed.
 
-
+(** Concatenation of paths: *)
 Lemma reachable_path_app:
   forall σ s1 s2 p1 p2,
     reachable_path σ (p2++s2::p1++[s1]) ->
@@ -254,41 +233,65 @@ Proof.
 Qed.
 
 
+(** *** Main equivalence result *)
+Lemma reachable_path_reachability:
+  forall σ s e,
+    ((s = e /\ s < dom σ) \/ (**r trivial case *)
+     exists p, reachable_path σ (e :: (p++[s]))) <-> σ ⊨ s ⇝ e. (**r main case if e ≠ s *)
+Proof.
+  split.
+  + intros [[Heq Hdom] | [p Hp]]; subst; eauto with rch.
+    generalize dependent e.
+    induction p;
+      repeat light;
+      eauto with rch.
+  + induction 1; destructs; eauto; right.
+    ++ exists []; simpl; unfold reachable_one_step.
+       repeat eexists; eauto using getObj_dom.
+    ++ exists (p++(l1::p0)).
+       rewrite <- app_assoc, app_comm_cons.
+       eauto using reachable_path_trans, app_comm_cons.
+Qed.
+
+(** *** Other results *)
+(** Splitting of paths: *)
 Lemma reachable_path_app2:
   forall σ s p1 p2,
     reachable_path σ (p2++s::p1) ->
     reachable_path σ (p2++[s]).
 Proof.
   assert (
-      forall (σ : list Obj) (s s': nat) (p1 p2 : list nat),
-        reachable_path σ (p2 ++ s :: p1++[s']) -> reachable_path σ (p2 ++ [s])) by
-      repeat steps || eapply_anywhere reachable_path_app.
-  intros.
-  destruct p1 => //.
+      forall σ s s' p1 p2,
+        reachable_path σ (p2 ++ s :: p1++[s']) ->
+        reachable_path σ (p2 ++ [s])
+    ) by repeat steps || eapply_anywhere reachable_path_app.
+  intros; destruct p1 => //.
   pose proof (app_exists_last p1 n) ; steps.
   rewrite H1 in H0; eauto.
 Qed.
 
-
-
+(** Containing a given edge is decidable: *)
 Lemma contains_edge_dec :
-  forall p l1 l2, contains_edge p l1 l2 \/ not (contains_edge p l1 l2).
+  forall p l1 l2,
+    contains_edge p l1 l2 \/
+    not (contains_edge p l1 l2).
 Proof.
   unfold contains_edge. intros.
   induction p; steps.
   + right. steps. symmetry in H. apply app_eq_nil in H. steps.
   + left. exists p1, (a::p2); steps.
-  + destruct (PeanoNat.Nat.eq_dec a l2) as [Ha | Ha]; subst.
-    ++ (* a = l2 *)
+  + destruct_eq (a = l2); subst.
+    ++ (**r a = l2 *)
       destruct p; steps.
       +++ right; steps. symmetry in H0. apply app_eq_unit in H0; steps.
-      +++ destruct (PeanoNat.Nat.eq_dec l l1) as [Hl | Hl];
-            [ left | right]; steps;
-              [ exists p, [] | destruct p2] ; steps; eauto.
-    ++ right; steps.
-       destruct p2; steps; eauto.
+      +++ destruct_eq (l = l1);
+            [ left | right ]; steps;
+              [ exists p, [] | destruct p2] ;
+              steps; eauto.
+    ++ (**r a ≠ l2 *)
+      right; steps.
+      destruct p2; steps; eauto.
 Qed.
-
 
 Lemma contains_edge_cons :
   forall p l l' l0,
@@ -300,7 +303,7 @@ Proof.
   destruct p2; steps; eauto.
 Qed.
 
-
+(** Combining previous results, we know that if a path contains a given edge [(l1,l2)], then [l1] is reachable from the start: *)
 Lemma reachable_path_split_on_edge:
   forall σ s p l1 l2,
     reachable_path σ (p++[s]) ->
@@ -316,7 +319,7 @@ Proof.
     rewrite <- matched in *. destructs; eauto.
 Qed.
 
-
+(** When the local environment associated with an object is updated, if the updated value was not part of a given path in the updated store, then it was already valid in the un-updated store.  *)
 Lemma contains_edge_assignment :
   forall σ σ' C ω ω' p f l l',
     (getObj σ l) = Some (C, ω) ->
@@ -334,12 +337,15 @@ Proof.
   split.
   + unfold reachable_one_step in *; destructs.
     repeat rewrite_anywhere update_dom.
-    destruct (PeanoNat.Nat.eq_dec l1 l); subst.
+    destruct_eq (l1 = l); subst.
     ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
        invert_constructor_equalities; subst.
-       destruct (PeanoNat.Nat.eq_dec l2 l'); subst ; [exfalso; apply H2; exists p, []  ; steps |].
-       unfold getVal in *. exists C0, ω; repeat split; eauto.
-       destruct (PeanoNat.Nat.eq_dec f f0); subst; rewrite_anywhere  update_one2; eauto.
+       destruct_eq (l2 = l'); subst ;
+         [exfalso; apply H2; exists p, []  ; steps |].
+       unfold getVal in *.
+       exists C0, ω; repeat split; eauto.
+       destruct_eq (f = f0); subst;
+         rewrite_anywhere  update_one2; eauto.
        apply_anywhere update_one4; subst. congruence.
     ++ rewrite_anywhere getObj_update2; eauto using getObj_dom.
        repeat eexists || split || eauto.
@@ -349,39 +355,7 @@ Proof.
     rewrite Hedge; eauto.
 Qed.
 
-
-Lemma contains_edge_first_edge :
-  forall p l l',
-    contains_edge p l l' ->
-    exists p1 p2, p = p1++(l'::l::p2) /\ not (contains_edge p2 l l').
-Proof.
-  induction p as [p IHp] using (induction_ltof1 _ (fun x => length x)); unfold ltof in IHp.
-  intros l l' [p1 [p2 H]].
-  destruct (contains_edge_dec p1 l l').
-  + apply IHp in H0.
-    destruct H0 as [p3 [p4 [H01 H02]]].
-    subst. exists (p2 ++ l' :: l :: p3), p4; split; eauto.
-    repeat rewrite app_comm_cons || rewrite app_assoc => //.
-    subst. rewrite app_length; simpl. Psatz.lia.
-  + exists p2, p1; split; eauto.
-Qed.
-
-Lemma contains_edge_last_edge :
-  forall p l l',
-    contains_edge p l l' ->
-    exists p1 p2, p = p1++(l'::l::p2) /\ not (contains_edge p1 l l').
-Proof.
-  induction p as [p IHp] using (induction_ltof1 _ (fun x => length x)); unfold ltof in IHp.
-  intros l l' [p1 [p2 H]].
-  destruct (contains_edge_dec p2 l l').
-  + apply IHp in H0.
-    destruct H0 as [p3 [p4 [H01 H02]]].
-    subst. exists p3 , (p4 ++ l' :: l :: p1) ; split; eauto.
-    repeat rewrite app_comm_cons || rewrite app_assoc => //.
-    subst. rewrite app_length; simpl. Psatz.lia.
-  + exists p2, p1; split; eauto.
-Qed.
-
+(** A path in an updated store either goes through the new value or was already valid in the un-updated store*)
 Lemma reachable_path_assignment :
   forall σ σ' C ω ω' p f l l',
     (getObj σ l) = Some (C, ω) ->
@@ -422,7 +396,7 @@ Proof.
     rewrite app_comm_cons => //.
 Qed.
 
-
+(** A path is either trivial or contains a first step: *)
 Lemma reachability_first_step:
   forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
@@ -434,7 +408,24 @@ Proof.
   right.  repeat eexists; eauto.
 Qed.
 
+(** We can extract the last edge [(l,l')] of a path: *)
+Lemma contains_edge_last_edge :
+  forall p l l',
+    contains_edge p l l' ->
+    exists p1 p2, p = p1++(l'::l::p2) /\ not (contains_edge p1 l l').
+Proof.
+  induction p as [p IHp] using (induction_ltof1 _ (fun x => length x)); unfold ltof in IHp.
+  intros l l' [p1 [p2 H]].
+  destruct (contains_edge_dec p2 l l').
+  + apply IHp in H0.
+    destruct H0 as [p3 [p4 [H01 H02]]].
+    subst. exists p3 , (p4 ++ l' :: l :: p1) ; split; eauto.
+    repeat rewrite app_comm_cons || rewrite app_assoc => //.
+    subst. rewrite app_length; simpl. Psatz.lia.
+  + exists p2, p1; split; eauto.
+Qed.
 
+(** When adding a empty object, no path can go through it: *)
 Lemma reachability_not_empty:
   forall σ C l, l < dom σ -> (σ++[(C, [])]) ⊨ (length σ) ⇝ l -> False .
 Proof.
@@ -444,19 +435,7 @@ Proof.
   rewrite_anywhere getObj_last; invert_constructor_equalities; destruct f; steps.
 Qed.
 
-Lemma reachability_ind2:
-  forall σ (P: Loc -> Loc -> Prop),
-    (forall l, P l l) ->
-    (forall l0 l1 C f ω, l1 < dom σ -> getObj σ l0 = Some (C, ω) -> getVal ω f = Some l1 -> P l0 l1) ->
-    (forall l0 l1 l2, σ ⊨ l0 ⇝ l1 -> P l0 l1 -> σ ⊨ l1 ⇝ l2 -> P l1 l2 -> P l0 l2) ->
-    forall l0 l1, σ ⊨ l0 ⇝ l1 -> P l0 l1.
-Proof.
-  intros.
-  induction H2; eauto.
-Qed.
-
-
-
+(** Extension of the previous result: a path in a store with a new empty object already existed in the store without it: *)
 Lemma reachability_empty:
   forall σ C L l, l < dom σ -> ((σ++[(C, [])]) ⊫ L ⇝ l) -> (σ ⊫ L ⇝ l).
 Proof.
@@ -474,7 +453,7 @@ Proof.
     ++ move: (app_cons_not_nil p nil l1) => Hp.
        simpl in Hrch. destruct (p ++ [l1]) eqn:P; [exfalso; eauto |]. light.
        unfold reachable_one_step in H0.
-       move: H0 => [C' [ω' [Hobja [[f Hval] Hdom]]]].
+       move: H0 => [C' [ω' [f [Hobja [ Hval Hdom]]]]] .
        pose proof (getObj_last_empty _ _ _ _ _ _ _ Hobja Hval) as [Hobj Hl1].
        light. eauto with rch.
 Qed.
