@@ -226,9 +226,6 @@ Definition Assignment (P: Store -> Store -> Prop)  : Prop :=
 Definition Freshness (P: Store -> Store -> Prop) : Prop :=
   forall s c ω, P s (s ++ [(c, ω)]).
 
-Ltac unfoldProps :=
-   unfold Reflexive, Transitive, Assignment, Freshness.
-
 (** A relation maintained by the evaluator. All local-reasoning theorems are about showing that some relations are eval maintained. *)
 Definition EvalMaintained (P: Store -> Store -> Prop)  k : Prop :=
   forall e σ σ' ρ v v',
@@ -246,7 +243,8 @@ Definition InitMaintained (P: Store -> Store -> Prop) (n:nat) : Prop :=
       P s σ'.
 
 (** Notably, if a relation verifies [Freshness] (and other properties), it will be maintained through initialization. *)
-Lemma FreshnessInitMaintained : forall (P: Store -> Store -> Prop) n,
+Lemma FreshnessInitMaintained :
+  forall (P: Store -> Store -> Prop) n,
     Reflexive P -> Transitive P -> Assignment P -> Freshness P -> InitMaintained P n.
 Proof.
   intros P n H_refl H_trans H_asgn H_fresh H_strong.
@@ -272,7 +270,8 @@ Qed.
 
 (** *** Evaluation of lists of expressions *)
 (** Another sub-case is to show that [Reflexive] and [Transitive] eval-maintained relations are also maintained when evaluating a list of expressions *)
-Lemma EvalListMaintained : forall (P: Store -> Store -> Prop) n,
+Lemma EvalListMaintained :
+  forall (P: Store -> Store -> Prop) n,
     Reflexive P ->
     Transitive P ->
     (forall k, k < n -> EvalMaintained P k) -> (**r strong induction hypothesis *)
@@ -298,7 +297,8 @@ Qed.
 (** *** Main evaluation result *)
 (** We show here that a relation that is [Reflexive], [Transitive], that is maintained through assignment and initialization is maintained by the evaluator. We use strong induction *)
 
-Lemma EvalMaintainedProp : forall (P: Store -> Store -> Prop),
+Lemma EvalMaintainedProp :
+  forall (P: Store -> Store -> Prop),
     Reflexive P -> Transitive P ->  Assignment P -> (forall n, InitMaintained P n) -> forall n, EvalMaintained P n.
   intros P H_refl H_trans  H_asgn H_init.
   apply strong_induction.
@@ -317,3 +317,7 @@ Lemma EvalMaintainedProp : forall (P: Store -> Store -> Prop),
   eapply H_trans with (assign v1 v v2 s0); eauto.
   unfold assign; repeat destruct_match; eauto using PeanoNat.Nat.eq_le_incl, update_one3.
 Qed.
+
+(** Usefull Ltac when using the above theorem *)
+Ltac unfoldProps :=
+  unfold Reflexive, Transitive, Assignment, Freshness, InitMaintained, EvalMaintained.

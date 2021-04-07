@@ -68,3 +68,4 @@ Proof.
     unfoldProps;
     eauto with cmpt.
 Qed.
+Hint Resolve compatibility_theorem: cmpt.
