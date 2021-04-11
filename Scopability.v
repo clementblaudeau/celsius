@@ -212,10 +212,6 @@ Module Scopability.
   Qed.
   Hint Resolve preserving_transitivity_degenerate: scoping.
 
-  Ltac inSingleton :=
-    match goal with
-    |H: ?a ∈ Singleton Loc ?b |- _ => induction H
-    end.
 
 
   Lemma scopability_assignment: forall σ1 σ2 σ2' L1 l l' f C ω ω',

@@ -3,7 +3,7 @@
 (** This file defines the notion of partial monotonicity between stores. The idea behind partial monotonicity is simple: objects that are being initialized (not warm already) can only get "warmer": the number of initialized fields can only increase. Between two stores [σ] and [σ'], it means that all objects in [σ] have more initialized fields in [σ']; it does not states anything about new objects that [σ'] can have. *)
 
 From Celsius Require Export Trees Eval Reachability Tactics Compatibility strongInduction.
-Require Import ssreflect ssrbool List Psatz.
+Require Import ssreflect ssrbool List Psatz Coq.Program.Tactics.
 Import ListNotations.
 Open Scope nat_scope.
 
@@ -90,7 +90,8 @@ Proof.
 Qed.
 Hint Resolve partialMonotonicity_assignment: pM.
 
-Lemma partialMonotonicity_freshness : forall (σ: Store) (c: ClN) (ρ: Env),
+Lemma partialMonotonicity_freshness :
+  forall σ c ρ,
     σ ⪯ σ ++ [(c, ρ)].
 Proof.
   unfold partialMonotonicity, initializedFields.
@@ -123,18 +124,33 @@ Proof.
 Qed.
 Hint Resolve partialMonotonicity_theorem_dom: pM.
 
-(** Similarly, we have a result on evaluation of lists *)
-Theorem partialMonotonicity_theorem_list_dom: forall n el σ σ' ρ ψ ρ',
-    ⟦_ el _⟧(σ, ρ, ψ)(n) = (Success_l ρ' σ') -> (dom σ) <= (dom σ').
+Ltac eval_dom :=
+  match goal with
+  | H: ⟦?e⟧(?σ, ?ρ, ?v)(?n) = Success ?v' ?σ' |- _ =>
+    let fresh := fresh "H_dom" in
+    add_hypothesis fresh (partialMonotonicity_theorem_dom n e σ σ' ρ v v' H)
+  end.
+
+
+(** Similarly, we have a result for evaluation of lists *)
+Theorem partialMonotonicity_theorem_list_dom:
+  forall n el σ σ' ρ ψ ρ',
+    ⟦_ el _⟧(σ, ρ, ψ)(n) = (Success_l ρ' σ') ->
+    dom σ <= dom σ'.
 Proof.
   intros.
-  eapply (EvalListMaintained (fun σ σ' => dom σ <= dom σ') (S n)); intros;
-    unfold Reflexive, Transitive, Assignment, Freshness, EvalMaintained; eauto with pM lia.
+  eapply (EvalListMaintained (fun σ σ' => dom σ <= dom σ') (S n));
+    unfoldProps ; eauto with pM lia.
 Qed.
 Hint Resolve partialMonotonicity_theorem_list_dom: pM.
 
 (** If we combine partial monotonicity with compatibility (objects do no change type), we can prove that warm objects stay warm *)
-Lemma partialMonotonicity_warm_monotone: forall σ σ' l, σ ⪯ σ' -> σ ⊆ σ' -> (σ ⊨ l : warm) -> (σ' ⊨ l : warm).
+Lemma partialMonotonicity_warm_monotone:
+  forall σ σ' l,
+    σ ⪯ σ' ->
+    σ ⊆ σ' ->
+    (σ ⊨ l : warm) ->
+    (σ' ⊨ l : warm).
 Proof.
   unfold partialMonotonicity, initializedFields, reachable_warm; steps.
   specialize (H l fields).
