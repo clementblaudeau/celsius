@@ -87,10 +87,18 @@ Qed.
 
 Lemma storeSubset_singleton2 :
   forall a σ,
-    (Singleton Loc a) ⪽ σ <-> a < dom σ.
+    (Singleton Loc a) ⪽ σ -> a < dom σ.
+Proof.
+  unfold storeSubset; steps.
+  induction (H a) ; steps.
+Qed.
+
+Lemma storeSubset_singleton3 :
+  forall a σ,
+    a < dom σ -> (Singleton Loc a) ⪽ σ.
 Proof.
   unfold storeSubset; steps;
-    [induction (H a) | induction H0] ; steps.
+    induction H0 ; steps.
 Qed.
 
 Lemma storeSubset_codom_empty : forall s, codom [] ⪽ s.
@@ -106,6 +114,15 @@ Proof.
     repeat steps || destruct H;
     eauto with wf.
 Qed.
+
+Lemma storeSubset_update:
+  forall L l o σ,
+    L ⪽ [l ↦ o] (σ) -> L ⪽ σ.
+Proof.
+  unfold storeSubset; steps; update_dom; eauto.
+Qed.
+Hint Resolve storeSubset_update: wf.
+
 
 (** In preparation for initialization theorems, we have technical results about adding a location *)
 Lemma wf_add : forall s c ρ, wf s -> codom ρ ⪽ s -> wf (s ++ [(c,ρ)]).
@@ -136,14 +153,17 @@ Hint Resolve storeSubset_add: wf.
 Hint Resolve storeSubset_union_r: wf.
 Hint Resolve storeSubset_singleton: wf.
 Hint Resolve storeSubset_singleton2: wf.
+Hint Resolve storeSubset_singleton3: wf.
 Hint Resolve storeSubset_codom_empty: wf.
 Hint Resolve wf_add: wf.
 Hint Resolve wf_add_empty: wf.
 Hint Resolve nth_error_In: wf.
+Hint Resolve storeSubset_update: wf.
 
 (** ** Evaluation-maintained results *)
 (** We want to show that the evaluator maintains the wellformedness of stores. As it is not only about stores but also the location of [this] and the result, we cannot use the results proved in Eval.v. We reprove it from scratch, starting with some technical results. *)
 
+(** First a technical result on assignment *)
 Lemma wf_assign:
   forall σ σ' ω ω' l v f C,
     (getObj σ l) = Some (C, ω) ->
@@ -159,7 +179,7 @@ Proof.
 Qed.
 Hint Resolve wf_assign: wf.
 
-(** We have the result for a evaluating a list of arguments *)
+(** Then we show the induction case for evaluating a list of expressions *)
 Lemma wellformedness_theorem_list_aux :
   forall n,
     (forall k : nat,
@@ -190,10 +210,7 @@ Proof.
       eauto with wf pM.
 Qed.
 
-Ltac update_dom :=
-  repeat rewrite_anywhere update_dom;
-  repeat rewrite update_dom.
-
+(** Then for the initialization case *)
 Lemma wellformedness_theorem_init_aux:
   forall n,
     (forall k : nat,
@@ -236,8 +253,8 @@ Proof.
     eapply_anywhere getVal_add; steps; try lia; eauto.
 Qed.
 
-
-Theorem wellformedness_conserved :
+(** Then we have the main result *)
+Theorem wellformedness_theorem :
   forall n e σ σ' ρ ψ l,
     ⟦e⟧(σ, ρ, ψ)(n) = (Success l σ') ->
     wf σ ->
@@ -262,7 +279,7 @@ Proof.
     eapply wellformedness_theorem_list_aux in matched6;
       eauto with wf pM lia; try destruct_and.
     eapply H_strongInd in H; try eapply_any; eauto with wf; destruct_and.
-    eapply storeSubset_union; [| eapply storeSubset_singleton2];
+    eapply storeSubset_union; [| eapply storeSubset_singleton3];
       eauto with wf lia.
   + destruct n => //; simpl in *; repeat (destruct_match; try discriminate).
     eapply wellformedness_theorem_list_aux in matched;
@@ -271,7 +288,7 @@ Proof.
     eapply wellformedness_theorem_init_aux in matched0;
       try rewrite dom_app; try rewrite_anywhere dom_app;
         eauto with wf lia; try destructs.
-    eapply storeSubset_union; [| eapply storeSubset_singleton2;  rewrite dom_app];
+    eapply storeSubset_union; [| eapply storeSubset_singleton3;  rewrite dom_app];
       eauto with wf lia.
     intros l Hl; rewrite dom_app.
     eapply H6 in Hl; eauto with lia.
@@ -288,17 +305,64 @@ Proof.
     ++ eapply storeSubset_trans with σ; eauto with wf lia.
        update_dom; lia.
 Qed.
+
+(* A simple corollary on the conservation of wellformedness *)
+Corollary wellformedness_conserved :
+  forall n e σ σ' ρ ψ l,
+    ⟦e⟧(σ, ρ, ψ)(n) = (Success l σ') ->
+    wf σ ->
+    (codom ρ) ∪ {ψ} ⪽ σ ->
+    wf σ'.
+Proof.
+  eapply wellformedness_theorem.
+Qed.
 Hint Resolve wellformedness_conserved: wf.
 
-
-Theorem correct_value :
+(** Another consequence: the returned value is within the returned store: *)
+Corollary correct_value :
   forall k e σ σ' ρ ψ l,
     ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->
     wf σ ->
     (codom ρ) ∪ {ψ} ⪽ σ ->
     l < dom σ'.
 Proof.
-  eapply wellformedness_conserved.
+  eapply wellformedness_theorem.
 Qed.
-
 Hint Resolve correct_value: wf.
+
+(** We extend it to list evalutions *)
+Theorem wellformedness_list_conserved :
+  forall n ρ ψ el s s' vl1 vl2,
+    fold_left (eval_list_aux ρ ψ n) el (Success_l vl1 s) = Success_l vl2 s' ->
+    wf s ->
+    codom vl1 ⪽ s ->
+    (codom ρ ∪ {ψ}) ⪽ s ->
+    wf s' /\ (codom vl2 ⪽ s') /\ (dom s <= dom s').
+Proof.
+  intros n; eapply wellformedness_theorem_list_aux with (S n); eauto with wf.
+Qed.
+Hint Resolve wellformedness_list_conserved: wf.
+
+(** A useful tactic: *)
+Ltac eval_wf :=
+  match goal with
+  | H:(⟦ ?e ⟧ (?σ, ?ρ, ?v )( ?n)) = Success ?v' ?σ', H1:wf ?σ
+    |- _ => match goal with
+          | H':wf σ' |- _ => fail 1
+          | _ =>
+            let H_val := fresh "H_val" in
+            let H_wf := fresh "H_wf" in
+            pose proof (wellformedness_theorem n e σ σ' _ _ _ H) as [H_wf H_val]; eauto with wf
+          end
+  | H:(⟦_ ?el _⟧ (?σ, ?ρ, ?v )( ?n)) = Success_l ?v_l ?σ', H1:wf ?σ
+    |- _ => match goal with
+          | H':wf σ' |- _ => fail 1
+          | _ =>
+            let H_val := fresh "H_val" in
+            let H_wf := fresh "H_wf" in
+            let H_codom := fresh "H_codom" in
+            pose proof (wellformedness_list_conserved _ _ _  el σ σ' _ _ H)
+              as [H_wf [H_codom H_val]];
+            eauto with wf pM
+          end
+  end.

@@ -86,12 +86,25 @@ Qed.
 Lemma reachability_dom :
   forall σ l1 l2,
     (σ ⊨ l1 ⇝ l2) ->
-    (l1 < (dom σ)) /\ (l2 < (dom σ)).
+    (l2 < (dom σ)).
 Proof.
   intros.
   induction H;
     repeat steps || eapply_anywhere getObj_dom.
 Qed.
+Hint Resolve reachability_dom: rch.
+
+(* Reachable objects are inside the store *)
+Lemma reachability_dom2 :
+  forall σ l1 l2,
+    (σ ⊨ l1 ⇝ l2) ->
+    (l1 < (dom σ)).
+Proof.
+  intros.
+  induction H;
+    repeat steps || eapply_anywhere getObj_dom.
+Qed.
+Hint Resolve reachability_dom2: rch.
 
 (** We define a custom induction predicate. If a transitive property is true along heap paths, then it is true between any two reachable locations. *)
 Lemma reachability_rev_ind:
@@ -222,6 +235,7 @@ Proof.
     simpl in *; eauto.
 Qed.
 
+(** **** Technical lemma :*)
 Lemma app_exists_last:
   forall p (x:Loc),
   exists y p', x::p = p'++[y].
@@ -231,7 +245,6 @@ Proof.
   + move /(_ a):IHp => IHp. steps.
     exists y, (x::p'); steps.
 Qed.
-
 
 (** *** Main equivalence result *)
 Lemma reachable_path_reachability:
@@ -456,4 +469,54 @@ Proof.
        move: H0 => [C' [ω' [f [Hobja [ Hval Hdom]]]]] .
        pose proof (getObj_last_empty _ _ _ _ _ _ _ Hobja Hval) as [Hobj Hl1].
        light. eauto with rch.
+Qed.
+
+(** *** Technical results *)
+Lemma reachability_weaken_assignment :
+(** We define an existential predicate corresponding to the [rch_step] case *)
+  forall σ σ' C ω ω' s e f l l',
+    (getObj σ l) = Some (C, ω) ->
+    ω' = [f ↦ l']ω ->
+    σ' = [l ↦ (C, ω')]σ ->
+    (l = l') ->
+    σ' ⊨ s ⇝ e ->
+    σ ⊨ s ⇝ e.
+Proof.
+  intros. move: H3. move: s e. induction 1; repeat steps || rewrite_anywhere update_dom; eauto with rch.
+  eapply_anywhere getObj_update3; eauto using getObj_dom; steps; eauto with rch.
+  eapply_anywhere getVal_update; steps;  eauto with rch.
+Qed.
+
+Lemma contains_edge_split:
+  forall y x p p1 p2 (l l': Loc),
+    y :: p ++ [x] = p1 ++ l' :: l :: p2 ->
+    l' = y \/
+    exists p1', p1 = y::p1' /\ y::p++[x] = y::p1'++l'::l::p2.
+Proof.
+  intros.
+  destruct p1; steps.
+  right.
+  exists p1; rewrite_any; steps.
+Qed.
+
+
+Lemma contains_edge_last:
+  forall l l' l0 p1',
+    l <> l' ->
+    contains_edge ((l0 :: p1') ++ [l']) l l' ->
+    contains_edge (l0 :: p1') l l'.
+Proof.
+  unfold contains_edge; steps.
+  destruct p1.
+  - exfalso; eapply_any.
+      eapply (app_inj_tail (p2 ++[l']) (l0::p1')).
+      rewrite app_assoc_reverse; steps.
+  - pose proof (app_exists_last p1 l1); destructs.
+    rewrite H1 in H0.
+    assert (l' = y). {
+      eapply (app_inj_tail (l0::p1') (p2++l'::l::p'));
+        rewrite app_assoc_reverse; eauto. }
+    exists p', p2; steps.
+    eapply app_inv_tail with [y].
+    rewrite app_assoc_reverse; eauto.
 Qed.

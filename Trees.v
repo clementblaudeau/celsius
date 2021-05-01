@@ -303,5 +303,6 @@ Ltac update_dom :=
 
 Ltac inSingleton :=
   match goal with
-  |H: ?a ∈ Singleton Loc ?b |- _ => induction H
+  | H: ?a ∈ Singleton Loc ?b |- _ => induction H
+  | H: {?x} ?y |- _ => induction H
   end.

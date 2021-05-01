@@ -2,6 +2,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Omega.
 Require Import Psatz.
+Require Import Coq.Program.Tactics.
 
 (* Borrowed from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
@@ -202,4 +203,17 @@ Ltac erewrite_anywhere f :=
 Ltac destruct_eq H :=
   match H with
   | ?a = ?b => let fresh_H := fresh "Heq" in pose proof (PeanoNat.Nat.eq_dec a b) as [fresh_H | fresh_H]
+  end.
+
+Ltac modus_ponens :=
+  repeat match goal with
+         | H1 : ?P -> ?Q, H2: ?P |- _ => pose proof (H1 H2) ; clear H1 end.
+
+Ltac nat_le_trans :=
+  repeat match goal with
+  |H1: ?a <= ?b, H2: ?b <= ?c |- _ =>
+   match goal with
+   | H3 : a <= c |- _ => fail 1
+   | _ => assert (a <= c) by lia
+   end
   end.
