@@ -1,14 +1,14 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
-Require Import Omega.
 Require Import Psatz.
 Require Import Coq.Program.Tactics.
+
 
 (* Borrowed and adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
 Open Scope string.
 
-Global Hint Extern 50 => omega: omega.
+
 Global Hint Extern 50 => lia: lia.
 Global Hint Extern 50 => cbn: cbn.
 Global Hint Extern 50 => cbn; intuition auto: cbn_intuition.
@@ -131,7 +131,6 @@ Ltac step_gen := match goal with
     destruct H as [ x' ]
   | [ p: ?A*?B |- _ ] => destruct p
   | [ H: (_,_) = (_,_) |- _ ] => inversion H; clear H
-  | [ H: context[Nat.eq_dec ?U ?V] |- _ ] => destruct (Nat.eq_dec U V)
   | H: _ |- _ => injection H; clear H
   | |- NoDup _ => constructor
   | H: forall a, _ -> _ |- _ => pose proof (H _ eq_refl); clear H
@@ -158,7 +157,7 @@ Ltac steps := repeat step.
 Ltac apply_any :=
   match goal with
   | H: _ |- _ => apply H
-  end. 
+  end.
 
 Ltac rewrite_any :=
   match goal with
