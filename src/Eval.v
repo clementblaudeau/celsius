@@ -2,9 +2,8 @@
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** This file defines the evaluator of the language and some general results *)
 
-From Celsius Require Export Trees Tactics.
+From Celsius Require Export Trees Tactics strongInduction.
 Require Import ssreflect ssrbool.
-Require Import Celsius.strongInduction.
 Require Import List.
 Require Import Psatz.
 Import ListNotations.

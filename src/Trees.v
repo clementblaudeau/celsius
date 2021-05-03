@@ -1,8 +1,8 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
 (** This file defines all the basic structures (as inductive types) of the project. Then some tools (for updating envs) are provided. *)
-
-Require Import ssreflect ssrbool Sets.Ensembles Celsius.Tactics Coq.Lists.List Psatz.
+From Celsius Require Export Tactics.
+Require Import ssreflect ssrbool Sets.Ensembles Coq.Lists.List Psatz.
 Import ListNotations.
 
 (** ** Language structures *)

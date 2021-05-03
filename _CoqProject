@@ -1,15 +1,13 @@
 -Q . Celsius
-Compatibility.v
-Eval.v
-PartialMonotonicity.v
-Scopability.v
-strongInduction.v
-Trees.v
-Wellformedness.v
-LocalReasoning.v
-Reachability.v
-Stackability.v
-Tactics.v
-Typing.v
-
-
+src/Compatibility.v
+src/Eval.v
+src/PartialMonotonicity.v
+src/Scopability.v
+src/strongInduction.v
+src/Trees.v
+src/Wellformedness.v
+src/LocalReasoning.v
+src/Reachability.v
+src/Stackability.v
+src/Tactics.v
+src/Typing.v
