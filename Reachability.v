@@ -1,10 +1,10 @@
 (* Celsius project *)
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** This file defines the notion of reachability of a location in a given store. The set of reachable locations, starting from a given one l is transitively defined as the ones that can be accessed by following pointers in object local environments. We then define and prove basic properties around this notion. In the second part, we show the equivalence between the inductive definition and a path-based definition. This allows us to reason about paths from one location to another, especially for scopability results.  *)
-
-From Celsius Require Export Trees Eval.
-Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Sets.Ensembles Psatz.
+From Celsius Require Export Eval Trees.
+Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Psatz.
 Import ListNotations.
+Require Import Sets.Ensembles.
 Open Scope nat_scope.
 Open Scope list_scope.
 
@@ -30,7 +30,7 @@ Inductive reachability : Store -> Loc -> Loc ->Prop :=
       σ ⊨ l0 ⇝ l2
 where "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2).
 
-Hint Resolve rch_heap rch_step rch_trans: rch.
+Global Hint Resolve rch_heap rch_step rch_trans: rch.
 Hint Rewrite update_dom: rch.
 
 (** We then extend the definition for a set of locations *)
@@ -92,7 +92,7 @@ Proof.
   induction H;
     repeat steps || eapply_anywhere getObj_dom.
 Qed.
-Hint Resolve reachability_dom: rch.
+Global Hint Resolve reachability_dom: rch.
 
 (* Reachable objects are inside the store *)
 Lemma reachability_dom2 :
@@ -104,7 +104,7 @@ Proof.
   induction H;
     repeat steps || eapply_anywhere getObj_dom.
 Qed.
-Hint Resolve reachability_dom2: rch.
+Global Hint Resolve reachability_dom2: rch.
 
 (** We define a custom induction predicate. If a transitive property is true along heap paths, then it is true between any two reachable locations. *)
 Lemma reachability_rev_ind:
@@ -148,7 +148,7 @@ Proof.
   unfold reachable_one_step; steps.
   eauto with rch.
 Qed.
-Hint Resolve reachable_one_step_reachability : rch.
+Global Hint Resolve reachable_one_step_reachability : rch.
 
 (** We define the notion of [reachable_path] in σ. The list of points are in reverse order (the head of the list is the end of the path) *)
 Fixpoint reachable_path σ p {struct p}:=

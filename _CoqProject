@@ -1,3 +1,15 @@
 -Q . Celsius
+Compatibility.v
+Eval.v
+PartialMonotonicity.v
+Scopability.v
+strongInduction.v
+Trees.v
+Wellformedness.v
+LocalReasoning.v
+Reachability.v
+Stackability.v
+Tactics.v
+Typing.v
 
 

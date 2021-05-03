@@ -106,7 +106,7 @@ Fixpoint eval e σ ρ v k :=
              | Success_l args_val σ1 => (
                  let I := (length σ1) in (* Fresh location for new object *)
                  let ρ_init := args_val in (* Local env during initialisation *)
-                 let σ2 := σ1 ++ [(C, ∅)] in (* New object with empty local env *)
+                 let σ2 := σ1 ++ [(C, [])] in (* New object with empty local env *)
                  match (init I ρ_init C σ2 n) with
                  | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
                  | None => Error end )

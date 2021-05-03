@@ -7,7 +7,7 @@ Require Import ssreflect ssrbool Psatz List.
 Import ListNotations.
 Open Scope nat_scope.
 
-Hint Resolve partialMonotonicity_warm_monotone: stk.
+Global Hint Resolve partialMonotonicity_warm_monotone: stk.
 
 (** ** Definitions and notations *)
 Definition stackability (σ σ' : Store) :=
@@ -21,7 +21,7 @@ Lemma stackability_reflexivity:
 Proof.
   unfold stackability. right => //.
 Qed.
-Hint Resolve stackability_reflexivity: stk.
+Global Hint Resolve stackability_reflexivity: stk.
 
 (** The transitivity relation requires additional conditions between [σ2] and [σ3]: *)
 Lemma stackability_transitivity:
@@ -36,7 +36,7 @@ Proof.
   specialize (H l). specialize (H0 l).
   steps; eauto with stk.
 Qed.
-Hint Resolve stackability_transitivity: stk.
+Global Hint Resolve stackability_transitivity: stk.
 
 (** Assignment *)
 Lemma stackability_assignment :
@@ -49,7 +49,7 @@ Proof.
   unfold stackability, dom; steps.
   rewrite_anywhere update_one3; steps.
 Qed.
-Hint Resolve stackability_assignment: stk.
+Global Hint Resolve stackability_assignment: stk.
 
 (** ** Initialization results *)
 (** Here we show a custom initialization result. Stackability does not verify [Freshness], as we cannot add any object to the store (it has to be a warn object). Here, we show that during the initialization process (foldleft of fields), the stores grows and the number of initialized fields grows too. Doing this, when we reach the end, we get a store with all initialized fields for the new object. We show it in the context of a strong induction. *)
@@ -119,7 +119,7 @@ Proof.
          [eauto using Lt.lt_S_n | steps].
   + unfold dom; rewrite app_length; simpl; lia.
 Qed.
-Hint Resolve stackability_init_fresh: stk.
+Global Hint Resolve stackability_init_fresh: stk.
 
 (** ** Main stackability theorem *)
 (** Using the custom initialization result, we get the main result: stackability is maintained by the evaluator *)

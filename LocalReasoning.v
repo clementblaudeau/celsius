@@ -1,10 +1,14 @@
+(* Celsius project *)
+(* Clément Blaudeau - Lamp@EPFL 2021 *)
+(** This file defines the main result of local reasoning, built upon wellformedness, compatibility, scopability and stackability. In a wellformed, fully initialized context, a newly created object can only access hot (transitively fully initialized) locations. *)
+
 From Celsius Require Export Trees Eval PartialMonotonicity Reachability Compatibility Scopability Stackability Wellformedness.
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List.
 Import ListNotations.
 Open Scope nat_scope.
 
-
-
+(** ** Local Reasoning theorem *)
+(** We start with a lemma : *)
 Lemma local_reasoning:
   forall σ σ' L L',
     L ⪽ σ ->
@@ -21,13 +25,14 @@ Proof.
   destruct (PeanoNat.Nat.lt_ge_cases l' (dom σ)).
   + (* l ∈ (dom σ) *)
     eapply partialMonotonicity_warm_monotone; eauto .
-    assert (reachability_set σ L l'). by (eapply H1; simpl => //; eexists; eauto).
+    assert (reachability_set σ L l') by (eapply H1; simpl => //; eexists; eauto).
     inversion H9; steps.
     eapply H5; eauto with rch.
-  + eapply reachability_dom, H2 in Hl'; intuition.
+  + (* l ∉ (dom σ) *)
+    eapply reachability_dom, H2 in Hl'; intuition.
 Qed.
 
-
+(* Then the main theorem : *)
 Theorem Local_reasoning:
   forall e σ σ' ρ ψ l k,
     ⟦e⟧(σ, ρ, ψ)(k) = (Success l σ') ->

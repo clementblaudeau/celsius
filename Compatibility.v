@@ -21,7 +21,7 @@ Lemma compatibility_reflexivity :
   forall σ, σ ⊆ σ.
 Proof.
   unfold compatible. eauto. Qed.
-Hint Resolve compatibility_reflexivity : cmpt.
+Global Hint Resolve compatibility_reflexivity : cmpt.
 
 Lemma compatibility_transitivity :
   forall s1 s2 s3, s1 ⊆ s2 -> s2 ⊆ s3 -> s1 ⊆ s3.
@@ -31,7 +31,7 @@ Proof.
   move /(_ l C ω' H):H0 => [ω'' H0].
   eauto.
 Qed.
-Hint Resolve compatibility_transitivity : cmpt.
+Global Hint Resolve compatibility_transitivity : cmpt.
 
 Lemma compatibility_assignment :
   forall σ σ' l C ω ω',
@@ -45,7 +45,7 @@ Proof.
       [rewrite getObj_update1 | rewrite getObj_update2];
       eauto using getObj_dom.
 Qed.
-Hint Resolve compatibility_assignment: cmpt.
+Global Hint Resolve compatibility_assignment: cmpt.
 
 Lemma compatibility_freshness :
   forall σ c ρ,
@@ -54,7 +54,7 @@ Proof.
   unfold compatible.
   induction σ; destruct l; simpl ; eauto => //.
 Qed.
-Hint Resolve compatibility_freshness: cmpt.
+Global Hint Resolve compatibility_freshness: cmpt.
 
 (** ** Main compatibility theorem *)
 (** Using the theorem shown in Eval.v, as the compatibility relation verifies enough properties, it is maintained by the evaluator *)
@@ -68,4 +68,4 @@ Proof.
     unfoldProps;
     eauto with cmpt.
 Qed.
-Hint Resolve compatibility_theorem: cmpt.
+Global Hint Resolve compatibility_theorem: cmpt.

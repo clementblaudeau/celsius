@@ -4,14 +4,14 @@ Require Import Omega.
 Require Import Psatz.
 Require Import Coq.Program.Tactics.
 
-(* Borrowed from SystemFR project : https://github.com/epfl-lara/SystemFR *)
+(* Borrowed and adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
 Open Scope string.
 
-Hint Extern 50 => omega: omega.
-Hint Extern 50 => lia: lia.
-Hint Extern 50 => cbn: cbn.
-Hint Extern 50 => cbn; intuition auto: cbn_intuition.
+Global Hint Extern 50 => omega: omega.
+Global Hint Extern 50 => lia: lia.
+Global Hint Extern 50 => cbn: cbn.
+Global Hint Extern 50 => cbn; intuition auto: cbn_intuition.
 
 Ltac options :=
 unfold option_map in *.
@@ -158,7 +158,7 @@ Ltac steps := repeat step.
 Ltac apply_any :=
   match goal with
   | H: _ |- _ => apply H
-  end.
+  end. 
 
 Ltac rewrite_any :=
   match goal with

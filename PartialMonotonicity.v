@@ -26,14 +26,14 @@ Lemma partialMonotonicity_reflexivity :
 Proof.
   unfold partialMonotonicity => //.
 Qed.
-Hint Resolve partialMonotonicity_reflexivity: pM.
+Global Hint Resolve partialMonotonicity_reflexivity: pM.
 
 (** The relation is trivially transitive *)
 Lemma partialMonotonicity_transitivity : forall (σ1 σ2 σ3 : Store), (σ1 ⪯ σ2) -> (σ2 ⪯ σ3) -> (σ1 ⪯ σ3).
 Proof.
   unfold partialMonotonicity; auto.
 Qed.
-Hint Resolve partialMonotonicity_transitivity: pM.
+Global Hint Resolve partialMonotonicity_transitivity: pM.
 
 (** Initialized fields are within the domain *)
 Lemma initializedFields_dom :
@@ -44,7 +44,7 @@ Proof.
   induction σ; destruct l as [| l']; steps; try lia.
   eapply Le.le_n_S, IHσ; rewrite_any; eauto.
 Qed.
-Hint Resolve initializedFields_dom: pM.
+Global Hint Resolve initializedFields_dom: pM.
 
 (** Technical result: an object always have 0 or more fields initialized *)
 Lemma initializedFields_exists :
@@ -56,7 +56,7 @@ Proof.
   induction σ; intros ; simpl ; try lia.
   - destruct σ, a; steps; lia.
 Qed.
-Hint Resolve initializedFields_exists: pM.
+Global Hint Resolve initializedFields_exists: pM.
 
 (** We have a result on the store sizes *)
 Lemma partialMonotonicity_domains:
@@ -69,7 +69,7 @@ Proof.
   case : (initializedFields_exists s c e) => f Hf.
   eauto using Lt.lt_le_S with pM.
 Qed.
-Hint Resolve partialMonotonicity_domains: pM.
+Global Hint Resolve partialMonotonicity_domains: pM.
 
 
 (** ** Main Monotonicity result *)
@@ -88,7 +88,7 @@ Proof.
     rewrite getObj_update1 || rewrite getObj_update2;
     eauto using getObj_dom.
 Qed.
-Hint Resolve partialMonotonicity_assignment: pM.
+Global Hint Resolve partialMonotonicity_assignment: pM.
 
 Lemma partialMonotonicity_freshness :
   forall σ c ρ,
@@ -98,7 +98,7 @@ Proof.
   induction σ ; destruct l => //.
   apply IHσ => //.
 Qed.
-Hint Resolve partialMonotonicity_freshness: pM.
+Global Hint Resolve partialMonotonicity_freshness: pM.
 
 (** Then we have the main result *)
 Theorem partialMonotonicity_theorem:
@@ -111,7 +111,7 @@ Proof.
     unfoldProps;
     eauto with pM.
 Qed.
-Hint Resolve partialMonotonicity_theorem: pM.
+Global Hint Resolve partialMonotonicity_theorem: pM.
 
 (** ** Other conservation results *)
 (** As a consequence, we have monotonicity on the sizes of stores *)
@@ -122,7 +122,7 @@ Theorem partialMonotonicity_theorem_dom:
 Proof.
   eauto with pM.
 Qed.
-Hint Resolve partialMonotonicity_theorem_dom: pM.
+Global Hint Resolve partialMonotonicity_theorem_dom: pM.
 
 Ltac eval_dom :=
   match goal with
@@ -142,7 +142,7 @@ Proof.
   eapply (EvalListMaintained (fun σ σ' => dom σ <= dom σ') (S n));
     unfoldProps ; eauto with pM lia.
 Qed.
-Hint Resolve partialMonotonicity_theorem_list_dom: pM.
+Global Hint Resolve partialMonotonicity_theorem_list_dom: pM.
 
 (** If we combine partial monotonicity with compatibility (objects do no change type), we can prove that warm objects stay warm *)
 Lemma partialMonotonicity_warm_monotone:

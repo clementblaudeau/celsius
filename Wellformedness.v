@@ -7,9 +7,9 @@ Require Import ssreflect ssrbool Psatz List Sets.Ensembles Coq.Program.Tactics.
 Import ListNotations.
 Open Scope nat_scope.
 
-Hint Resolve Union_intror: wf.
-Hint Resolve Union_introl: wf.
-Hint Resolve In_singleton: wf.
+Global Hint Resolve Union_intror: wf.
+Global Hint Resolve Union_introl: wf.
+Global Hint Resolve In_singleton: wf.
 
 (** ** Definitions and notations *)
 (** A wellformed store only contains pointers to locations that are within itself *)
@@ -115,13 +115,23 @@ Proof.
     eauto with wf.
 Qed.
 
+Lemma codom_cons:
+  forall a ρ, codom (a::ρ) = ({a} ∪ (codom ρ)).
+Proof.
+  intros; apply Extensionality_Ensembles.
+  unfold Same_set; steps; intros l; steps; try inversion H; steps;
+    try inSingleton;
+    eauto using Union_introl, Union_intror.
+Qed.
+
+
 Lemma storeSubset_update:
   forall L l o σ,
     L ⪽ [l ↦ o] (σ) -> L ⪽ σ.
 Proof.
   unfold storeSubset; steps; update_dom; eauto.
 Qed.
-Hint Resolve storeSubset_update: wf.
+Global Hint Resolve storeSubset_update: wf.
 
 
 (** In preparation for initialization theorems, we have technical results about adding a location *)
@@ -146,19 +156,20 @@ Proof.
 Qed.
 
 (** We add all hints *)
-Hint Resolve storeSubset_trans: wf.
-Hint Resolve storeSubset_union: wf.
-Hint Resolve storeSubset_union_l: wf.
-Hint Resolve storeSubset_add: wf.
-Hint Resolve storeSubset_union_r: wf.
-Hint Resolve storeSubset_singleton: wf.
-Hint Resolve storeSubset_singleton2: wf.
-Hint Resolve storeSubset_singleton3: wf.
-Hint Resolve storeSubset_codom_empty: wf.
-Hint Resolve wf_add: wf.
-Hint Resolve wf_add_empty: wf.
-Hint Resolve nth_error_In: wf.
-Hint Resolve storeSubset_update: wf.
+Global Hint Resolve storeSubset_trans: wf.
+Global Hint Resolve storeSubset_union: wf.
+Global Hint Resolve storeSubset_union_l: wf.
+Global Hint Resolve storeSubset_add: wf.
+Global Hint Resolve storeSubset_union_r: wf.
+Global Hint Resolve storeSubset_singleton: wf.
+Global Hint Resolve storeSubset_singleton2: wf.
+Global Hint Resolve storeSubset_singleton3: wf.
+Global Hint Resolve storeSubset_codom_empty: wf.
+Global Hint Resolve wf_add: wf.
+Global Hint Resolve wf_add_empty: wf.
+Global Hint Resolve nth_error_In: wf.
+Global Hint Resolve storeSubset_update: wf.
+Hint Rewrite codom_cons: wf.
 
 (** ** Evaluation-maintained results *)
 (** We want to show that the evaluator maintains the wellformedness of stores. As it is not only about stores but also the location of [this] and the result, we cannot use the results proved in Eval.v. We reprove it from scratch, starting with some technical results. *)
@@ -177,7 +188,7 @@ Proof.
   getObj_update; steps; eauto.
   getVal_update; steps; eauto.
 Qed.
-Hint Resolve wf_assign: wf.
+Global Hint Resolve wf_assign: wf.
 
 (** Then we show the induction case for evaluating a list of expressions *)
 Lemma wellformedness_theorem_list_aux :
@@ -316,7 +327,7 @@ Corollary wellformedness_conserved :
 Proof.
   eapply wellformedness_theorem.
 Qed.
-Hint Resolve wellformedness_conserved: wf.
+Global Hint Resolve wellformedness_conserved: wf.
 
 (** Another consequence: the returned value is within the returned store: *)
 Corollary correct_value :
@@ -328,7 +339,7 @@ Corollary correct_value :
 Proof.
   eapply wellformedness_theorem.
 Qed.
-Hint Resolve correct_value: wf.
+Global Hint Resolve correct_value: wf.
 
 (** We extend it to list evalutions *)
 Theorem wellformedness_list_conserved :
@@ -341,7 +352,7 @@ Theorem wellformedness_list_conserved :
 Proof.
   intros n; eapply wellformedness_theorem_list_aux with (S n); eauto with wf.
 Qed.
-Hint Resolve wellformedness_list_conserved: wf.
+Global Hint Resolve wellformedness_list_conserved: wf.
 
 (** A useful tactic: *)
 Ltac eval_wf :=

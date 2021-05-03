@@ -1,8 +1,8 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
-(** This file defines the notions of scoping and scoping preservation. There are more complex and subtle, and should not be used as an introduction to the local reasonning properties.
+(** This file defines the notions of scoping and scoping preservation. There are more complex and subtle, and should not serve as an introduction to the local reasonning properties.
 The main idea is pretty natural: to ensure that newly created objects are hot, we need to check that, transitively, all locations reachable from the attributes of the object are intialized. To do so, we need to be able to reason about the set of locations that are reachable from a set of attributes in a given store. Given two stores [σ] and [σ'], and two sets of locations [L] and [L'], the pair [(σ, L)] "scopes" [(σ',L')] if all locations reachable from [L'] in [σ'] were already reachable from [L] in [σ].
- For technical reasons, we also need to make sure that some scoping relations that were true in a given store remain true. This is expressed by the scoping preservation. *)
+ But as we allow to manipulate objects under initialization, we also need to consider a notion of "preservation" : scoping relations that are maintained when updating from one store to another. *)
 
 From Celsius Require Export PartialMonotonicity Compatibility Wellformedness Reachability.
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List.
@@ -30,10 +30,10 @@ Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
     (σ0, L0) ⋖ (σ2, L1).
 Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 81, σ2 at level 80, L at level 80).
 
-Hint Unfold scoping : scoping.
-Hint Unfold scoping_preservation : scoping.
-Hint Resolve Union_introl: scoping.
-Hint Resolve Union_intror: scoping.
+Global Hint Unfold scoping : scoping.
+Global Hint Unfold scoping_preservation : scoping.
+Global Hint Resolve Union_introl: scoping.
+Global Hint Resolve Union_intror: scoping.
 
 
 (** ** Basic results *)
@@ -45,14 +45,14 @@ Proof.
   unfold scoping, reachability_set; steps.
   exists l'; steps; eapply H => //.
 Qed.
-Hint Resolve scoping_reflexivity: scoping.
+Global Hint Resolve scoping_reflexivity: scoping.
 
 Lemma scoping_reflexivity2 :
   forall σ L, (σ, L) ⋖ (σ, L).
 Proof.
   eauto with scoping.
 Qed.
-Hint Resolve scoping_reflexivity2: scoping.
+Global Hint Resolve scoping_reflexivity2: scoping.
 
 Lemma scoping_subset :
   forall σ1 σ2 L L1 L2,
@@ -65,7 +65,7 @@ Proof.
   exists l'; steps; eauto with scoping.
   apply Union_intror; steps.
 Qed.
-Hint Resolve scoping_subset: scoping.
+Global Hint Resolve scoping_subset: scoping.
 
 Lemma scoping_union :
   forall σ1 σ2 L L1 L2,
@@ -76,7 +76,7 @@ Proof.
   unfold scoping, reachability_set; steps.
   induction H4; steps; eauto with wf.
 Qed.
-Hint Resolve scoping_union: scoping.
+Global Hint Resolve scoping_union: scoping.
 
 Lemma scoping_union_introl :
   forall σ1 σ2 L L1 L2,
@@ -88,7 +88,7 @@ Proof.
   eapply_any; eauto.
   eexists; eauto with scoping.
 Qed.
-Hint Resolve scoping_union_introl: scoping.
+Global Hint Resolve scoping_union_introl: scoping.
 
 Lemma scoping_union_intror :
   forall σ1 σ2 L L1 L2,
@@ -100,7 +100,7 @@ Proof.
   eapply_any; eauto.
   eexists; eauto with scoping.
 Qed.
-Hint Resolve scoping_union_intror: scoping.
+Global Hint Resolve scoping_union_intror: scoping.
 
 
 Lemma scoping_reachability:
@@ -111,7 +111,7 @@ Proof.
   unfold scoping, reachability_set ; steps.
   exists l1; try inSingleton; steps; eauto with scoping rch.
 Qed.
-Hint Resolve scoping_reachability: scoping.
+Global Hint Resolve scoping_reachability: scoping.
 
 
 Lemma scoping_transitivity:
@@ -125,7 +125,7 @@ Proof.
   unfold scoping; unfold reachability_set; simpl ; steps.
   eauto with scoping lia.
 Qed.
-Hint Resolve scoping_transitivity: scoping.
+Global Hint Resolve scoping_transitivity: scoping.
 
 Lemma preserving_transitivity:
   forall σ1 σ2 σ3 L1 L2,
@@ -140,7 +140,7 @@ Proof.
   eapply H4; eauto with wf lia.
   eapply scoping_transitivity with σ1 L1; eauto with wf lia rch.
 Qed.
-Hint Resolve preserving_transitivity: scoping.
+Global Hint Resolve preserving_transitivity: scoping.
 
 Lemma preserving_regularity_degenerate:
   forall σ1 σ2 L,
@@ -151,7 +151,7 @@ Proof.
   unfold scoping_preservation, scoping; simpl; steps.
   eauto with scoping.
 Qed.
-Hint Resolve preserving_regularity_degenerate: scoping.
+Global Hint Resolve preserving_regularity_degenerate: scoping.
 
 Lemma preserving_regularity:
   forall σ0 σ1 σ2 L L1,
@@ -166,7 +166,7 @@ Lemma preserving_regularity:
 Proof.
   unfold scoping_preservation; steps.
 Qed.
-Hint Resolve preserving_regularity: scoping.
+Global Hint Resolve preserving_regularity: scoping.
 
 Lemma preserving_transitivity_degenerate:
   forall σ1 σ2 σ3 L1 ,
@@ -177,8 +177,7 @@ Lemma preserving_transitivity_degenerate:
 Proof.
   steps; eauto with scoping.
 Qed.
-Hint Resolve preserving_transitivity_degenerate: scoping.
-
+Global Hint Resolve preserving_transitivity_degenerate: scoping.
 
 Lemma scopability_add:
   forall σ σ' ρ' l0 l a,
@@ -198,7 +197,6 @@ Proof.
       + inSingleton; apply Union_intror; steps. }
   rewrite H1; eauto with scoping.
 Qed.
-
 
 Lemma scopability_add_env:
   forall I v s c e0,
@@ -223,6 +221,7 @@ Qed.
 
 (** ** Assignment results *)
 (** We prove some specific results on scopability in the context of assignment. The key reasonning technique is to do a case analysis on the presence of the modified entry in the reachability path. *)
+
 Lemma scopability_assignment:
   forall σ1 σ2 σ2' L1 l l' f C ω ω',
     σ1 ⇝ σ2 ⋖ L1 ->
@@ -250,6 +249,7 @@ Proof.
       eapply B1; simpl; (try exists x); eauto using reachability_weaken_assignment with wf.
     + (* l ≠ l' *)
       pose proof (reachability_dom _ _ _ H9).
+      (* Key case analysis : is the modified value in the path ? *)
       eapply reachable_path_reachability in H9; light; destructs; subst; update_dom.
       * eapply B1; (try exists l0); simpl; eauto with rch.
       * pose proof H10.
@@ -283,6 +283,7 @@ Proof.
       * eapply H0; try (eexists; split);
           eauto using In_singleton, reachability_weaken_assignment with wf rch updates.
       * pose proof H.
+      (* Key case analysis : is the modified value in the path ? *)
         eapply reachable_path_assignment in H as [Hedge | Hpath]; eauto.
         ++ assert (l' < dom σ2). {
              erewrite <- update_dom.
@@ -313,53 +314,7 @@ Definition scopability_prop n :=
     wf σ -> (codom ρ) ∪ {ψ} ⪽ σ ->
     ((σ, ((codom ρ) ∪ {ψ})) ⋖ (σ', {l})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ {ψ})) .
 
-(* Then we show the induction case for lists *)
-Lemma codom_cons:
-  forall a ρ, codom (a::ρ) = (Union Loc {a} (codom ρ)).
-Proof.
-  intros; apply Extensionality_Ensembles.
-  unfold Same_set; steps; intros l; steps; try inversion H; steps;
-    try inSingleton;
-    eauto using Union_introl, Union_intror.
-Qed.
-
-(* Lemma scopability_list_aux: *)
-(*   forall n : nat, *)
-(*     (forall k, k < S n -> scopability_prop k) (**r strong induction hypothesis *) -> *)
-(*     forall σ ρ ψ , *)
-(*       wf σ -> *)
-(*       (codom ρ ∪ {ψ}) ⪽ σ -> *)
-(*       forall el σ1 σ2 L acc, *)
-(*         fold_left (eval_list_aux ρ ψ n) el (Success_l acc σ1) = Success_l L σ2 -> *)
-(*         wf σ1 -> *)
-(*         dom σ <= dom σ1 -> *)
-(*         σ ⇝ σ1 ⋖ (codom ρ ∪ {ψ}) -> *)
-(*         (codom acc) ⪽ σ1 -> *)
-(*         (σ, codom ρ ∪ {ψ}) ⋖ (σ1, codom acc) -> *)
-
-(*         ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, codom L)) /\ *)
-(*         (σ ⇝ σ2 ⋖ codom ρ ∪ {ψ}) /\ *)
-(*         (dom σ <= dom σ2) /\ *)
-(*         (codom L ⪽ σ2) /\ *)
-(*         (wf σ2). *)
-(* Proof. *)
-(*   unfold scopability_prop; *)
-(*     intros n H_strong σ ρ ψ H_wf H_codom. *)
-(*   induction el ; [steps |]; intros; simpl in H. *)
-(*   destruct n; [rewrite_anywhere foldLeft_constant => // |]. *)
-(*   simpl in H. *)
-(*   destruct_eval_with_name H_A. *)
-(*   eval_dom; eval_wf. *)
-(*   eapply H_strong in H_A; eauto with wf; destructs. *)
-(*   apply IHel in H; *)
-(*     repeat rewrite_anywhere codom_cons || rewrite codom_cons; *)
-(*     eauto using preserving_transitivity_degenerate  with wf lia. *)
-(*   eapply scoping_union. *)
-(*   + apply scoping_transitivity with σ1 (codom ρ ∪ {ψ}); *)
-(*       eauto with pM wf; try eapply_any; eauto with pM wf scoping. *)
-(*   + apply H_A1; eauto with lia scoping. *)
-(* Qed. *)
-
+(* We show the induction case for lists *)
 Lemma scopability_list_aux:
   forall n,
     (forall k, k < S n -> scopability_prop k) (**r strong induction hypothesis *) ->
@@ -372,6 +327,7 @@ Proof.
   unfold scopability_prop; intros.
   destruct n; try discriminate.
   simpl in * |- .
+  (* We generalize the induction hypothesis *)
   assert (forall el ρ' σ1 σ2 acc,
              fold_left (eval_list_aux ρ ψ n) el (Success_l acc σ1) = Success_l ρ' σ2 ->
              wf σ1 ->
@@ -400,15 +356,12 @@ Proof.
   intros l'; steps. inversion H3.
 Qed.
 
-
-
-(** The induction case for initialization of a new object *)
-Lemma scopability_init:
+(** Then the induction case for initialization of a new object *)
+Lemma scopability_init_aux:
   forall n,
     (forall k, k < S n -> scopability_prop k) (**r strong induction hypothesis *) ->
     forall σ L L1 I fields σ1 σ2,
       fold_left (init_field L1 I n) fields (Some σ1) = Some σ2 ->
-
       dom σ <= dom σ1 ->
       I < dom σ1 ->
       wf σ1 ->
@@ -448,8 +401,8 @@ Qed.
 
 
 (** ** Main Scopability theorem *)
-(** We show the main theorem. As for wellformedness theorem, we have to make a custom proof *)
-Lemma scopability_theorem:
+(** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)
+Theorem scopability_theorem:
   forall n, scopability_prop n.
 Proof.
   apply strong_induction.
@@ -500,7 +453,7 @@ Proof.
     simpl in matched0. repeat (destruct_match; try discriminate).
     assert (dom (σ_n ++ [(C, [])]) = S (dom σ_n)) as H_dom
         by (unfold dom; rewrite app_length; simpl; lia).
-    eapply scopability_init with (σ := σ) (L := codom ρ ∪ {ψ}) in matched0;
+    eapply scopability_init_aux with (σ := σ) (L := codom ρ ∪ {ψ}) in matched0;
       try rewrite H_dom; eauto with wf lia.
     ++ destructs; split => //.
        eapply scoping_union_intror ; eauto with wf scoping.
