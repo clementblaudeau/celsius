@@ -21,7 +21,7 @@ install: [make "install"]
 depends: [
   "ocaml" {>= "4.11.0"}
   "coq" {(>= "8.12") | (= "dev")}
-  "coq-mathcomp-ssreflect" {(>= "1.7.0")}
+  "coq-coq2html" {>= "1.2"}
 ]
 
 tags: [
