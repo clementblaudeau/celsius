@@ -1,0 +1,31 @@
+
+opam-version: "2.0"
+maintainer: "clement.blaudeau@gmail.com"
+version: "dev"
+
+homepage: "https://github.com/clementblaudeau/celsius"
+dev-repo: "git+https://github.com/clementblaudeau/celsius.git"
+bug-reports: "https://github.com/clementblaudeau/celsius/issues"
+license: "GNU GPL v3"
+
+synopsis: "Formalization of the Celsius project: a language for safe initialization of objects in OOP"
+description: """
+In this project we define a small object-oriented language with annotations. We prove results of safe initialization while permitting complex intertwined initialization of objects, thanks to the annotations.
+"""
+
+build: [
+  [make "-j%{jobs}%"]
+]
+install: [make "install"]
+
+depends: [
+  "ocaml" {>= "4.11.0"}
+  "coq" {(>= "8.12") | (= "dev")}
+  "coq-mathcomp-ssreflect" {(>= "1.7.0")}
+]
+
+tags: [
+]
+authors: [
+  "Clément Blaudeau"
+]
