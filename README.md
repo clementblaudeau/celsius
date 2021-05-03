@@ -1,3 +1,5 @@
+[![Docker CI](https://github.com/clementblaudeau/celsius/workflows/Docker%20CI/badge.svg?branch=master)](https://github.com/clementblaudeau/celsius/actions?query=workflow:"Docker%20CI")
+
 ![Celsius logo](https://github.com/clementblaudeau/celsius/blob/master/logo.png)
 
 # Celsius Coq formalization
