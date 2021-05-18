@@ -7,14 +7,14 @@ Import ListNotations.
 
 (** ** Language structures *)
 (** *** Type modifiers *)
-Inductive mode: Set := hot | warm | cold.
+Inductive Mode: Set := hot | warm | cold.
 Notation "'@' u " := (u) (at level 20).
 
 (** *** Basic types *)
 Definition Var : Type := nat.
 Definition Mtd : Type := nat.
 Definition ClN : Type := nat.
-Definition Tpe : Type := (ClN * mode).
+Definition Tpe : Type := (ClN * Mode).
 Definition Loc : Type := nat.
 
 (** *** Expression constructors *)
@@ -27,7 +27,7 @@ Inductive Expr: Type :=
 | asgn  : Expr -> Var -> Expr -> Expr -> Expr.
 
 Inductive Method: Type :=
-| method(μ: mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
+| method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
 
 Inductive Field: Type :=
 | field(type: Tpe)(expr: Expr).
@@ -37,6 +37,7 @@ Inductive Class: Type :=
 
 Inductive Program: Type :=
 | program(C: list Class)(entry: Expr).
+
 
 (** *** Constructs *)
 Definition Value : Type := Loc.
@@ -53,6 +54,12 @@ Notation "{ l }" := (Singleton Loc l).
 Notation "L ∪ { l }" := (Union Loc L (Singleton Loc l)) (at level 80).
 Notation "{ l } ∪ L" := (Union Loc (Singleton Loc l) L) (at level 80).
 
+(** *** Global Parameters *)
+
+Parameter Ξ: list Class.
+Parameter entry: ClN.
+Definition ct: ClassTable := nth_error Ξ.
+Definition main: Mtd := 0.
 
 (** ** Helper functions *)
 Definition dom {X: Type} (x: list X) : nat := (length x).

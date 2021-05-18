@@ -9,9 +9,6 @@ Require Import Psatz.
 Import ListNotations.
 Open Scope nat_scope.
 
-(** The classtable is assumed generaly accessible *)
-Parameter ct: ClassTable.
-
 (** ** Helper functions *)
 
 (** Update store with new value in local env : adds a new field to an existing object *)
