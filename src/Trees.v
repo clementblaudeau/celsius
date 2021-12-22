@@ -2,19 +2,18 @@
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
 (** This file defines all the basic structures (as inductive types) of the project. Then some tools (for updating envs) are provided. *)
 From Celsius Require Export Tactics.
-Require Import ssreflect ssrbool Sets.Ensembles Coq.Lists.List Psatz.
+Require Import ssreflect ssrbool Sets.Ensembles Coq.Lists.List Coq.Lists.ListSet Psatz.
+Require Import Coq.Arith.EqNat.
+Open Scope nat_scope.
 Import ListNotations.
+Open Scope bool_scope.
 
 (** ** Language structures *)
-(** *** Type modifiers *)
-Inductive Mode: Set := hot | warm | cold.
-Notation "'@' u " := (u) (at level 20).
 
 (** *** Basic types *)
 Definition Var : Type := nat.
 Definition Mtd : Type := nat.
 Definition ClN : Type := nat.
-Definition Tpe : Type := (ClN * Mode).
 Definition Loc : Type := nat.
 
 (** *** Expression constructors *)
@@ -26,11 +25,33 @@ Inductive Expr: Type :=
 | new   : ClN -> (list Expr) -> Expr
 | asgn  : Expr -> Var -> Expr -> Expr -> Expr.
 
-Inductive Method: Type :=
-| method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
+Fixpoint Expr_eq_dec (e1 e2: Expr) : {e1 = e2} + {e1 <> e2}.
+Proof.
+  decide equality; decide equality.
+Defined.
+
+Definition expr_eqb e1 e2 := if (Expr_eq_dec e1 e2) then true else false.
+
+Lemma expr_eq_dec: forall (e1 e2: Expr), {e1 = e2} + {e1 <> e2}.
+Proof.
+  intros.
+  destruct (Expr_eq_dec e1 e2); steps.
+Qed.
+
+Inductive Mode: Type :=
+| hot
+| warm
+| cool : list Var -> Mode
+| cold.
+Notation "'@' u " := (u) (at level 20).
+
+Definition Tpe : Type := ClN * Mode.
 
 Inductive Field: Type :=
 | field(type: Tpe)(expr: Expr).
+
+Inductive Method: Type :=
+| method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
 
 Inductive Class: Type :=
 | class(args: list Tpe)(fields: list Field)(methods: Mtd -> (option Method)).
@@ -188,6 +209,18 @@ Proof.
   unfold dom; rewrite app_length; simpl; lia.
 Qed.
 
+Lemma length_plus_1:
+  forall (ρ:Env) v,
+    length(ρ ++ [v]) = S(length(ρ)).
+Proof.
+  intros.
+  rewrite app_length; simpl; lia.
+Qed.
+
+
+#[export] Hint Extern 1 => rewrite (update_one3): updates.
+#[export] Hint Extern 1 => rewrite (update_dom): updates.
+#[export] Hint Extern 1 => rewrite (length_plus_1): updates.
 Global Hint Resolve update_one1: updates.
 Global Hint Resolve update_one2: updates.
 Global Hint Resolve update_one3: updates.

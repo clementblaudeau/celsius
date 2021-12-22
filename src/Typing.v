@@ -1,5 +1,5 @@
 From Celsius Require Export Trees.
-Require Import List.
+Require Import List ListSet.
 Open Scope nat_scope.
 Import ListNotations.
 
@@ -25,6 +25,7 @@ Definition methodInfo C m :=
 
 
 (* Mode lattice *)
+(*
 Definition join μ1 μ2: Mode :=
   match μ1, μ2 with
   | hot, _ => μ2
@@ -44,25 +45,31 @@ Definition meet μ1 μ2 :=
   | _, _ => warm
   end.
 Notation "m1 ⊓ m2" := (meet m1 m2) (at level 40).
+*)
 
 Reserved Notation "m1 ⊑ m2" (at level 40).
 Inductive S_Mode: Mode -> Mode -> Prop :=
 | s_mode_hot: forall μ, hot ⊑ μ
-| s_mode_warm: warm ⊑ warm
+| s_mode_warm: forall Ω, warm ⊑ cool Ω
+| s_mode_union: forall Ω1 Ω2, cool (Ω1 ++ Ω2) ⊑ cool Ω1
 | s_mode_cold: forall μ, μ ⊑ cold
 where "m1 ⊑ m2" := (S_Mode m1 m2).
-Global Hint Resolve s_mode_cold s_mode_hot s_mode_warm: typ.
+Global Hint Resolve s_mode_cold s_mode_hot s_mode_warm s_mode_union: typ.
 
-Lemma s_mode_refl: forall μ, μ ⊑ μ.
+(* Lemma s_mode_refl: forall μ, μ ⊑ μ.
 Proof.
   destruct μ; eauto with typ.
 Qed.
-Global Hint Resolve s_mode_refl: typ.
+Global Hint Resolve s_mode_refl: typ. *)
+
 
 Lemma s_mode_trans: forall μ1 μ2 μ3, μ1 ⊑ μ2 -> μ2 ⊑ μ3 -> μ1 ⊑ μ3.
 Proof.
   intros.
-  inversion H; inversion H0; subst; eauto with typ; steps.
+  inversion H;
+    inversion H0; steps;
+    try rewrite <- app_assoc;
+      eauto with typ.
 Qed.
 Global Hint Resolve s_mode_trans: typ.
 
@@ -84,7 +91,7 @@ Lemma s_typ_refl:
   forall T, T <: T.
 Proof.
   destruct T; eauto with typ.
-Qed.
+Admitted. (* Qed. *)
 Global Hint Resolve s_typ_refl: typ.
 
 Lemma s_typ_trans:
@@ -142,6 +149,13 @@ Inductive T_Expr : Env -> Tpe -> Expr -> Tpe -> Prop :=
       (fieldType D f = Some U) ->
       [Γ, T ⊢ (fld e f) : U]
 
+| t_selcool:
+    forall Γ T e f U D Ω,
+      [Γ, T ⊢ e : (D, cool Ω)] ->
+      List.In f Ω ->
+      (fieldType D f = Some U) ->
+      [Γ, T ⊢ (fld e f) : U]
+
 | t_new:
     forall Γ T C args paramTs fields methods,
       ct C = Some (class paramTs fields methods) ->
@@ -195,7 +209,12 @@ Definition T_Field Γ T f :=
   match f with
   | field U e => [Γ, T ⊢ e : U]
   end.
-Definition T_Fields Γ T := Forall (T_Field Γ T).
+Inductive T_Fields: Env -> Tpe -> (list Var) -> (list Field) -> Prop :=
+| t_fields_nil: forall Γ T, T_Fields Γ T [] []
+| f_fields_cool_cons: forall Γ C Ω f fs,
+    T_Field Γ (C, cool Ω) f ->
+    T_Fields Γ (C, cool (f::Ω)) fs ->
+    T_Fields Γ (C, cool Γ) (f::fs).
 
 (** ** Method typing *)
 Definition T_Method C m :=

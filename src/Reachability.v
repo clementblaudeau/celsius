@@ -31,7 +31,7 @@ Inductive reachability : Store -> Loc -> Loc ->Prop :=
 where "σ ⊨ l1 ⇝ l2" := (reachability σ l1 l2).
 
 Global Hint Resolve rch_heap rch_step rch_trans: rch.
-Hint Rewrite update_dom: rch.
+#[export] Hint Rewrite update_dom: rch.
 
 (** We then extend the definition for a set of locations *)
 Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).

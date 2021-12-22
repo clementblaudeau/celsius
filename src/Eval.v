@@ -4,8 +4,7 @@
 
 From Celsius Require Export Trees Tactics strongInduction.
 Require Import ssreflect ssrbool.
-Require Import List.
-Require Import Psatz.
+Require Import List Psatz Arith.
 Import ListNotations.
 Open Scope nat_scope.
 
@@ -57,66 +56,67 @@ Fixpoint eval e σ ρ v k :=
   | S n => match e with
           (** Var: simple lookup of the store *)
           | var x => (**r [e = x] *)
-            (match (getVal ρ x) with
-             | Some v => (Success v σ)
-             | _ => Error
-             end )
+              (match (getVal ρ x) with
+               | Some v => (Success v σ)
+               | _ => Error
+               end )
 
           (** This: returns current value *)
           | this => (Success v σ) (**r [e = this] *)
 
           (** Field access: compute object value and access field *)
           | fld e0 x => (**r [e = e0.x] *)
-            ( match (⟦e0⟧(σ, ρ, v)(n)) with
-              | Success v0 σ1 =>
-                match (getObj σ1 v0) with
-                | Some (c, f) =>
-                  match (getVal f x) with
-                  | Some v1 => Success v1 σ1
-                  | _ => Error end
-                | _ => Error end
-              | _ => Error end )
+              ( match (⟦e0⟧(σ, ρ, v)(n)) with
+                | Success v0 σ1 =>
+                    match (getObj σ1 v0) with
+                    | Some (c, f) =>
+                        match (getVal f x) with
+                        | Some v1 => Success v1 σ1
+                        | _ => Error end
+                    | _ => Error end
+                | _ => Error end )
 
           (** Method call : compute object value, compute arguments and do the call*)
           | mtd e0 m el => (**r [e = e0.m(el)] *)
-            (match (⟦e0⟧(σ, ρ, v)(n)) with
-             | Success v0 σ1 => (
-                 match (getObj σ1 v0) with
-                 | Some (C, _) => (
-                     match (ct C)  with
-                     | Some (class _  _ methods) => (
-                         match methods m with
-                         | Some (method μ x _ e1) => (
-                             match (⟦_ el _⟧(σ1, ρ, v)(n)) with
-                             | Success_l args_val σ2 =>
-                               let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0)(n)
-                             | _ => Error end)
-                         | _ => Error end)
+              (match (⟦e0⟧(σ, ρ, v)(n)) with
+               | Success v0 σ1 =>
+                   ( match (getObj σ1 v0) with
+                     | Some (C, _) =>
+                         ( match (ct C)  with
+                           | Some (class _  _ methods) =>
+                               ( match methods m with
+                                 | Some (method μ x _ e1) =>
+                                     ( match (⟦_ el _⟧(σ1, ρ, v)(n)) with
+                                       | Success_l args_val σ2 =>
+                                           let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0)(n)
+                                       | _ => Error end)
+                                 | _ => Error end)
+                           | _ => Error end)
                      | _ => Error end)
-                 | _ => Error end)
-             | _ => Error end)
+               | _ => Error end)
 
           (** New class *)
           | new C args => (**r [e = new C(args)] *)
-            (match (⟦_ args _⟧(σ, ρ, v)(n)) with
-             | Success_l args_val σ1 => (
-                 let I := (length σ1) in (* Fresh location for new object *)
-                 let ρ_init := args_val in (* Local env during initialisation *)
-                 let σ2 := σ1 ++ [(C, [])] in (* New object with empty local env *)
-                 match (init I ρ_init C σ2 n) with
-                 | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
-                 | None => Error end )
-             | _ => Error end) (* Invalid args *)
+              (match (⟦_ args _⟧(σ, ρ, v)(n)) with
+               | Success_l args_val σ1 =>
+                   ( let I := (length σ1) in (* Fresh location for new object *)
+                     let ρ_init := args_val in (* Local env during initialization *)
+                     let σ2 := σ1 ++ [(C, [])] in (* New object with empty local env *)
+                     match (init I ρ_init C σ2 n) with
+                     | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
+                     | None => Error end )
+               | _ => Error end) (* Invalid args *)
 
           (** Field assignement *)
           | asgn e1 x e2 e' => (**r [e = (e1.x ← e2 ; e')] *)
-            (match (⟦e1⟧(σ, ρ, v)(n)) with
-             | Success v1 σ1 => match (⟦e2⟧(σ1, ρ, v)(n)) with
-                               | Success v2 σ2 => (
-                                   let σ3 := (assign v1 x v2 σ2) in
-                                   ⟦e'⟧(σ3, ρ, v)(n))
-                               | _ => Error end
-             | _ => Error end )
+              (match (⟦e1⟧(σ, ρ, v)(n)) with
+               | Success v1 σ1 =>
+                   match (⟦e2⟧(σ1, ρ, v)(n)) with
+                   | Success v2 σ2 =>
+                       ( let σ3 := (assign v1 x v2 σ2) in
+                         ⟦e'⟧(σ3, ρ, v)(n))
+                   | _ => Error end
+               | _ => Error end )
           end
   end
 where "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"  := (eval e σ ρ v k)
@@ -130,32 +130,39 @@ with eval_list_aux (ρ: Env) (v: Value) (k: nat) acc (e: Expr) :=
        match k with
        | 0 => Timeout_l
        | S n => match acc with
-               | Success_l vs σ1 => match (⟦e⟧(σ1, ρ, v)(n)) with
-                                   | Success v σ2 => Success_l (v::vs) σ2
-                                   | Timeout => Timeout_l
-                                   | Error => Error_l
-                                   end
+               | Success_l vs σ1 =>
+                   match (⟦e⟧(σ1, ρ, v)(n)) with
+                   | Success v σ2 => Success_l (vs++[v]) σ2
+                   | Timeout => Timeout_l
+                   | Error => Error_l
+                   end
                | z => z end end
 (** Initialization of a list of fields using (fold) *)
 with init (I : Var) (args_values: list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
        match k with | 0 => None | S n =>
-                                 match (ct C) with
-                                 | Some (class x F M) => (fold_left (init_field args_values I n) F (Some σ))
-                                 | None => None
-                                 end
+                                   match (ct C) with
+                                   | Some (class x F M) => (fold_left (init_field args_values I n) F (Some σ))
+                                   | None => None
+                                   end
        end
 with init_field (args_values: list Var) (this: Var) (k: nat) (σ_opt: option Store)  (f: Field): option Store :=
        match k with
        | 0 => None
        | S n =>
-         match σ_opt with
-         | None => None
-         | Some σ => ( match f with
-                      | field t e => (
-                          match (⟦e⟧(σ, args_values, this)(n)) with
-                          | Success v1 σ1 => (assign_new this v1 σ1)
-                          | _ => None
-                          end) end) end end.
+           match σ_opt with
+           | None => None
+           | Some σ =>
+               ( match f with
+                 | field t e =>
+                     ( match (⟦e⟧(σ, args_values, this)(n)) with
+                       | Success v1 σ1 => (assign_new this v1 σ1)
+                       | _ => None
+                       end)
+                 end)
+           end
+       end.
+
+
 
 (** A usefull lemma to show that folds on computations that got stuck (error or timeout) will stay stuck *)
 Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
@@ -170,16 +177,16 @@ Qed.
 Ltac destruct_eval :=
   match goal with
   | H: context[⟦ ?e ⟧ (?σ, ?ρ, ?ψ )( ?k)] |- _ =>
-    let fresh_H := fresh H in
-    destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
-    try solve [rewrite foldLeft_constant in H => //]
+      let fresh_H := fresh H in
+      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
+      try solve [rewrite foldLeft_constant in H => //]
   end.
 
 Ltac destruct_eval_with_name fresh_H :=
   match goal with
   | H: context[⟦ ?e ⟧ (?σ, ?ρ, ?ψ )( ?k)] |- _ =>
-    destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
-    try solve [rewrite foldLeft_constant in H => //]
+      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
+      try solve [rewrite foldLeft_constant in H => //]
   end.
 
 (** A simple result on lengths *)
@@ -193,15 +200,13 @@ Proof.
     (forall l σ σ' ρ v v_list1 v_list2,
         fold_left (eval_list_aux ρ v n) l (Success_l v_list1 σ) = Success_l v_list2 σ'
         -> length l + length v_list1 = length v_list2) as H_fold.
-  {
-    induction l as [| e l] ; steps.
+  + induction l as [| e l] ; steps.
     destruct n; simpl in H ; [rewrite foldLeft_constant in H => // |].
     destruct_eval.
     apply IHl in H.
-    simpl in H.
-    rewrite plus_n_Sm => //.
-  }
-  steps;
+    rewrite app_length in H.
+    simpl in H. lia.
+  + steps;
     eapply_anywhere H_fold;
     rewrite_anywhere PeanoNat.Nat.add_0_r => // .
 Qed.

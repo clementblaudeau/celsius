@@ -3,7 +3,7 @@
 (** This file defines the compatibility relation between stores.
  Two stores are compatible when they have the same objects stored at the same locations. The local environment associated with the object can be different, but the object type must be the same. It's a technical result that is proven using the general evaluation maintained property of Eval.v *)
 
-From Celsius Require Export Trees Eval Reachability Tactics.
+From Celsius Require Export Trees EvalP Reachability Tactics.
 Require Import ssreflect ssrbool List.
 Import ListNotations.
 Open Scope nat_scope.
@@ -31,7 +31,14 @@ Proof.
   move /(_ l C ω' H):H0 => [ω'' H0].
   eauto.
 Qed.
-Global Hint Resolve compatibility_transitivity : cmpt.
+#[global] Hint Resolve compatibility_transitivity : cmpt.
+
+Ltac compatibility_transitivity :=
+  repeat match goal with
+  | H: ?σ1 ⊆ ?σ2 |- ?σ1 ⊆ _  => apply compatibility_transitivity with σ2 ; [assumption |]
+  | H: ?σ1 ⊆ ?σ2 |- _ ⊆ ?σ2  => apply compatibility_transitivity with σ1 ; [| assumption]
+         end.
+#[global] Hint Extern 1 => compatibility_transitivity: cmpt.
 
 Lemma compatibility_assignment :
   forall σ σ' l C ω ω',
@@ -48,24 +55,44 @@ Qed.
 Global Hint Resolve compatibility_assignment: cmpt.
 
 Lemma compatibility_freshness :
-  forall σ c ρ,
-    σ ⊆ σ ++ [(c, ρ)].
+  forall σ c,
+    σ ⊆ σ ++ [(c, [])].
 Proof.
   unfold compatible.
   induction σ; destruct l; simpl ; eauto => //.
 Qed.
-Global Hint Resolve compatibility_freshness: cmpt.
+#[global] Hint Resolve compatibility_freshness: cmpt.
 
 (** ** Main compatibility theorem *)
 (** Using the theorem shown in Eval.v, as the compatibility relation verifies enough properties, it is maintained by the evaluator *)
 
 Theorem compatibility_theorem:
-  forall n e σ σ' ρ v v',
-      ⟦e⟧(σ, ρ, v)(n) = (Success v' σ') -> σ ⊆ σ'.
-Proof.
-  apply (EvalMaintainedProp compatible);
-    try (intros; apply FreshnessInitMaintained);
-    unfoldProps;
-    eauto with cmpt.
+  forall e σ σ' ρ ψ v,
+      ⟦e⟧p (σ, ρ, ψ) --> (v, σ') -> σ ⊆ σ'.
+Proof with (eauto with cmpt).
+  intros.
+  induction H using evalP_ind2 with
+    (Pl := fun _ σ _ _ _ σ' _ => σ ⊆ σ')
+    (Pin := fun _ _ _ σ σ' _ => σ ⊆ σ');
+    unfold assign, assign_new in *; steps ...
 Qed.
 Global Hint Resolve compatibility_theorem: cmpt.
+
+Theorem compatibility_theorem_list:
+  forall el σ σ' ρ ψ vl,
+      ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ⊆ σ'.
+Proof with (eauto with cmpt).
+  intros.
+  induction H...
+Qed.
+Global Hint Resolve compatibility_theorem_list: cmpt.
+
+Theorem compatibility_theorem_init:
+  forall fls ρ ψ σ σ',
+     initP fls ψ ρ σ σ' -> σ ⊆ σ'.
+Proof with (eauto with cmpt).
+  intros.
+  induction H;
+    unfold assign, assign_new in *; steps ...
+Qed.
+Global Hint Resolve compatibility_theorem_init: cmpt.
