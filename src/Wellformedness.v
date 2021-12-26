@@ -137,7 +137,7 @@ Global Hint Resolve storeSubset_update: wf.
 (** In preparation for initialization theorems, we have technical results about adding a location *)
 Lemma wf_add : forall s c ρ, wf s -> codom ρ ⪽ s -> wf (s ++ [(c,ρ)]).
 Proof.
-  unfold wf, dom; intros.
+  unfold wf; intros.
   rewrite app_length; simpl.
   destruct_eq (l = length s);
     [subst; rewrite_anywhere getObj_last | rewrite_anywhere getObj_last2]; eauto.

@@ -42,7 +42,7 @@ Lemma stk_assign : forall σ l C ω ω',
     length ω <= length ω' ->
     σ ≪ [l ↦ (C, ω')]σ.
 Proof.
-  unfold stackability, dom; steps.
+  unfold stackability; steps.
   rewrite_anywhere update_one3; steps.
 Qed.
 Global Hint Resolve stk_assign: stk.
@@ -72,7 +72,7 @@ Proof with (eauto with stk pM cmpt updates lia ).
     move /(_ l Hl): H1 => H1. steps.
     destruct_eq (l = dom σ1); steps; [left |].
     + unfold reachable_warm ; repeat eexists ...
-    + unfold dom in *. rewrite app_length in H5. steps. lia.
+    + rewrite app_length in H5. steps. lia.
   - steps ; pM_trans ...
     eapply stk_trans with ([v1 ↦ (c, [x ↦ v2] (e))] (σ2)) ...
     eapply stk_trans with σ2 ...

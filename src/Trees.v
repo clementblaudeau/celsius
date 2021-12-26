@@ -83,8 +83,8 @@ Definition ct: ClassTable := nth_error Ξ.
 Definition main: Mtd := 0.
 
 (** ** Helper functions *)
-Definition dom {X: Type} (x: list X) : nat := (length x).
-Definition getObj (l : list Obj):= nth_error l.
+Notation "'dom' x" := (length x) (at level 0).
+Definition getObj (l : list Obj)   := nth_error l.
 Definition getVal (l : list Value) := nth_error l.
 
 Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
@@ -104,7 +104,7 @@ Fixpoint update_list {X : Type} (positions : list nat) (values : list X) (l : li
   | (x::xt, v::vt) => update_list xt vt (update_one x v l)
   | (_, _) => l end.
 
-Notation "[ x ↦ v ] σ" := (update_one x v σ) (at level 0).
+Notation "[ x ↦  v ] σ" := (update_one x v σ) (at level 0).
 Notation "[ x ⟼ v ] σ" := (update_list x v σ) (at level 0).
 
 
@@ -137,11 +137,10 @@ Proof.
   intros.
   assert (l < dom (σ ++ [(C,[])])).
   {
-    unfold getObj, dom in *.
+    unfold getObj in *.
     eapply nth_error_Some.
     rewrite H; steps.
   }
-  unfold dom in H1;
     rewrite app_length in H1 ;
     simpl in H1;
     fold (dom σ) in H1;
@@ -185,7 +184,7 @@ Lemma update_dom :
   forall (σ:Store) p v,
     dom [p ↦ v]σ = dom σ.
 Proof.
-  unfold dom; eauto using update_one3.
+   eauto using update_one3.
 Qed.
 
 Lemma update_one4 :
@@ -206,7 +205,7 @@ Lemma dom_app:
     dom (σ ++ ((C, ω)::nil)) = S (dom σ).
 Proof.
   intros.
-  unfold dom; rewrite app_length; simpl; lia.
+   rewrite app_length; simpl; lia.
 Qed.
 
 Lemma length_plus_1:

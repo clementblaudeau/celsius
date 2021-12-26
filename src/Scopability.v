@@ -360,12 +360,11 @@ Proof with (timeout 10 eauto with scoping wf rch lia).
     destruct IHevalP; eauto with wf.
     specialize IHevalP0 with (codom ρ ∪ {ψ}) σ.
     assert (dom σ1 <= dom (σ1 ++ [(C, [])])) by (rewrite dom_app; lia).
-    assert (Heq:length σ1 = dom σ1) by steps. rewrite Heq in IHevalP0, H__init |- *.
     destruct IHevalP0; eauto with wf .
     + rewrite dom_app. steps.
     + eapply storeSubset_union ...
       eapply storeSubset_singleton3 .
-      rewrite dom_app /dom ... (* storeSubset_add_empty ? *)
+      rewrite dom_app ... (* storeSubset_add_empty ? *)
     + intros ? ; steps.
       move : H9 => [l0 [H__l0 H__rch]].
       inversion H__l0; steps.
@@ -402,9 +401,10 @@ Proof with (timeout 10 eauto with scoping wf rch lia).
       * eapply scoping_transitivity with (σ2 := σ2) (L2 := codom ρ ∪ {ψ}) ...
       * eapply preserving_transitivity ...
   - (* el_nil *)
-    split ...
-    intros x; steps.
-    inversion H3; steps.
+    split.
+    + intros x; steps.
+      inversion H3; steps.
+    + eapply preserving_transitivity_degenerate ...
   - (* el_cons *)
     destruct IHevalP, IHevalP0 ...
     split.

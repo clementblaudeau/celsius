@@ -15,11 +15,11 @@ Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80, l1 at level 80, l2 at level 8
 Inductive reachability : Store -> Loc -> Loc ->Prop :=
 | rch_heap: (**r we can access the current location *)
     forall l σ,
-      l < (dom σ) ->
+      l < dom σ ->
       σ ⊨ l ⇝ l
 | rch_step: (**r we can access a location in the local environment of the object at l0 *)
     forall l0 l1 C f ω σ,
-      l1 < (dom σ) ->
+      l1 < dom σ ->
       getObj σ l0 = Some (C, ω) ->
       getVal ω f = Some l1 ->
       σ ⊨ l0 ⇝ l1
@@ -345,7 +345,7 @@ Proof.
   intros.
   generalize dependent p.
   induction p as [| l2 p]; intros; simpl; eauto.
-  destruct p as [| l1 p]; [ simpl in *; subst; unfold dom in *; rewrite_anywhere update_one3; eauto |].
+  destruct p as [| l1 p]; [ simpl in *; subst; rewrite_anywhere update_one3; eauto |].
   simpl in H3. destruct_and.
   split.
   + unfold reachable_one_step in *; flatten.
@@ -382,7 +382,7 @@ Proof.
   right.
   induction p; eauto.
   simpl in *.
-  destruct_match; [steps ; unfold dom in *; rewrite_anywhere update_one3 => // |].
+  destruct_match; [steps ; rewrite_anywhere update_one3 => // |].
   subst. flatten. intuition auto.
   + clear H2. clear H1. unfold reachable_one_step in *; steps.
     destruct (PeanoNat.Nat.eq_dec l n); steps.
@@ -398,10 +398,10 @@ Proof.
            eapply nth_error_Some.
            erewrite H0 => //.
        +++ rewrite_anywhere update_one2; eauto .
-       +++ unfold dom in *. erewrite_anywhere update_one3; eauto.
+       +++ erewrite_anywhere update_one3; eauto.
     ++ rewrite_anywhere getObj_update2; eauto using getObj_dom.
        repeat eexists || eassumption.
-       unfold dom in *. erewrite <- update_one3; eauto.
+       erewrite <- update_one3; eauto.
   + apply H2; clear H2.
     unfold reachable_one_step, contains_edge in *.
     intros. flatten.
@@ -443,7 +443,7 @@ Lemma reachability_not_empty:
   forall σ C l, l < dom σ -> (σ++[(C, [])]) ⊨ (length σ) ⇝ l -> False .
 Proof.
   intros.
-  apply reachability_first_step in H0; unfold dom in *; steps; try lia.
+  apply reachability_first_step in H0; steps; try lia.
   unfold reachable_one_step in *; steps.
   rewrite_anywhere getObj_last; invert_constructor_equalities; destruct f; steps.
 Qed.
