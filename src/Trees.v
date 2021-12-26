@@ -71,7 +71,7 @@ Definition LocSet := (Ensemble Loc).
 Notation "l ∈ L" := (Ensembles.In Loc L l) (at level 80).
 Notation "L ⊆ L'" := (Included Loc L L') (at level 80).
 Notation "L ∪ L'" := (Union Loc L L') (at level 80, L' at next level).
-Notation "{ l }" := (Singleton Loc l).
+Notation "{ l }" := (Singleton Loc l) (at level 0, l at level 99).
 Notation "L ∪ { l }" := (Union Loc L (Singleton Loc l)) (at level 80).
 Notation "{ l } ∪ L" := (Union Loc (Singleton Loc l) L) (at level 80).
 
@@ -202,7 +202,7 @@ Proof.
 Qed.
 
 Lemma dom_app:
-  forall σ (C: ClN) (ω:Env),
+  forall (σ: Store) (C: ClN) (ω:Env),
     dom (σ ++ ((C, ω)::nil)) = S (dom σ).
 Proof.
   intros.

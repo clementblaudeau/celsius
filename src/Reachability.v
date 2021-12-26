@@ -55,7 +55,7 @@ Notation "σ ⊫ L : 'hot'" := (forall l, (l ∈ L) -> reachable_hot σ l) (at l
 
 (** A usefull rewrite *)
 Ltac rch_singleton:=
-  match goal with
+  repeat match goal with
   | H: ?s ⊫ (Singleton Loc ?l1) ⇝ ?l2 |- _ =>
     let freshH := fresh "H" in
     unfold reachability_set in H;
@@ -197,7 +197,7 @@ Proof.
     rewrite <- P in *. simpl in H.
     destruct_and.
     unfold reachable_one_step in H.
-    destructs.
+    flatten.
     eapply rch_trans with a; eauto with rch => //.
     eapply IHp => //.
 Qed.
@@ -258,7 +258,7 @@ Proof.
     induction p;
       repeat light;
       eauto with rch.
-  + induction 1; destructs; eauto; right.
+  + induction 1; flatten; eauto; right.
     ++ exists []; simpl; unfold reachable_one_step.
        repeat eexists; eauto using getObj_dom.
     ++ exists (p++(l1::p0)).
@@ -326,10 +326,10 @@ Proof.
   unfold contains_edge; steps.
   move: H. move: l1 l2 p1.
   induction p2; intros; simpl in *.
-  + eapply reachable_path_is_reachable; destructs; eauto.
+  + eapply reachable_path_is_reachable; flatten; eauto.
     rewrite app_comm_cons. apply in_app_iff; steps.
   + destruct_match; [apply_anywhere app_eq_nil; steps |].
-    rewrite <- matched in *. destructs; eauto.
+    rewrite <- matched in *. flatten; eauto.
 Qed.
 
 (** When the local environment associated with an object is updated, if the updated value was not part of a given path in the updated store, then it was already valid in the un-updated store.  *)
@@ -348,7 +348,7 @@ Proof.
   destruct p as [| l1 p]; [ simpl in *; subst; unfold dom in *; rewrite_anywhere update_one3; eauto |].
   simpl in H3. destruct_and.
   split.
-  + unfold reachable_one_step in *; destructs.
+  + unfold reachable_one_step in *; flatten.
     repeat rewrite_anywhere update_dom.
     destruct_eq (l1 = l); subst.
     ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
@@ -383,7 +383,7 @@ Proof.
   induction p; eauto.
   simpl in *.
   destruct_match; [steps ; unfold dom in *; rewrite_anywhere update_one3 => // |].
-  subst. destructs. intuition auto.
+  subst. flatten. intuition auto.
   + clear H2. clear H1. unfold reachable_one_step in *; steps.
     destruct (PeanoNat.Nat.eq_dec l n); steps.
     ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
@@ -404,7 +404,7 @@ Proof.
        unfold dom in *. erewrite <- update_one3; eauto.
   + apply H2; clear H2.
     unfold reachable_one_step, contains_edge in *.
-    intros. destructs.
+    intros. flatten.
     apply Hedge. exists p1, (a::p2). rewrite H2.
     rewrite app_comm_cons => //.
 Qed.
@@ -450,7 +450,7 @@ Qed.
 
 (** Extension of the previous result: a path in a store with a new empty object already existed in the store without it: *)
 Lemma reachability_empty:
-  forall σ C L l, l < dom σ -> ((σ++[(C, [])]) ⊫ L ⇝ l) -> (σ ⊫ L ⇝ l).
+  forall σ C L l, l < dom σ ->((σ++[(C, [])]) ⊫ L ⇝ l) -> (σ ⊫ L ⇝ l).
 Proof.
   intros.
   inversion H0 as [l1 [Hl1 Hrch]].
@@ -511,7 +511,7 @@ Proof.
   - exfalso; eapply_any.
       eapply (app_inj_tail (p2 ++[l']) (l0::p1')).
       rewrite app_assoc_reverse; steps.
-  - pose proof (app_exists_last p1 l1); destructs.
+  - pose proof (app_exists_last p1 l1); flatten.
     rewrite H1 in H0.
     assert (l' = y). {
       eapply (app_inj_tail (l0::p1') (p2++l'::l::p'));

@@ -54,8 +54,8 @@ Qed.
 
 Lemma eval_step_monotonicity_aux: forall n,
     (forall m, m > n ->
-          (forall e σ ρ ψ l σ', ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ' ->
-                           ⟦ e ⟧ (σ, ρ, ψ)(m) = Success l σ')) /\
+          (forall e σ ρ ψ v σ', ⟦ e ⟧ (σ, ρ, ψ)(n) = Success v σ' ->
+                           ⟦ e ⟧ (σ, ρ, ψ)(m) = Success v σ')) /\
       (forall m, m > n ->
             (forall el σ ρ ψ vl σ', ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
                                ⟦_ el _⟧ (σ, ρ, ψ)(m) = Success_l vl σ')) /\
@@ -154,8 +154,8 @@ Proof with try lia.
   eauto.
 Qed.
 
-Reserved Notation "'⟦'  e  '⟧p' '(' σ ',' ρ ',' v ')' '-->' '(' v0 ',' σ0 ')'" (at level 80).
-Reserved Notation "'⟦_' e '_⟧p' '(' σ ',' ρ ',' v ')' '-->' '(' vl ',' σl ')'" (at level 80).
+Reserved Notation "'⟦'  e  '⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' v0 ',' σ0 ')'" (at level 80).
+Reserved Notation "'⟦_' e '_⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' vl ',' σl ')'" (at level 80).
 
 Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
 | e_var : forall σ x ρ ψ l,
@@ -223,11 +223,11 @@ Section evalP_ind.
     P e0 σ ρ ψ l1 σ1 (H__e0) ->
     P (fld e0 x) σ ρ ψ v1 σ1 (e_fld σ ρ ψ e0 x l1 σ1 C f v1 H__e0 Hobj Hval).
 
-  Variable P_mtd : forall σ e0 m el e2 ρ ψ l1 vl2 l3 σ1 σ2 σ3 C f argsC argsM fields methods T μ H__e0 Hobj Hct Hmth H__el H__e2,
-    P e0 σ ρ ψ l1 σ1 H__e0 ->
+  Variable P_mtd : forall σ e0 m el e2 ρ ψ v1 vl2 v3 σ1 σ2 σ3 C f argsC argsM fields methods T μ H__e0 Hobj Hct Hmth H__el H__e2,
+    P e0 σ ρ ψ v1 σ1 H__e0 ->
     Pl el σ1 ρ ψ vl2 σ2 H__el ->
-    P e2 σ2 vl2 l1 l3 σ3 H__e2 ->
-    P( mtd e0 m el) σ ρ ψ l3 σ3 (e_mtd σ e0 m el e2 ρ ψ l1 vl2 l3 σ1 σ2 σ3 C f argsC argsM fields methods T μ H__e0 Hobj Hct Hmth H__el H__e2).
+    P e2 σ2 vl2 v1 v3 σ3 H__e2 ->
+    P( mtd e0 m el) σ ρ ψ v3 σ3 (e_mtd σ e0 m el e2 ρ ψ v1 vl2 v3 σ1 σ2 σ3 C f argsC argsM fields methods T μ H__e0 Hobj Hct Hmth H__el H__e2).
 
   Variable P_new : forall σ ρ ψ C args vl__args σ1 σ3 Tps Flds Mtds H__args H__ct H__init,
     Pl args σ ρ ψ vl__args σ1 H__args ->
@@ -242,10 +242,10 @@ Section evalP_ind.
 
   Variable Pl_nil : forall σ ρ ψ, Pl [] σ ρ ψ [] σ (el_nil σ ρ ψ).
 
-  Variable Pl_cons : forall σ ρ ψ e el l1 σ1 vl σ2 H__e H__el,
-      P e σ ρ ψ l1 σ1 H__e ->
+  Variable Pl_cons : forall σ ρ ψ e el v1 σ1 vl σ2 H__e H__el,
+      P e σ ρ ψ v1 σ1 H__e ->
       Pl el σ1 ρ ψ vl σ2 H__el ->
-      Pl (e::el) σ ρ ψ (l1::vl) σ2 (el_cons σ ρ ψ e el l1 σ1 vl σ2 H__e H__el).
+      Pl (e::el) σ ρ ψ (v1::vl) σ2 (el_cons σ ρ ψ e el v1 σ1 vl σ2 H__e H__el).
 
   Variable Pin_nil: forall I (ρ: Env) (σ: Store), Pin [] I ρ σ σ (init_nil I ρ σ).
 
@@ -258,7 +258,7 @@ Section evalP_ind.
 
   Fixpoint evalP_ind2 e σ ρ ψ v σ' (eval : evalP e σ ρ ψ v σ') : P e σ ρ ψ v σ' eval :=
     match eval with
-    | e_var σ x ρ ψ l Hget => P_var σ x ρ ψ l Hget
+    | e_var σ x ρ ψ v Hget => P_var σ x ρ ψ v Hget
     | e_this σ ρ ψ => P_this σ ρ ψ
     | e_fld σ ρ ψ e0 x l1 σ1 C f v1 H__e0 Hobj Hval =>
         P_fld σ ρ ψ e0 x l1 σ1 C f v1 H__e0 Hobj Hval (evalP_ind2 e0 σ ρ ψ l1 σ1 H__e0)
@@ -339,7 +339,7 @@ Proof with (eauto; try lia).
       eapply evalList_step_monotonicity with (m := (S (S n))) in H__el...
       exists (S (S n)); simpl in H__el |- *.
       rewrite H__e.
-      eapply fold_left_app with (n0 := S n) (acc := [l1]) in H__el => //.
+      eapply fold_left_app with (n0 := S n) (acc := [v1]) in H__el => //.
     + clear H H__flds.
       destruct IHevalP as [n__e H__e], IHevalP0 as [n__flds H__flds].
       remember (S (max n__e n__flds)) as n.

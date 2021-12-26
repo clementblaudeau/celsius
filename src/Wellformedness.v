@@ -295,7 +295,7 @@ Global Hint Resolve correct_value: wf.
 
 (** A useful tactic: *)
 Ltac eval_wf :=
-  match goal with
+  repeat match goal with
   | H: ⟦ ?e ⟧p (?σ, ?ρ, ?ψ ) -->( ?v, ?σ'),
       H1:wf ?σ
     |- _ => match goal with

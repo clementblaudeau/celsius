@@ -50,7 +50,7 @@ destruct t eqn:matched
 end.
 
 
-Ltac destructs :=
+Ltac flatten :=
   repeat subst ||
          match goal with
          | H : _ \/ _ |- _ => let fresh1 := fresh H in
