@@ -25,73 +25,48 @@ Definition methodInfo C m :=
 
 
 (* Mode lattice *)
-(*
-Definition join μ1 μ2: Mode :=
-  match μ1, μ2 with
-  | hot, _ => μ2
-  | _, hot => μ1
-  | cold, _ => cold
-  | _, cold => cold
-  | _, _ => warm
-  end.
-Notation "m1 ⊔ m2" := (join m1 m2) (at level 40).
-
-Definition meet μ1 μ2 :=
-  match μ1, μ2 with
-  | hot, _ => hot
-  | _, hot => hot
-  | cold, _ => μ2
-  | _, cold => μ1
-  | _, _ => warm
-  end.
-Notation "m1 ⊓ m2" := (meet m1 m2) (at level 40).
-*)
-
 Reserved Notation "m1 ⊑ m2" (at level 40).
 Inductive S_Mode: Mode -> Mode -> Prop :=
+| s_mode_refl : forall μ, μ ⊑ μ
 | s_mode_hot: forall μ, hot ⊑ μ
 | s_mode_warm: forall Ω, warm ⊑ cool Ω
-| s_mode_union: forall Ω1 Ω2, cool (Ω1 ++ Ω2) ⊑ cool Ω1
+| s_mode_union: forall Ω1 Ω2, cool (Ω1 + Ω2) ⊑ cool Ω1
 | s_mode_cold: forall μ, μ ⊑ cold
 where "m1 ⊑ m2" := (S_Mode m1 m2).
 Global Hint Resolve s_mode_cold s_mode_hot s_mode_warm s_mode_union: typ.
 
-(* Lemma s_mode_refl: forall μ, μ ⊑ μ.
-Proof.
-  destruct μ; eauto with typ.
-Qed.
-Global Hint Resolve s_mode_refl: typ. *)
-
-
 Lemma s_mode_trans: forall μ1 μ2 μ3, μ1 ⊑ μ2 -> μ2 ⊑ μ3 -> μ1 ⊑ μ3.
 Proof.
   intros.
-  inversion H;
-    inversion H0; steps;
-    try rewrite <- app_assoc;
-      eauto with typ.
+  inversion H; steps;
+    inversion H0; steps.
+  rewrite Plus.plus_assoc_reverse.
+  eauto with typ.
 Qed.
 Global Hint Resolve s_mode_trans: typ.
 
 
 (* Subtyping *)
 Reserved Notation "T1 <: T2" (at level 40).
+
 Inductive S_Typ : Tpe -> Tpe -> Prop :=
 | s_typ_mode (C: ClN) μ1 μ2: μ1 ⊑ μ2 -> (C, μ1) <: (C, μ2)
-with S_Typs : (list Tpe) -> (list Tpe) -> Prop :=
+where "T1 <: T2" := (S_Typ T1 T2).
+
+Inductive S_Typs : (list Tpe) -> (list Tpe) -> Prop :=
 | s_typs_nil: S_Typs nil nil
 | s_typs_cons: forall Ts1 Ts2 T1 T2,
     S_Typs Ts1 Ts2 ->
     T1 <: T2 ->
-    S_Typs (T1::Ts1) (T2::Ts2)
-where "T1 <: T2" := (S_Typ T1 T2).
+    S_Typs (T1::Ts1) (T2::Ts2).
 Global Hint Resolve s_typ_mode: typ.
 
 Lemma s_typ_refl:
   forall T, T <: T.
 Proof.
-  destruct T; eauto with typ.
-Admitted. (* Qed. *)
+  destruct T, m;
+    eapply s_typ_mode, s_mode_refl.
+Qed.
 Global Hint Resolve s_typ_refl: typ.
 
 Lemma s_typ_trans:
@@ -152,7 +127,7 @@ Inductive T_Expr : Env -> Tpe -> Expr -> Tpe -> Prop :=
 | t_selcool:
     forall Γ T e f U D Ω,
       [Γ, T ⊢ e : (D, cool Ω)] ->
-      List.In f Ω ->
+      f <= Ω ->
       (fieldType D f = Some U) ->
       [Γ, T ⊢ (fld e f) : U]
 
@@ -205,16 +180,17 @@ with T_Exprs: Env -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
 where  "'[_' Γ ',' T '⊢' es ':' Us '_]'" := (T_Exprs Γ T es Us).
 
 (** ** Field typing *)
-Definition T_Field Γ T f :=
+Definition T_Field (Γ:Env) T f :=
   match f with
-  | field U e => [Γ, T ⊢ e : U]
+  | field U e => [(nil:Env), T ⊢ e : U]
   end.
-Inductive T_Fields: Env -> Tpe -> (list Var) -> (list Field) -> Prop :=
-| t_fields_nil: forall Γ T, T_Fields Γ T [] []
+
+Inductive T_Fields: Env -> Tpe -> (list Field) -> Prop :=
+| t_fields_nil: forall Γ T, T_Fields Γ T []
 | f_fields_cool_cons: forall Γ C Ω f fs,
     T_Field Γ (C, cool Ω) f ->
-    T_Fields Γ (C, cool (f::Ω)) fs ->
-    T_Fields Γ (C, cool Γ) (f::fs).
+    T_Fields Γ (C, cool (S Ω)) fs ->
+    T_Fields Γ (C, cool Ω) (f::fs).
 
 (** ** Method typing *)
 Definition T_Method C m :=
@@ -229,6 +205,7 @@ Definition T_Class C cl :=
   match cl with
   | class paramTs fields methods => T_Fields paramTs (C, cold) fields /\ T_Methods C methods
   end.
+
 Fixpoint T_Classes (Ct: list Class) i :=
   match Ct with
   | nil => True

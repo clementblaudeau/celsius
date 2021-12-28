@@ -16,6 +16,12 @@ Definition Mtd : Type := nat.
 Definition ClN : Type := nat.
 Definition Loc : Type := nat.
 
+Lemma Var_dec : forall (x y: Var), {x = y} + {x <> y}.
+Proof.
+  decide equality.
+Qed.
+
+
 (** *** Expression constructors *)
 Inductive Expr: Type :=
 | var   : Var -> Expr
@@ -41,9 +47,9 @@ Qed.
 Inductive Mode: Type :=
 | hot
 | warm
-| cool : list Var -> Mode
+| cool : nat -> Mode
 | cold.
-Notation "'@' u " := (u) (at level 20).
+Notation "'@' u " := (u:Mode) (at level 20).
 
 Definition Tpe : Type := ClN * Mode.
 
