@@ -13,7 +13,7 @@ Definition initializedFields σ l (f: list Field) : Prop :=
   | Some (C, ω) => ((length f) <= (length ω))
   | _ => False
   end.
-Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 80, f at level 80).
+Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 98, f at level 98).
 
 Definition partialMonotonicity σ σ' :=
   forall l f, (σ ⊨ l : f) -> (σ' ⊨ l : f).

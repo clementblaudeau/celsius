@@ -35,7 +35,7 @@ Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
     (σ0, L0) ⋖ (σ1, L) ->
     (σ0, L0) ⋖ (σ1, L1) ->
     (σ0, L0) ⋖ (σ2, L1).
-Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 81, σ2 at level 80, L at level 80).
+Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 99).
 
 Global Hint Unfold scoping : scoping.
 Global Hint Unfold scoping_preservation : scoping.
@@ -215,7 +215,7 @@ Lemma scopability_add_env:
 Proof.
   intros; unfold scoping; simpl; intros.
   destruct H8; steps.
-  assert (s ⊨ x ⇝ l \/ ((s ⊨ x ⇝ I) /\ (s ⊨ v ⇝ l))) by
+  assert ((s ⊨ x ⇝ l) \/ ((s ⊨ x ⇝ I) /\ (s ⊨ v ⇝ l))) by
       eauto using reachability_add_env with updates.
   steps;
     [ eapply H4 | eapply H3] ;

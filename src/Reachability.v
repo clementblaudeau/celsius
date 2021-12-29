@@ -11,7 +11,7 @@ Open Scope list_scope.
 
 (** ** Definitions and notations *)
 (** We first define the reachability predicate between two individual locations *)
-Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80, l1 at level 80, l2 at level 80).
+Reserved Notation "σ ⊨ l1 ⇝ l2" (at level 80, l1 at level 98, l2 at level 98).
 Inductive reachability : Store -> Loc -> Loc ->Prop :=
 | rch_heap: (**r we can access the current location *)
     forall l σ,
@@ -35,26 +35,27 @@ Global Hint Resolve rch_heap rch_step rch_trans: rch.
 
 (** We then extend the definition for a set of locations *)
 Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
-Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 99, L at level 99).
+Notation "σ ⊫ L ⇝ l" := (reachability_set σ L l) (at level 80, l at level 98, L at level 98).
+Notation "σ ⊫ { l } ⇝ l'" := (reachability_set σ {l} l')  (at level 80, l at level 98, l' at level 98).
 
 (** Depending on the temperature of objects we can reach, we have three predicates about the store (plus the set version for each). Inside a store [σ], a location [l] is said to be:
 - [reachable_cold]: if the location is in the heap (but might point to an object with unitialized fields)
 - [reachable_warm]: if the location points to an object with all initialized fields (but those might point to cold objects)
 - [reachable_hot]: if the location points to a hot object (transitively all initialized) *)
 Definition reachable_cold (σ: Store) (l: Loc) := (l < dom σ).
-Notation "σ ⊨ l : 'cold'" := (reachable_cold σ l) (at level 80, l at level 80).
-Notation "σ ⊫ L : 'cold'" := (forall l, (l ∈ L) -> reachable_cold σ l) (at level 80, L at level 99).
+Notation "σ ⊨ l : 'cold'" := (reachable_cold σ l) (at level 80, l at level 98).
+Notation "σ ⊫ L : 'cold'" := (forall l, (l ∈ L) -> reachable_cold σ l) (at level 80, L at level 98).
 
 Definition reachable_warm (σ: Store) (l: Loc) := (exists C ω args fields methods , (getObj σ l) = Some (C, ω) /\ ((ct C) = Some (class args fields methods)) /\ (length fields <= length ω)).
-Notation "σ ⊨ l : 'warm'" := (reachable_warm σ l) (at level 80, l at level 80).
-Notation "σ ⊫ L : 'warm'" := (forall l, (l ∈ L) -> reachable_warm σ l) (at level 80, L at level 99).
+Notation "σ ⊨ l : 'warm'" := (reachable_warm σ l) (at level 80, l at level 98).
+Notation "σ ⊫ L : 'warm'" := (forall l, (l ∈ L) -> reachable_warm σ l) (at level 80, L at level 98).
 
 Definition reachable_hot  (σ: Store) (l: Loc) :=(forall (l': Loc), (σ ⊨ l ⇝ l') -> (σ ⊨ l' : warm)).
-Notation "σ ⊨ l : 'hot'"  := (reachable_hot σ l) (at level 80, l at level 80).
-Notation "σ ⊫ L : 'hot'" := (forall l, (l ∈ L) -> reachable_hot σ l) (at level 80, L at level 99).
+Notation "σ ⊨ l : 'hot'"  := (reachable_hot σ l) (at level 80, l at level 98).
+Notation "σ ⊫ L : 'hot'" := (forall l, (l ∈ L) -> reachable_hot σ l) (at level 80, L at level 98).
 
 (** A usefull rewrite *)
-Ltac rch_singleton:=
+Ltac rch_singleton :=
   repeat match goal with
   | H: ?s ⊫ (Singleton Loc ?l1) ⇝ ?l2 |- _ =>
     let freshH := fresh "H" in
@@ -74,10 +75,12 @@ Proof.
   unfold reachable_hot; eauto with rch.
 Qed.
 
+Print Grammar constr.
+
 (** Reaching from a singleton is the same as reaching from the only element of the singleton *)
 Lemma reachability_singleton :
   forall σ l1 l2,
-    (σ ⊫ (Singleton Loc l1) ⇝ l2) <-> σ ⊨ l1 ⇝ l2.
+    (σ ⊫ {l1} ⇝ l2) <-> σ ⊨ l1 ⇝ l2.
 Proof.
   split; intros; [rch_singleton | exists l1]; eauto => //.
 Qed.
@@ -85,8 +88,8 @@ Qed.
 (* Reachable objects are inside the store *)
 Lemma reachability_dom :
   forall σ l1 l2,
-    (σ ⊨ l1 ⇝ l2) ->
-    (l2 < (dom σ)).
+    σ ⊨ l1 ⇝ l2 ->
+    l2 < dom σ.
 Proof.
   intros.
   induction H;
@@ -97,8 +100,8 @@ Global Hint Resolve reachability_dom: rch.
 (* Reachable objects are inside the store *)
 Lemma reachability_dom2 :
   forall σ l1 l2,
-    (σ ⊨ l1 ⇝ l2) ->
-    (l1 < (dom σ)).
+    σ ⊨ l1 ⇝ l2 ->
+    l1 < dom σ.
 Proof.
   intros.
   induction H;
@@ -125,7 +128,7 @@ Lemma reachability_add_env:
     getObj σ x = Some(C, ω) ->
     forall l1 l2,
       ([x ↦ (C, ω ++ [l])]σ) ⊨ l1 ⇝ l2 ->
-      σ ⊨ l1 ⇝ l2 \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
+      (σ ⊨ l1 ⇝ l2) \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
 Proof.
   intros σ x C ω l Hx Hobj.
   apply reachability_rev_ind; steps; eauto with rch;

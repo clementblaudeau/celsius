@@ -89,7 +89,7 @@ Definition ct: ClassTable := nth_error Ξ.
 Definition main: Mtd := 0.
 
 (** ** Helper functions *)
-Notation "'dom' x" := (length x) (at level 0).
+Notation "'dom' x" := (length x) (at level 0, x at level 1).
 Definition getObj (l : list Obj)   := nth_error l.
 Definition getVal (l : list Value) := nth_error l.
 
@@ -125,7 +125,7 @@ Qed.
 
 Lemma getObj_last2 :
   forall σ C ρ l,
-    l < dom σ ->
+    l < (dom σ) ->
     getObj (σ++[(C,ρ)]) l = getObj σ l.
 Proof.
   induction σ; simpl; intros; try lia.
