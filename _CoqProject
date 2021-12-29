@@ -3,7 +3,6 @@ src/Compatibility.v
 src/Eval.v
 src/PartialMonotonicity.v
 src/Scopability.v
-src/strongInduction.v
 src/Trees.v
 src/Wellformedness.v
 src/LocalReasoning.v
