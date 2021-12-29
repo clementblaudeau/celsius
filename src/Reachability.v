@@ -1,7 +1,7 @@
 (* Celsius project *)
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** This file defines the notion of reachability of a location in a given store. The set of reachable locations, starting from a given one l is transitively defined as the ones that can be accessed by following pointers in object local environments. We then define and prove basic properties around this notion. In the second part, we show the equivalence between the inductive definition and a path-based definition. This allows us to reason about paths from one location to another, especially for scopability results.  *)
-From Celsius Require Export Eval Trees.
+From Celsius Require Export Trees.
 Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Psatz.
 Import ListNotations.
 Require Import Sets.Ensembles.
@@ -73,8 +73,6 @@ Lemma reachability_hot:
 Proof.
   unfold reachable_hot; eauto with rch.
 Qed.
-
-Print Grammar constr.
 
 (** Reaching from a singleton is the same as reaching from the only element of the singleton *)
 Lemma reachability_singleton :
@@ -243,7 +241,7 @@ Lemma app_exists_last:
   exists y p', x::p = p'++[y].
 Proof.
   induction p; steps.
-  + exists x, []; steps.
+  + exists x, ([]:list Loc); steps.
   + move /(_ a):IHp => IHp. steps.
     exists y, (x::p'); steps.
 Qed.
@@ -261,7 +259,7 @@ Proof.
       repeat light;
       eauto with rch.
   + induction 1; flatten; eauto; right.
-    ++ exists []; simpl; unfold reachable_one_step.
+    ++ eexists []; simpl; unfold reachable_one_step.
        repeat eexists; eauto using getObj_dom.
     ++ exists (p++(l1::p0)).
        rewrite <- app_assoc, app_comm_cons.
@@ -301,7 +299,7 @@ Proof.
       +++ right; steps. symmetry in H0. apply app_eq_unit in H0; steps.
       +++ destruct_eq (l = l1);
             [ left | right ]; steps;
-              [ exists p, [] | destruct p2] ;
+              [ eexists p, [] | destruct p2] ;
               steps; eauto.
     ++ (**r a ≠ l2 *)
       right; steps.
@@ -356,7 +354,7 @@ Proof.
     ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
        invert_constructor_equalities; subst.
        destruct_eq (l2 = l'); subst ;
-         [exfalso; apply H2; exists p, []  ; steps |].
+         [exfalso; apply H2; eexists p, []  ; steps |].
        unfold getVal in *.
        exists C0, ω; repeat split; eauto.
        destruct_eq (f = f0); subst;
@@ -395,7 +393,7 @@ Proof.
        +++ rewrite_anywhere update_one1 ; eauto using nth_error_Some.
            invert_constructor_equalities; steps.
            exfalso; apply Hedge.
-           unfold contains_edge. exists l0, []; steps.
+           unfold contains_edge. eexists l0, []; steps.
            erewrite <- update_one3.
            eapply nth_error_Some.
            erewrite H0 => //.

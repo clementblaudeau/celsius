@@ -178,7 +178,7 @@ Global Hint Resolve wf_add_empty: wf.
 Global Hint Resolve nth_error_In: wf.
 Global Hint Resolve storeSubset_update: wf.
 Global Hint Resolve getVal_codom: wf.
-Hint Rewrite codom_cons: wf.
+Global Hint Rewrite codom_cons: wf.
 
 (** ** Evaluation-maintained results *)
 (** We want to show that the evaluator maintains the wellformedness of stores. As it is not only about stores but also the location of [this] and the result, we cannot use the results proved in Eval.v. We reprove it from scratch, starting with some technical results. *)

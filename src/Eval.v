@@ -1,35 +1,12 @@
 (* Celsius project *)
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the evaluator of the language and some general results *)
+(** This file defines the big-step evaluator of the language (with fuel). It is then shown equivalent to the predicate version *)
 
-From Celsius Require Export Trees Tactics strongInduction.
+From Celsius Require Export EvalP.
 Require Import ssreflect ssrbool.
 Require Import List Psatz Arith.
 Import ListNotations.
 Open Scope nat_scope.
-
-(** ** Helper functions *)
-
-(** Update store with new value in local env : adds a new field to an existing object *)
-Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
-  match (getObj σ obj) with
-  | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
-  | None => None (* ? *)
-  end.
-
-(** Update store with update in local env : update an already-existing field of an existing object*)
-Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
-  match (getObj σ obj) with
-  | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
-  | None => σ (* ? *)
-  end.
-
-(** Update store with new values : update already existing fields of an existing object*)
-Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
-  match (getObj σ v0) with
-  | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
-  | None => σ
-  end.
 
 (** ** Evaluation results *)
 
@@ -212,113 +189,239 @@ Proof.
 Qed.
 
 
-(** ** Results *)
-(** As we will show, if a relationship between stores verifies certain properties, it will be maintained by the evaluator. This is used to prove the partial-monotonicity, compatibility, wellformedness and stackability theorems. The scopability theorem is more involved, as it is a relationship involving both the stores and the locations. *)
-
-Definition Reflexive (P: Store -> Store -> Prop) : Prop :=
-  forall σ, P σ σ.
-Definition Transitive (P: Store -> Store -> Prop)  : Prop :=
-  forall σ1 σ2 σ3, P σ1 σ2 ->  P σ2 σ3 ->  P σ1 σ3.
-Definition Assignment (P: Store -> Store -> Prop)  : Prop :=
-  forall σ σ' l C ω ω',
-    getObj σ l = Some (C, ω) ->
-    length ω <= length ω' ->
-    σ' = [l ↦ (C, ω')]σ -> P σ σ'.
-Definition Freshness (P: Store -> Store -> Prop) : Prop :=
-  forall s c ω, P s (s ++ [(c, ω)]).
-
-(** A relation maintained by the evaluator. All local-reasoning theorems are about showing that some relations are eval maintained. *)
-Definition EvalMaintained (P: Store -> Store -> Prop)  k : Prop :=
-  forall e σ σ' ρ v v',
-    ⟦e⟧(σ, ρ, v)(k) = Success v' σ' ->
-    P σ σ'.
-
-(** *** Initialization *)
-(** One sub-case is to show relations are maintained through initialization of a new object. This could be the consequence of some general properties, or can be proved ad hoc (like for stackability). It's written for a strong-induction-style proof *)
-Definition InitMaintained (P: Store -> Store -> Prop) (n:nat) : Prop :=
-  (forall k, k < n -> EvalMaintained P k) -> (**r strong induction hypothesis *)
-  forall k,
-    k < n ->
-    forall l0 s σ' c,
-      init (length s) l0 c (s ++ [(c, [])]) k = Some σ' ->
-      P s σ'.
-
-(** Notably, if a relation verifies [Freshness] (and other properties), it will be maintained through initialization. *)
-Lemma FreshnessInitMaintained :
-  forall (P: Store -> Store -> Prop) n,
-    Reflexive P -> Transitive P -> Assignment P -> Freshness P -> InitMaintained P n.
+(** ** Evaluator step-monotonicity *)
+Lemma fold_left_app:
+  forall (n0 : nat) (ρ : Env) (ψ : Value) (σ' : Store) (el0 : list Expr)
+    (vl0 : list Value) (σ1 : Store) vl acc,
+    fold_left (eval_list_aux ρ ψ n0) el0 (Success_l vl σ1) = Success_l vl0 σ' <->
+      fold_left (eval_list_aux ρ ψ n0) el0 (Success_l (acc++vl) σ1) = Success_l (acc++vl0) σ'.
 Proof.
-  intros P n H_refl H_trans H_asgn H_fresh H_strong.
-  assert ( forall k, k < n ->
-                forall l0 σ σ' c I , init I l0 c σ k = Some σ' -> P σ σ'); eauto.
-  destruct k; simpl; try discriminate.
-  intros Hn; intros.
-  repeat destruct_match; try discriminate. clear matched0 matched.
-  move : H. move: σ σ'.
-  induction fields as [| [x e] fields]; [steps | simpl; intros].
-  destruct k; simpl in H; [ rewrite foldLeft_constant in H => // |].
-  destruct_eval_with_name E; eauto.
-  unfold assign_new in *.
-  repeat destruct_match; try solve [rewrite foldLeft_constant in H => //].
-  subst.
-  apply PeanoNat.Nat.lt_succ_l, PeanoNat.Nat.lt_succ_l in Hn.
-  apply H_strong in E => //.
-  eapply (H_trans _ _ _ E).
-  apply (H_trans _  [I ↦ (c1, e0 ++ [v])] (s) ) ; eauto.
-  apply (H_asgn _ _ _ _ _ (e0 ++ [v])  matched); eauto.
-  rewrite app_length; steps; lia.
+  intros.
+  move: n0 σ1 σ' vl acc.
+  induction el0; split; intros.
+  + inversion H; steps.
+  + inversion H. steps.
+    eapply app_inv_head in H1. steps.
+  + inversion H; steps.
+    destruct n0; try solve [rewrite foldLeft_constant in H => //].
+    simpl in H |- *.
+    destruct_eval.
+    specialize (IHel0 (S n0) s σ' (vl++[v]) acc) as [IHel0 _].
+    rewrite app_assoc_reverse.
+    eauto.
+  + inversion H; steps.
+    destruct n0; try solve [rewrite foldLeft_constant in H => //].
+    simpl in H |- *.
+    destruct_eval.
+    specialize (IHel0 (S n0) s σ' (vl++[v]) acc) as [ ].
+    rewrite app_assoc_reverse in H.
+    eauto.
 Qed.
 
-(** *** Evaluation of lists of expressions *)
-(** Another sub-case is to show that [Reflexive] and [Transitive] eval-maintained relations are also maintained when evaluating a list of expressions *)
-Lemma EvalListMaintained :
-  forall (P: Store -> Store -> Prop) n,
-    Reflexive P ->
-    Transitive P ->
-    (forall k, k < n -> EvalMaintained P k) -> (**r strong induction hypothesis *)
-    forall k,
-      k < n ->
-      forall l σ σ' ρ v v_list,
-        ⟦_ l _⟧(σ, ρ, v)(k) = Success_l v_list σ' ->
-        P σ σ'.
+Lemma fold_left_app_inv:
+  forall n el σ ρ ψ vl σ' acc,
+    fold_left (eval_list_aux ρ ψ n) el (Success_l acc σ) = Success_l vl σ' ->
+    exists vl', vl = acc ++ vl'.
 Proof.
-  intros P n H_refl H_trans H_strong.
-  destruct k; simpl; try discriminate.
-  assert (forall l σ σ' ρ v v_list1 v_list2,
-             (k < n) ->
-             fold_left (eval_list_aux ρ v k) l (Success_l v_list1 σ) = Success_l v_list2 σ' ->
-             P σ σ'); eauto using PeanoNat.Nat.lt_succ_l.
-  induction l as [| e l]; [steps | simpl; intros].
-  destruct k; simpl in *; [rewrite foldLeft_constant in H0 => // |].
-  move /(_ _ _ _ _ _ _ H):IHl => IHl.
-  move /(_ _ (PeanoNat.Nat.lt_succ_l _ _ H)):H_strong => H_strong.
-  destruct_eval ; eauto.
+  induction el; intros; steps.
+  - exists ([]: list Value). rewrite app_nil_r => //.
+  - destruct n; try solve [rewrite foldLeft_constant in H => //].
+    simpl in H.
+    destruct_eval.
+    eapply IHel in H as [vl' H].
+    exists (v::vl').
+    rewrite -app_assoc in H => //.
 Qed.
 
-(** *** Main evaluation result *)
-(** We show here that a relation that is [Reflexive], [Transitive], that is maintained through assignment and initialization is maintained by the evaluator. We use strong induction *)
-
-Lemma EvalMaintainedProp :
-  forall (P: Store -> Store -> Prop),
-    Reflexive P -> Transitive P ->  Assignment P -> (forall n, InitMaintained P n) -> forall n, EvalMaintained P n.
-  intros P H_refl H_trans  H_asgn H_init.
-  apply strong_induction.
-  unfold EvalMaintained.
-  intros n H_strong.
-  move /(_ n H_strong):H_init => H_init.
-  (** To get one step of the evaluator, we destruct n *)
-  destruct n => //.
-  move : (PeanoNat.Nat.lt_succ_diag_r n) => Hn.
-  destruct e;
-    repeat light || invert_constructor_equalities || destruct_match || eauto 3;
-    try solve [eapply_anywhere EvalListMaintained; eauto].
-  (** Only one case remaining *)
-  eapply H_trans with s; eauto.
-  eapply H_trans with s0; eauto.
-  eapply H_trans with (assign v1 v v2 s0); eauto.
-  unfold assign; repeat destruct_match; eauto using PeanoNat.Nat.eq_le_incl, update_one3.
+Lemma eval_step_monotonicity_aux: forall n,
+    (forall m, m > n ->
+          (forall e σ ρ ψ v σ', ⟦ e ⟧ (σ, ρ, ψ)(n) = Success v σ' ->
+                           ⟦ e ⟧ (σ, ρ, ψ)(m) = Success v σ')) /\
+      (forall m, m > n ->
+            (forall el σ ρ ψ vl σ', ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
+                               ⟦_ el _⟧ (σ, ρ, ψ)(m) = Success_l vl σ')) /\
+      (forall m, m > n ->
+            (forall C σ σ' l vl, init l vl C σ n = Some σ' ->
+                            init l vl C σ m = Some σ')).
+Proof with (try lia).
+  induction n as [n IHn] using lt_wf_ind. destruct n.
+  - repeat split; intros; inversion H0.
+  - repeat split; intros ; destruct m...
+    + (* expression *)
+      destruct (IHn n) as [Hexp [Hlist Hinit]]...
+      destruct e ; try solve [steps; eauto].
+      * inversion H0; repeat destruct_match => //; subst.
+        eapply (Hexp m) in matched; steps...
+      * inversion H0; repeat destruct_match => //.
+        rewrite_any.
+        eapply (Hexp m) in matched, H2...
+        eapply (Hlist m) in matched6...
+        steps.
+      * inversion H0; repeat destruct_match => //.
+        rewrite_any.
+        eapply (Hlist m) in matched...
+        eapply (Hinit m) in matched0...
+        steps.
+      * inversion H0; repeat destruct_match => //; sort.
+        rewrite_any.
+        eapply (Hexp m) in matched, matched0, H2...
+        steps.
+    + (* lists *)
+      simpl in *. move: vl σ σ' H0.
+      set (acc := []).
+      generalize acc.
+      clear acc.
+      induction el => //. intros; simpl in *.
+      destruct n; try solve [rewrite foldLeft_constant in H0 => //]; simpl in * => //.
+      destruct m...
+      destruct_eval. destruct (IHn n) as [He _]...
+      eapply (He m) in H1...
+      steps.
+    + (* init *)
+      simpl in *; destruct_match; steps.
+      gen σ.
+      clear matched.
+      induction fields => //.
+      intros; simpl in *.
+      destruct n; try solve [rewrite foldLeft_constant in H0 => //]; simpl in * => //.
+      destruct m...
+      simpl. destruct a.
+      destruct_eval.
+      destruct (IHn n) as [He _]...
+      eapply (He m) in H1...
+      rewrite H1.
+      unfold assign_new in *.
+      destruct (getObj s l); steps; eauto.
+      rewrite foldLeft_constant in H0 => //.
 Qed.
 
-(** Usefull Ltac when using the above theorem *)
-Ltac unfoldProps :=
-  unfold Reflexive, Transitive, Assignment, Freshness, InitMaintained, EvalMaintained.
+Theorem eval_step_monotonicity:
+  forall n m e σ ρ ψ l σ',
+    n < m ->
+    ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ' ->
+    ⟦ e ⟧ (σ, ρ, ψ)(m) = Success l σ'.
+Proof.
+  intros.
+  pose proof (eval_step_monotonicity_aux n) as [He _].
+  eauto with lia.
+Qed.
+
+Theorem evalList_step_monotonicity:
+  forall n m el σ ρ ψ vl σ',
+    n < m ->
+    ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
+    ⟦_ el _⟧ (σ, ρ, ψ)(m) = Success_l vl σ'.
+Proof.
+  intros.
+  pose proof (eval_step_monotonicity_aux n) as [_ [Hel _]].
+  eauto with lia.
+Qed.
+
+Theorem init_step_monotonicity:
+  forall n m Flds ρ ψ σ σ',
+    n < m ->
+    fold_left (init_field ρ ψ n) Flds (Some σ)  = Some σ' ->
+    fold_left (init_field ρ ψ m) Flds (Some σ)  = Some σ'.
+Proof with try lia.
+  intros. move: σ σ' H0.
+  induction Flds as [| [T e] flds]; [steps |].
+  intros.
+  destruct m ...
+  destruct n ; simpl in H0 |- * ; try solve [rewrite foldLeft_constant in H0 => //].
+  destruct_eval.
+  eapply eval_step_monotonicity with (m := m) in H1...
+  rewrite H1.
+  destruct (assign_new ψ v s); try solve [rewrite foldLeft_constant in H0 => //].
+  eauto.
+Qed.
+
+
+Theorem evalListP_eval_list :
+  forall e σ ρ ψ l σ', ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ') <-> exists n, ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ'.
+Proof with (eauto; try lia).
+  split; intros.
+  - induction H using evalP_ind2 with
+      (Pl := fun el σ ρ ψ vl σ' (H__el : evalListP el σ ρ ψ vl σ') =>
+               exists n, ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ')
+      (Pin := fun fls I ρ σ σ' (H__init : initP fls I ρ σ σ') =>
+               exists n, fold_left (init_field ρ I n) fls (Some σ) = Some σ');
+      try solve [exists 1; steps].
+    + destruct IHevalP as [n__e0 H__e0].
+      exists (S n__e0); steps.
+    + clear H H__el H0.
+      destruct IHevalP1 as [n__e0 H__e0], IHevalP2 as [n__el H__el], IHevalP3 as [n__e2 H__e2].
+      set (n := S (max n__e0 (max n__el n__e2))).
+      eapply eval_step_monotonicity with (m := n) in H__e0, H__e2...
+      eapply evalList_step_monotonicity with (m := n) in H__el...
+      exists (S n); steps.
+    + clear H__args H__init.
+      destruct IHevalP as [n__args H__args], IHevalP0 as [n__init H__init].
+      remember (S (max n__args n__init)) as n.
+      eapply evalList_step_monotonicity with (m := (S n)) in H__args...
+      eapply init_step_monotonicity with (m := n) in H__init...
+      exists (S (S n)). simpl in H__args |- * .
+      steps.
+    + clear H H0 H1.
+      destruct IHevalP1 as [n__e1 H__e1], IHevalP2 as [n__e2 H__e2], IHevalP3 as [n__e3 H__e3].
+      remember (S (max n__e1 (max n__e2 n__e3))) as n.
+      eapply eval_step_monotonicity with (m := n) in H__e1, H__e2, H__e3 ...
+      exists (S n). steps.
+    + clear H H__el.
+      destruct IHevalP as [n__e H__e], IHevalP0 as [n__el H__el].
+      remember (S (max n__e n__el)) as n.
+      eapply eval_step_monotonicity with (m := n) in H__e ...
+      eapply evalList_step_monotonicity with (m := (S (S n))) in H__el...
+      exists (S (S n)); simpl in H__el |- *.
+      rewrite H__e.
+      eapply fold_left_app with (n0 := S n) (acc := [v1]) in H__el => //.
+    + clear H H__flds.
+      destruct IHevalP as [n__e H__e], IHevalP0 as [n__flds H__flds].
+      remember (S (max n__e n__flds)) as n.
+      eapply eval_step_monotonicity with (m := n) in H__e ...
+      eapply init_step_monotonicity with (m := (S n)) in H__flds...
+      exists (S n). steps.
+  - destruct H as [n H].
+    gen e σ ρ ψ l σ'.
+    eapply proj1 with (
+        (forall el σ ρ ψ vl σ',
+              ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
+              ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ')) /\
+          (forall C Tps Mtds Flds ψ ρ σ σ',
+              ct C = Some (class Tps Flds Mtds) ->
+              fold_left (init_field ρ ψ n) Flds (Some σ) = Some σ' ->
+              initP Flds ψ ρ σ σ' )).
+    induction n as [n IHn] using lt_wf_ind. destruct n.
+    + clear IHn.
+      repeat split => // ; intros; simpl in * => //.
+      destruct Flds; steps; eauto.
+      rewrite foldLeft_constant in H0 => //.
+    + repeat split.
+      * intros.
+        move : (IHn n) => [ ] // => IHn__e [IHn__el _].
+        destruct (IHn (n - 1)) as [_ [ _ IH__init]]...
+        destruct_eval; steps;
+          eauto using evalP.
+        ++ destruct n; [steps |].
+           assert (S n - 1 = n) by lia. rewrite H in IH__init.
+           simpl in matched0.
+           repeat destruct_match; [| steps].
+           eapply e_new; eauto.
+      * move /(_ n): IHn => [ ] // => IHn__e [IHn__el _].
+        induction el; [ steps; eauto |].
+        intros.
+        destruct n ; simpl in H |- *; try solve [rewrite foldLeft_constant in H => //].
+        destruct_eval.
+        lets [vl' Hv] : fold_left_app_inv (S n) [v] H; subst.
+        eapply eval_step_monotonicity with (m := S n) in H0...
+        eapply el_cons; eauto.
+        eapply IHel, fold_left_app with (acc := [v]) => //.
+      * intros.
+        move /(_ n): IHn => [ ] // => IHn__e [IHn__el _].
+        clear H.
+        move: σ σ' H0.
+        induction Flds as [| [T e] flds]; [steps; eauto|].
+        intros.
+        simpl in H0. destruct_eval.
+        destruct (assign_new ψ v s) eqn:H__assign; eauto using initP.
+        rewrite foldLeft_constant in H0 => //.
+Qed.

@@ -219,7 +219,7 @@ Proof.
     [ eapply H4 | eapply H3] ;
     simpl; try (eexists; split); eauto with wf.
 Qed.
-Hint Resolve scp_add_env: scp.
+Global Hint Resolve scp_add_env: scp.
 
 Lemma reachability_not_empty: forall σ C l1 l2,
     wf σ ->
@@ -335,8 +335,8 @@ Proof.
 Qed.
 
 (** ** Evaluation-maintained results *)
-Hint Extern 1 => repeat rch_singleton: scp.
-Hint Extern 1 => rewrite update_dom : updates.
+Global Hint Extern 1 => repeat rch_singleton: scp.
+Global Hint Extern 1 => rewrite update_dom : updates.
 
 (** ** Main Scopability theorem *)
 (** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)

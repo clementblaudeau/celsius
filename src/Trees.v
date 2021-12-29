@@ -8,9 +8,9 @@ Open Scope nat_scope.
 Import ListNotations.
 Open Scope bool_scope.
 
-(** ** Language structures *)
+(** * Language structures *)
 
-(** *** Basic types *)
+(** ** Basic types *)
 Definition Var : Type := nat.
 Definition Mtd : Type := nat.
 Definition ClN : Type := nat.
@@ -22,7 +22,8 @@ Proof.
 Qed.
 
 
-(** *** Expression constructors *)
+(** ** Expression constructors *)
+
 Inductive Expr: Type :=
 | var   : Var -> Expr
 | this
@@ -66,7 +67,7 @@ Inductive Program: Type :=
 | program(C: list Class)(entry: Expr).
 
 
-(** *** Constructs *)
+(** ** Constructs *)
 Definition Value : Type := Loc.
 Definition ClassTable: Type := (ClN -> option Class).
 Definition Env: Type   := list Value.
@@ -81,7 +82,7 @@ Notation "{ l }" := (Singleton Loc l) (at level 0, l at level 99).
 Notation "L ∪ { l }" := (Union Loc L (Singleton Loc l)) (at level 80).
 Notation "{ l } ∪ L" := (Union Loc (Singleton Loc l) L) (at level 80).
 
-(** *** Global Parameters *)
+(** ** Global Parameters *)
 
 Parameter Ξ: list Class.
 Parameter entry: ClN.
@@ -113,6 +114,26 @@ Fixpoint update_list {X : Type} (positions : list nat) (values : list X) (l : li
 Notation "[ x ↦  v ] σ" := (update_one x v σ) (at level 0).
 Notation "[ x ⟼ v ] σ" := (update_list x v σ) (at level 0).
 
+(** Update store with new value in local env : adds a new field to an existing object *)
+Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
+  match (getObj σ obj) with
+  | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
+  | None => None (* ? *)
+  end.
+
+(** Update store with update in local env : update an already-existing field of an existing object*)
+Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
+  match (getObj σ obj) with
+  | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
+  | None => σ (* ? *)
+  end.
+
+(** Update store with new values : update already existing fields of an existing object*)
+Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
+  match (getObj σ v0) with
+  | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
+  | None => σ
+  end.
 
 (** ** Basic results on helper functions *)
 (** We then have multiple easy results on those helper functions *)
