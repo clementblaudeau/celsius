@@ -14,15 +14,13 @@ Open Scope nat_scope.
 Definition scoping (σ σ': Store) (L L': Ensemble Loc) :=
   L ⪽ σ ->
   L' ⪽ σ' ->
-  (forall l, l < (dom σ) -> (σ' ⊫ L' ⇝ l) -> σ ⊫ L ⇝ l).
+  (forall l, l < dom σ -> (σ' ⊫ L' ⇝ l) -> σ ⊫ L ⇝ l).
 
 Notation "( σ1 , L1 )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 L1 L2) (at level 0).
 Notation "( σ1 , { l } )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 {l} L2) (at level 0).
 Notation "( σ1 , L1 )  ⋖  ( σ2 , { l } )" := (scoping σ1 σ2 L1 {l}) (at level 0).
 Notation "( σ1 , { l1 } )  ⋖  ( σ2 , { l2 } )" := (scoping σ1 σ2 {l1} {l2}) (at level 0).
 
-
-(* Notation "a ⋖ b" := (scoping (fst a) (fst b) (snd a) (snd b)) (at level 81).*)
 
 (* The scoping preservation, with technical choices of hypothesis: *)
 Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
@@ -37,101 +35,101 @@ Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
     (σ0, L0) ⋖ (σ2, L1).
 Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 99).
 
-Global Hint Unfold scoping : scoping.
-Global Hint Unfold scoping_preservation : scoping.
-Global Hint Unfold reachability_set: scoping.
-Global Hint Resolve Union_introl: scoping.
-Global Hint Resolve Union_intror: scoping.
+Global Hint Unfold scoping : scp.
+Global Hint Unfold scoping_preservation : scp.
+Global Hint Unfold reachability_set: scp.
+Global Hint Resolve Union_introl: scp.
+Global Hint Resolve Union_intror: scp.
 
 
 (** ** Basic results *)
 (** We first show a set of basic results about scoping. The premisses can sometime look a bit arbitrary, but they are actually fine-tuned *)
 
-Lemma scoping_reflexivity :
+Lemma scp_refl :
+  forall σ L, (σ, L) ⋖ (σ, L).
+Proof.
+  eauto with scp.
+Qed.
+Global Hint Resolve scp_refl: scp.
+
+Lemma scp_refl2 :
   forall σ L1 L2, L2 ⊆ L1 -> (σ, L1) ⋖ (σ, L2).
 Proof.
   unfold scoping, reachability_set; steps.
   exists l'; steps; eapply H => //.
 Qed.
-Global Hint Resolve scoping_reflexivity: scoping.
+Global Hint Resolve scp_refl2: scp.
 
-Lemma scoping_reflexivity2 :
-  forall σ L, (σ, L) ⋖ (σ, L).
-Proof.
-  eauto with scoping.
-Qed.
-Global Hint Resolve scoping_reflexivity2: scoping.
-
-Lemma scoping_subset :
+Lemma scp_subset :
   forall σ1 σ2 L L1 L2,
-    (σ1, L1) ⋖ (σ2, L2∪L) ->
-    L2∪L ⪽ σ2 ->
+    (σ1, L1) ⋖ (σ2, L2) ->
+    L ⊆ L2 ->
+    L2 ⪽ σ2  ->
     (σ1, L1) ⋖ (σ2, L).
-Proof with (eauto with scoping).
+Proof with (eauto with scp).
   unfold scoping, reachability_set; steps ...
 Qed.
-Global Hint Resolve scoping_subset: scoping.
+Global Hint Resolve scp_subset: scp.
 
-Lemma scoping_union :
+Lemma scp_union :
   forall σ1 σ2 L L1 L2,
     (σ1, L)  ⋖ (σ2, L1) ->
     (σ1, L)  ⋖ (σ2, L2) ->
     (σ1, L)  ⋖ (σ2, L1∪L2).
 Proof.
   unfold scoping, reachability_set; steps.
-  induction H4; steps; eauto with wf.
+  inversion H4; steps; eauto with wf.
 Qed.
-Global Hint Resolve scoping_union: scoping.
+Global Hint Resolve scp_union: scp.
 
-Lemma scoping_union_introl :
+Lemma scp_union_introl :
   forall σ1 σ2 L L1 L2,
     (L1 ∪ L2) ⪽ σ2 ->
     (σ1, L) ⋖ (σ2, L1∪L2) ->
     (σ1, L) ⋖ (σ2, L1).
 Proof.
   unfold scoping, reachability_set; steps.
-  eauto with scoping.
+  eauto with scp.
 Qed.
-Global Hint Resolve scoping_union_introl: scoping.
+Global Hint Resolve scp_union_introl: scp.
 
-Lemma scoping_union_intror :
+Lemma scp_union_intror :
   forall σ1 σ2 L L1 L2,
     (L1 ∪ L2) ⪽ σ2 ->
     (σ1, L)  ⋖ (σ2, L1∪L2) ->
     (σ1, L)  ⋖ (σ2, L2).
 Proof.
   unfold scoping, reachability_set; steps.
-  eauto with scoping.
+  eauto with scp.
 Qed.
-Global Hint Resolve scoping_union_intror: scoping.
+Global Hint Resolve scp_union_intror: scp.
 
 
-Lemma scoping_reachability:
+Lemma scp_reachability:
   forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
     (σ, {l1}) ⋖ (σ, {l2}).
 Proof.
   unfold scoping, reachability_set ; steps.
-  eauto with scoping.
-  exists l1; try inSingleton; steps; eauto with scoping rch.
+  eauto with scp.
+  exists l1; try inSingleton; steps; eauto with scp rch.
 Qed.
-Global Hint Resolve scoping_reachability: scoping.
+Global Hint Resolve scp_reachability: scp.
 
 
-Lemma scoping_transitivity:
+Lemma scp_trans:
   forall σ1 σ2 σ3 L1 L2 L3,
     dom σ1 <= dom σ2 ->
     L2 ⪽ σ2 ->
     (σ1, L1) ⋖ (σ2, L2) ->
     (σ2, L2) ⋖ (σ3, L3) ->
     (σ1, L1) ⋖ (σ3, L3).
-Proof.
-  unfold scoping; unfold reachability_set; simpl ; steps.
-  eauto with scoping lia.
+Proof with eauto with scp lia.
+  unfold scoping, reachability_set; steps...
 Qed.
-Global Hint Resolve scoping_transitivity: scoping.
+Global Hint Resolve scp_trans: scp.
 
-Lemma preserving_transitivity:
+Lemma scp_pr_trans:
   forall σ1 σ2 σ3 L1 L2,
     σ1 ⇝ σ2 ⋖ L1 ->
     σ2 ⇝ σ3 ⋖ L2 ->
@@ -142,22 +140,22 @@ Proof with (eauto with wf lia).
   unfold scoping_preservation ; light.
   split; [eapply_any |]; steps.
   eapply_any ...
-  eapply scoping_transitivity with σ1 L1 ...
+  eapply scp_trans with σ1 L1 ...
 Qed.
-Global Hint Resolve preserving_transitivity: scoping.
+Global Hint Resolve scp_pr_trans: scp.
 
-Lemma preserving_regularity_degenerate:
+Lemma scp_pr_regularity_degenerate:
   forall σ1 σ2 L,
     σ1 ⇝ σ2 ⋖ L ->
     (dom σ1) <= (dom σ2) ->
     (σ1, L) ⋖ (σ2, L).
 Proof.
   unfold scoping_preservation, scoping; simpl; steps.
-  eauto with scoping.
+  eauto with scp.
 Qed.
-Global Hint Resolve preserving_regularity_degenerate: scoping.
+Global Hint Resolve scp_pr_regularity_degenerate: scp.
 
-Lemma preserving_regularity:
+Lemma scp_pr_regularity:
   forall σ0 σ1 σ2 L L1,
     σ1 ⇝ σ2 ⋖ L ->
     (dom σ0) <= (dom σ2) ->
@@ -170,20 +168,20 @@ Lemma preserving_regularity:
 Proof.
   unfold scoping_preservation; steps.
 Qed.
-Global Hint Resolve preserving_regularity: scoping.
+Global Hint Resolve scp_pr_regularity: scp.
 
-Lemma preserving_transitivity_degenerate:
+Lemma scp_pr_trans_degenerate:
   forall σ1 σ2 σ3 L1 ,
     σ1 ⇝ σ2 ⋖ L1 ->
     dom σ1 <= dom σ2 ->
     σ2 ⇝ σ3 ⋖ L1 ->
     σ1 ⇝ σ3 ⋖ L1.
 Proof.
-  steps; eauto with scoping.
+  steps; eauto with scp.
 Qed.
-Global Hint Resolve preserving_transitivity_degenerate: scoping.
+Global Hint Resolve scp_pr_trans_degenerate: scp.
 
-Lemma scopability_add:
+Lemma scp_add:
   forall σ σ' ρ' l0 l a,
     (σ, a) ⋖ (σ', {l}) ->
     (σ, a) ⋖ (σ', codom ρ' ∪ {l0}) ->
@@ -199,10 +197,10 @@ Proof.
     - inversion H2; steps.
       + apply Union_introl; steps.
       + inSingleton; apply Union_intror; steps. }
-  rewrite H1; eauto with scoping.
+  rewrite H1; eauto with scp.
 Qed.
 
-Lemma scopability_add_env:
+Lemma scp_add_env:
   forall I v s c e0,
     getObj s I = Some (c, e0) ->
     v < dom s ->
@@ -221,13 +219,38 @@ Proof.
     [ eapply H4 | eapply H3] ;
     simpl; try (eexists; split); eauto with wf.
 Qed.
-Hint Resolve scopability_add_env: scoping.
+Hint Resolve scp_add_env: scp.
 
+Lemma reachability_not_empty: forall σ C l1 l2,
+    wf σ ->
+    (σ++[(C, [])]) ⊨ l1 ⇝ l2 ->
+    (l1 = dom σ /\ l2 = dom σ) \/ ( σ ⊨ l1 ⇝ l2).
+Proof with (eauto with rch).
+  intros.
+  remember (σ++[(C,[])]) as σ0.
+  induction H0; steps ...
+  - rewrite dom_app in H0; steps.
+    apply le_S_n in H0.
+    destruct (Lt.le_lt_or_eq _ _ H0); steps.
+    right. steps ...
+  - eapply getObj_last_empty in H1; steps ...
+Qed.
+
+Lemma reachability_add_empty: forall σ C L l,
+    wf σ ->
+    (σ++[(C, [])]) ⊫ L ⇝ l ->
+    (σ ⊫ L ⇝ l) \/ l = length σ.
+Proof.
+  intros.
+  inversion H0 as [l1 [Hl1 Hrch]].
+  eapply reachability_not_empty in Hrch; steps.
+  left. exists l1; eauto.
+Qed.
 
 (** ** Assignment results *)
 (** We prove some specific results on scopability in the context of assignment. The key reasonning technique is to do a case analysis on the presence of the modified entry in the reachability path. *)
 
-Lemma scopability_assignment:
+Lemma scp_assign:
   forall σ1 σ2 σ2' L1 l l' f C ω ω',
     σ1 ⇝ σ2 ⋖ L1 ->
     (σ1, L1) ⋖ (σ2, {l}) ->
@@ -246,7 +269,7 @@ Proof.
     unfold scoping; simpl.
     intros.
     assert ((σ0, L0) ⋖ (σ2, L)) as B1 by eauto.
-    assert ((σ0, L0) ⋖ (σ2, {l'})) as C1 by eauto using scoping_transitivity.
+    assert ((σ0, L0) ⋖ (σ2, {l'})) as C1 by eauto using scp_trans.
     destruct H7; steps.
     eapply storeSubset_update in H5.
     destruct_eq (l = l'); subst.
@@ -312,7 +335,7 @@ Proof.
 Qed.
 
 (** ** Evaluation-maintained results *)
-Hint Extern 1 => repeat rch_singleton: scoping.
+Hint Extern 1 => repeat rch_singleton: scp.
 Hint Extern 1 => rewrite update_dom : updates.
 
 (** ** Main Scopability theorem *)
@@ -322,46 +345,46 @@ Theorem scopability_theorem:
     ⟦e⟧p (σ, ρ, ψ) --> (v, σ') ->
     (codom ρ) ∪ {ψ} ⪽ σ -> wf σ ->
     ((σ, ((codom ρ) ∪ {ψ})) ⋖ (σ', {v})) /\ (σ ⇝ σ' ⋖ ((codom ρ) ∪ {ψ})) .
-Proof with (timeout 10 eauto with scoping wf rch lia).
+Proof with (timeout 10 eauto with scp wf rch lia).
   intros.
   move: H0 H1.
   induction H using evalP_ind2 with
     (Pl := fun _ σ ρ ψ vl σ' _ =>
              (codom ρ ∪ {ψ}) ⪽ σ ->
              wf σ ->
-             ((σ, codom ρ ∪ {ψ}) ⋖ (σ', codom vl)) /\ (σ ⇝ σ' ⋖ codom ρ ∪ {ψ}))
-    (Pin := fun _ ψ ρ σ σ' _   => forall L σ0,
+             ((σ, codom ρ ∪ {ψ}) ⋖ (σ', codom vl)) /\ (σ ⇝ σ' ⋖ (codom ρ ∪ {ψ})))
+    (Pin := fun _ I ρ σ σ' _   => forall L σ0,
                 dom σ0 <= dom σ ->
-                (codom ρ ∪ {ψ}) ⪽ σ ->
-                ((σ0, L) ⋖ (σ, (codom ρ) ∪ {ψ})) ->
+                (codom ρ ∪ {I}) ⪽ σ ->
+                ((σ0, L) ⋖ (σ, (codom ρ) ∪ {I})) ->
                 (σ0 ⇝ σ ⋖ L) ->
                 wf σ ->
-                ((σ0, L) ⋖ (σ', (codom ρ) ∪ {ψ})) /\ (σ0 ⇝ σ' ⋖ L));
+                ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\ (σ0 ⇝ σ' ⋖ L));
     unfold assign, assign_new in * ; intros; eval_dom; eval_wf;
-    try solve [rch_singleton; eauto with scoping lia].
+    try solve [rch_singleton; eauto with scp lia].
   - (* e = x *)
     unfold scoping; steps...
     exists l ...
   - (* e = e0.f *)
     unfold scoping; steps; rch_singleton ...
     assert ((σ,  (codom ρ) ∪ ({ψ})) ⋖ (σ1, {l})) as C1 by
-        (eapply scoping_transitivity with σ1 {l1}; eauto with updates rch wf scoping).
+        (eapply scp_trans with σ1 {l1}; eauto with updates rch wf scp).
     eapply C1 ; steps ...
   - (* e = e0.m(l0) *)
     destruct IHevalP1, IHevalP2; eauto with wf.
     destruct IHevalP3; eauto with wf.
-    assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ1, (codom ρ) ∪ {ψ})) as A4 by eauto with scoping wf pM.
+    assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ1, (codom ρ) ∪ {ψ})) as A4 by eauto with scp wf pM.
     assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, (codom vl2) ∪ {v1}) ) as A6 by
-        (eapply scoping_union; eauto with scoping wf pM lia).
+        (eapply scp_union; eauto with scp wf pM lia).
     split.
-    + eapply scoping_transitivity with σ2 ( codom vl2 ∪ {v1}) ...
-    + eapply preserving_transitivity with σ2 ( codom vl2 ∪ {v1}) ...
+    + eapply scp_trans with σ2 ( codom vl2 ∪ {v1}) ...
+    + eapply scp_pr_trans with σ2 ( codom vl2 ∪ {v1}) ...
   - (* e = new C(l0) *)
     destruct IHevalP; eauto with wf.
     specialize IHevalP0 with (codom ρ ∪ {ψ}) σ.
     assert (dom σ1 <= dom (σ1 ++ [(C, [])])) by (rewrite dom_app; lia).
     destruct IHevalP0; eauto with wf .
-    + rewrite dom_app. steps.
+    + rewrite dom_app ...
     + eapply storeSubset_union ...
       eapply storeSubset_singleton3 .
       rewrite dom_app ... (* storeSubset_add_empty ? *)
@@ -369,15 +392,19 @@ Proof with (timeout 10 eauto with scoping wf rch lia).
       move : H9 => [l0 [H__l0 H__rch]].
       inversion H__l0; steps.
       * eapply H3 ...
-        eapply reachability_empty with (C := C) ...
-      * inSingleton.
         eapply reachability_not_empty in H__rch ...
-    + eapply preserving_transitivity; eauto.
+        exists l0; steps.
+        eapply H_vals in H6 ...
+      * inSingleton.
+        eapply reachability_not_empty in H__rch as [ ] ...
+        eapply reachability_dom2 in H6. lia.
+    + eapply scp_pr_trans; eauto.
       unfold scoping_preservation; steps; eauto.
       unfold scoping; steps.
-      eapply reachability_empty in H15 ...
+      move: H15 => [l0 [Hl0 H__rch]].
+      eapply reachability_not_empty in H__rch as [ ]...
     + flatten; split => //.
-       eapply scoping_union_intror ; eauto with wf scoping.
+      eapply scp_union_intror ; eauto with wf scp.
       eapply storeSubset_union.
       eapply storeSubset_trans; eauto with wf lia.
       eapply storeSubset_trans; eauto with wf lia.
@@ -388,39 +415,39 @@ Proof with (timeout 10 eauto with scoping wf rch lia).
     + destruct IHevalP1, IHevalP2 ...
       destruct IHevalP3; eauto with wf lia.
       * eapply storeSubset_trans with σ2; eauto with updates ...
-      * eapply scopability_assignment with (f := x) (σ1 := σ) (l' := v2) (L1 := (codom ρ ∪ {ψ})) in H__obj as [ ];
-          try reflexivity; eauto 5 with wf lia scoping.
+      * eapply scp_assign with (f := x) (σ1 := σ) (l' := v2) (L1 := (codom ρ ∪ {ψ})) in H__obj as [ ];
+          try reflexivity; eauto 5 with wf lia scp.
         split.
-        -- eapply scoping_transitivity with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))]σ2) (L2 := codom ρ ∪ {ψ});
-             try eapply H8; eauto 3 with wf lia scoping updates.
+        -- eapply scp_trans with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))]σ2) (L2 := codom ρ ∪ {ψ});
+             try eapply H8; eauto 3 with wf lia scp updates.
            eapply storeSubset_trans with σ2; eauto with updates wf lia.
-        -- eapply preserving_transitivity; eauto with scoping; update_dom ; eauto with wf lia.
+        -- eapply scp_pr_trans; eauto with scp; update_dom ; eauto with wf lia.
            eapply_any; update_dom...
     + destruct IHevalP1, IHevalP2, IHevalP3 ...
       split .
-      * eapply scoping_transitivity with (σ2 := σ2) (L2 := codom ρ ∪ {ψ}) ...
-      * eapply preserving_transitivity ...
+      * eapply scp_trans with (σ2 := σ2) (L2 := codom ρ ∪ {ψ}) ...
+      * eapply scp_pr_trans ...
   - (* el_nil *)
     split.
     + intros x; steps.
       inversion H3; steps.
-    + eapply preserving_transitivity_degenerate ...
+    + eapply scp_pr_trans_degenerate ...
   - (* el_cons *)
     destruct IHevalP, IHevalP0 ...
     split.
     + rewrite codom_cons.
-      eapply scoping_union ...
-    + eapply preserving_transitivity_degenerate ...
+      eapply scp_union ...
+    + eapply scp_pr_trans_degenerate ...
   - (* init_cons *)
     destruct IHevalP; eauto.
     destruct (getObj σ1 I) as [[C ω] |] eqn:H__obj; [| steps].
     inversion H__assign; subst.
     specialize (IHevalP0 L σ0).
     destruct IHevalP0; eauto with updates wf lia.
-    + eapply scopability_add_env ...
+    + eapply scp_add_env ...
       eapply H3.
-    + eapply preserving_transitivity; eauto.
-      eapply preserving_transitivity; eauto.
+    + eapply scp_pr_trans; eauto.
+      eapply scp_pr_trans; eauto.
       unfold scoping_preservation; intros ...
     + unfold wf; intros; update_dom.
       getObj_update; flatten; subst; repeat invert_constructor_equalities; subst; eauto.

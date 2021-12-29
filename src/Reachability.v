@@ -57,18 +57,17 @@ Notation "σ ⊫ L : 'hot'" := (forall l, (l ∈ L) -> reachable_hot σ l) (at l
 (** A usefull rewrite *)
 Ltac rch_singleton :=
   repeat match goal with
-  | H: ?s ⊫ (Singleton Loc ?l1) ⇝ ?l2 |- _ =>
+  | H: (reachability_set ?s (Singleton Loc ?l1) ?l2) |- _ =>
     let freshH := fresh "H" in
     unfold reachability_set in H;
     destruct H as [l' [freshH H] ]; induction freshH
   end.
 
-
 (** *** Basic results *)
 (** Rechable locations from a hot location lead to other hot locations *)
 Lemma reachability_hot:
   forall σ l l',
-    (σ ⊨ l: hot) ->
+    σ ⊨ l : hot ->
     σ ⊨ l ⇝ l' ->
     σ ⊨ l': hot.
 Proof.
@@ -441,38 +440,6 @@ Proof.
   + exists p2, p1; split; eauto.
 Qed.
 
-(** When adding a empty object, no path can go through it: *)
-Lemma reachability_not_empty:
-  forall σ C l, l < dom σ -> (σ++[(C, [])]) ⊨ (length σ) ⇝ l -> False .
-Proof.
-  intros.
-  apply reachability_first_step in H0; steps; try lia.
-  unfold reachable_one_step in *; steps.
-  rewrite_anywhere getObj_last; invert_constructor_equalities; destruct f; steps.
-Qed.
-
-(** Extension of the previous result: a path in a store with a new empty object already existed in the store without it: *)
-Lemma reachability_empty:
-  forall σ C L l, l < dom σ ->((σ++[(C, [])]) ⊫ L ⇝ l) -> (σ ⊫ L ⇝ l).
-Proof.
-  intros.
-  inversion H0 as [l1 [Hl1 Hrch]].
-  exists l1; split => //.
-  apply reachable_path_reachability in Hrch as [Hrch | [p Hrch]].
-  + steps; eauto with rch.
-  + clear Hl1 H0. generalize dependent l. generalize dependent l1.
-    induction p; intros.
-    ++ steps; unfold reachable_one_step in *; steps.
-       repeat rewrite_anywhere dom_app.
-       eapply getObj_last_empty in H2; eauto; steps.
-       eapply rch_trans with l1; eauto using getObj_dom with rch.
-    ++ move: (app_cons_not_nil p nil l1) => Hp.
-       simpl in Hrch. destruct (p ++ [l1]) eqn:P; [exfalso; eauto |]. light.
-       unfold reachable_one_step in H0.
-       move: H0 => [C' [ω' [f [Hobja [ Hval Hdom]]]]] .
-       pose proof (getObj_last_empty _ _ _ _ _ _ _ Hobja Hval) as [Hobj Hl1].
-       light. eauto with rch.
-Qed.
 
 (** *** Technical results *)
 Lemma reachability_weaken_assignment :

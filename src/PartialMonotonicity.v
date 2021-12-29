@@ -17,21 +17,24 @@ Notation "σ ⊨ l : f" := (initializedFields σ l f) (at level 80, l at level 9
 
 Definition partialMonotonicity σ σ' :=
   forall l f, (σ ⊨ l : f) -> (σ' ⊨ l : f).
-Notation "σ ⪯ σ'" := (partialMonotonicity σ σ') (at level 80).
+Notation "σ ⪯ σ'" := (partialMonotonicity σ σ') (at level 0).
 #[global] Hint Unfold partialMonotonicity: pM.
 
 
 (** ** Basic results *)
 (** The relation is trivially reflexive *)
-Lemma pM_refl:
-  forall σ, σ ⪯ σ.
+Lemma pM_refl: forall σ,
+    σ ⪯ σ.
 Proof.
   auto with pM.
 Qed.
 #[global] Hint Resolve pM_refl: pM.
 
 (** The relation is trivially transitive *)
-Lemma pM_trans : forall σ1 σ2 σ3, (σ1 ⪯ σ2) -> (σ2 ⪯ σ3) -> (σ1 ⪯ σ3).
+Lemma pM_trans : forall σ1 σ2 σ3,
+    σ1 ⪯ σ2 ->
+    σ2 ⪯ σ3 ->
+    σ1 ⪯ σ3.
 Proof.
   auto with pM.
 Qed.
@@ -102,7 +105,7 @@ Global Hint Resolve pM_assignment: pM.
 
 Lemma pM_freshness :
   forall σ c ρ,
-    σ ⪯ σ ++ [(c, ρ)].
+    σ ⪯ (σ ++ [(c, ρ)]).
 Proof.
   unfold partialMonotonicity, initializedFields.
   induction σ ; destruct l => //.
