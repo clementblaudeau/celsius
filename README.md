@@ -11,7 +11,7 @@ This repo contains the Coq formalization of the language and results. The main t
 
 ## Build
 
-To build the coq project, you'll need `coq` ( >= 4.12). From the top-level directory, run :
+To build the coq project, you'll need `coq` ( >= 8.14). From the top-level directory, run :
 ```sh
 make Makefile.coq
 make
