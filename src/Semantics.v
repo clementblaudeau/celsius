@@ -2,15 +2,15 @@
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** This file defines the evaluator as a predicate and shows the equivalence with the functional version *)
 
-From Celsius Require Export Trees LibTactics.
+From Celsius Require Export Language Notations Helpers LibTactics.
 Require Import ssreflect ssrbool.
-Require Import List Psatz Arith.
+Import List Psatz Arith.
 Import ListNotations.
 Open Scope nat_scope.
 
+(* Notation only used for the definition *)
 Reserved Notation "'⟦'  e  '⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' v0 ',' σ0 ')'" (at level 80).
 Reserved Notation "'⟦_' e '_⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' vl ',' σl ')'" (at level 80).
-
 Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
 | e_var : forall σ x ρ ψ l,
     getVal ρ x = Some l ->
@@ -61,6 +61,13 @@ with initP : list Field -> Var -> Env -> Store -> Store -> Prop :=
     assign_new I v σ1 = Some σ2 ->
     initP flds I ρ σ2 σ3 ->
     initP (field T e :: flds) I ρ σ σ3.
+
+
+Global Instance notation_big_step_list_expr : notation_big_step (list Expr) (list Value) :=
+  { big_step_ := evalListP }.
+
+Global Instance notation_big_step_expr : notation_big_step Expr Value :=
+  { big_step_ := evalP }.
 
 Section evalP_ind.
   Variable P : forall e σ ρ ψ v σ', (evalP e σ ρ ψ v σ') -> Prop.
@@ -152,5 +159,3 @@ Section evalP_ind.
 
 
 End evalP_ind.
-
-Check evalP_ind2.

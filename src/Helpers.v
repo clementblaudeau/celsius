@@ -1,103 +1,18 @@
-(* Celsius project *)
-(* Clément Blaudeau - Lamp@EPFL 2021 *)
-(** This file defines all the basic structures (as inductive types) of the project. Then some tools (for updating envs) are provided. *)
-From Celsius Require Export Tactics.
-Require Import ssreflect ssrbool Sets.Ensembles Coq.Lists.List Coq.Lists.ListSet Psatz.
-Require Import Coq.Arith.EqNat.
-Open Scope nat_scope.
-Import ListNotations.
-Open Scope bool_scope.
-
-(** * Language structures *)
-
-(** ** Basic types *)
-Definition Var : Type := nat.
-Definition Mtd : Type := nat.
-Definition ClN : Type := nat.
-Definition Loc : Type := nat.
-
-Lemma Var_dec : forall (x y: Var), {x = y} + {x <> y}.
-Proof.
-  decide equality.
-Qed.
-
-
-(** ** Expression constructors *)
-
-Inductive Expr: Type :=
-| var   : Var -> Expr
-| this
-| fld   : Expr -> Var -> Expr
-| mtd   : Expr -> Mtd -> (list Expr) -> Expr
-| new   : ClN -> (list Expr) -> Expr
-| asgn  : Expr -> Var -> Expr -> Expr -> Expr.
-
-Fixpoint Expr_eq_dec (e1 e2: Expr) : {e1 = e2} + {e1 <> e2}.
-Proof.
-  decide equality; decide equality.
-Defined.
-
-Definition expr_eqb e1 e2 := if (Expr_eq_dec e1 e2) then true else false.
-
-Lemma expr_eq_dec: forall (e1 e2: Expr), {e1 = e2} + {e1 <> e2}.
-Proof.
-  intros.
-  destruct (Expr_eq_dec e1 e2); steps.
-Qed.
-
-Inductive Mode: Type :=
-| hot
-| warm
-| cool : nat -> Mode
-| cold.
-Notation "'@' u " := (u:Mode) (at level 20).
-
-Definition Tpe : Type := ClN * Mode.
-
-Inductive Field: Type :=
-| field(type: Tpe)(expr: Expr).
-
-Inductive Method: Type :=
-| method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
-
-Inductive Class: Type :=
-| class(args: list Tpe)(fields: list Field)(methods: Mtd -> (option Method)).
-
-Inductive Program: Type :=
-| program(C: list Class)(entry: Expr).
-
-
-(** ** Constructs *)
-Definition Value : Type := Loc.
-Definition ClassTable: Type := (ClN -> option Class).
-Definition Env: Type   := list Value.
-Definition Obj: Type   := (ClN * Env).
-Definition Store: Type := list Obj.
-
-Definition LocSet := (Ensemble Loc).
-Notation "l ∈ L" := (Ensembles.In Loc L l) (at level 80).
-Notation "L ⊆ L'" := (Included Loc L L') (at level 80).
-Notation "L ∪ L'" := (Union Loc L L') (at level 80, L' at next level).
-Notation "{ l }" := (Singleton Loc l) (at level 0, l at level 99).
-Notation "L ∪ { l }" := (Union Loc L (Singleton Loc l)) (at level 80).
-Notation "{ l } ∪ L" := (Union Loc (Singleton Loc l) L) (at level 80).
-
-(** ** Global Parameters *)
-
-Parameter Ξ: list Class.
-Parameter entry: ClN.
-Definition ct: ClassTable := nth_error Ξ.
-Definition main: Mtd := 0.
+From Celsius Require Import Language Notations Tactics.
+Import List ListNotations Psatz Ensembles.
+Require Import ssreflect ssrbool.
+Open Scope list_scope.
 
 (** ** Helper functions *)
-Notation "'dom' x" := (length x) (at level 0, x at level 1).
-Definition getObj (l : list Obj)   := nth_error l.
-Definition getVal (l : list Value) := nth_error l.
+Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
+Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
+Definition getType (Σ: StoreTyping) : Loc -> option Tpe := nth_error Σ.
 
 Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
   match l with
   | [] => []
-  | ((v, t) :: l') => (v::(removeTypes l')) end.
+  | ((v, t) :: l') => (v::(removeTypes l'))
+  end.
 
 Fixpoint update_one {X : Type} (position : nat) (value : X)(l : list X) : list X :=
   match (l, position) with
@@ -135,6 +50,28 @@ Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : S
   | None => σ
   end.
 
+Definition fieldType C f :=
+  match ct C with
+  | None => None
+  | Some (class _ flds _ ) =>
+    match nth_error flds f with
+    | Some (field (T, μ) _) => Some (T, μ)
+    | _ => None
+    end
+  end.
+
+Definition methodInfo C m :=
+  match ct C with
+  | None => None
+  | Some (class _ _ methods) =>
+    match methods m with
+    | None => None
+    | Some (method μ Ts retT e) => Some (μ, Ts, retT, e)
+    end
+  end.
+
+
+
 (** ** Basic results on helper functions *)
 (** We then have multiple easy results on those helper functions *)
 Lemma getObj_last :
@@ -156,7 +93,7 @@ Proof.
 Qed.
 
 Lemma getObj_last_empty :
-  forall σ C C' ω l f v,
+  forall (σ: Store) C C' ω l f v,
     getObj (σ++[(C,[])]) l = Some (C', ω) ->
     getVal ω f = Some v ->
     getObj σ l = Some (C', ω) /\ l < dom σ.
@@ -224,7 +161,7 @@ Proof.
     rewrite update_one3 in H0; apply H0.
     rewrite H. discriminate.
   }
-  rewrite update_one1 in H; eauto. injection H => //.
+  rewrite update_one1 in H; eauto.
 Qed.
 
 Lemma dom_app:

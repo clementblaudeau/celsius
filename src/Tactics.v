@@ -9,6 +9,7 @@ Require Import Coq.Program.Tactics.
 Open Scope string.
 
 
+Global Hint Extern 1 => congruence: core.
 Global Hint Extern 50 => lia: lia.
 Global Hint Extern 50 => cbn: cbn.
 Global Hint Extern 50 => cbn; intuition auto: cbn_intuition.
@@ -58,8 +59,10 @@ Ltac flatten :=
          | H : _ /\ _ |- _ => let fresh1 := fresh H in
                            let fresh2 := fresh H in destruct H as [fresh1 fresh2]
          | H : exists a, _  |- _ => let fresh_a := fresh a in destruct H as [fresh_a H]
-         end.
+         end || invert_constructor_equalities.
 
+Ltac ground :=
+  repeat destruct_match || flatten.
 
 Ltac light :=
   (intros) ||

@@ -2,7 +2,7 @@
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** This file defines the big-step evaluator of the language (with fuel). It is then shown equivalent to the predicate version *)
 
-From Celsius Require Export EvalP.
+From Celsius Require Export Semantics Tactics.
 Require Import ssreflect ssrbool.
 Require Import List Psatz Arith.
 Import ListNotations.

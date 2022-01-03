@@ -1,31 +1,10 @@
-From Celsius Require Export Trees.
+From Celsius Require Export Language Notations Helpers.
 Require Import List ListSet.
 Open Scope nat_scope.
 Import ListNotations.
 
-Definition fieldType C f :=
-  match ct C with
-  | None => None
-  | Some (class _ flds _ ) =>
-    match nth_error flds f with
-    | Some (field (T, μ) _) => Some (T, μ)
-    | _ => None
-    end
-  end.
-
-Definition methodInfo C m :=
-  match ct C with
-  | None => None
-  | Some (class _ _ methods) =>
-    match methods m with
-    | None => None
-    | Some (method μ Ts retT e) => Some (μ, Ts, retT, e)
-    end
-  end.
-
 
 (* Mode lattice *)
-Reserved Notation "m1 ⊑ m2" (at level 40).
 Inductive S_Mode: Mode -> Mode -> Prop :=
 | s_mode_refl : forall μ, μ ⊑ μ
 | s_mode_hot: forall μ, hot ⊑ μ
@@ -47,7 +26,6 @@ Global Hint Resolve s_mode_trans: typ.
 
 
 (* Subtyping *)
-Reserved Notation "T1 <: T2" (at level 40).
 
 Inductive S_Typ : Tpe -> Tpe -> Prop :=
 | s_typ_mode (C: ClN) μ1 μ2: μ1 ⊑ μ2 -> (C, μ1) <: (C, μ2)
@@ -92,100 +70,98 @@ Qed.
 
 (** ** Expression Typing *)
 
-Definition Env := list (Tpe).
-Reserved Notation "'[' Γ ',' T '⊢' e ':' U ']'" (at level 60, Γ at level 60, e at level 60).
-Reserved Notation "'[_' Γ ',' T '⊢' es ':' Us '_]'" (at level 60, Γ at level 60, es at level 60).
+
 (** e can have the type U with env Γ and `this` of type T *)
-Inductive T_Expr : Env -> Tpe -> Expr -> Tpe -> Prop :=
+Inductive T_Expr : StoreTyping -> Tpe -> Expr -> Tpe -> Prop :=
 | t_sub:
     forall Γ T e U U',
-      [Γ, T ⊢ e : U'] ->
+      (Γ, T) ⊢ e : U' ->
       (U' <: U) ->
-      [Γ, T ⊢ e : U]
+      (Γ, T) ⊢ e : U
 
 | t_var:
     forall Γ T x U,
       nth_error Γ x = Some U ->
-      [Γ, T ⊢ (var x) : U]
+      (Γ, T) ⊢ (var x) : U
 
 | t_this:
     forall Γ T,
-      [Γ, T ⊢ this : T]
+      (Γ, T) ⊢ this : T
 
 | t_selhot:
     forall Γ T e f C D μ,
-      [Γ, T ⊢ e : (D, hot)] ->
+      (Γ, T) ⊢ e : (D, hot) ->
       (fieldType D f = Some (C, μ)) ->
-      [Γ, T ⊢ (fld e f) : (C, hot)]
+      (Γ, T) ⊢ (fld e f) : (C, hot)
 
 | t_selwarm:
     forall Γ T e f U D,
-      [Γ, T ⊢ e : (D, warm)] ->
+      (Γ, T) ⊢ e : (D, warm) ->
       (fieldType D f = Some U) ->
-      [Γ, T ⊢ (fld e f) : U]
+      (Γ, T) ⊢ (fld e f) : U
 
 | t_selcool:
     forall Γ T e f U D Ω,
-      [Γ, T ⊢ e : (D, cool Ω)] ->
+      (Γ, T) ⊢ e : (D, cool Ω) ->
       f <= Ω ->
       (fieldType D f = Some U) ->
-      [Γ, T ⊢ (fld e f) : U]
+      (Γ, T) ⊢ (fld e f) : U
 
 | t_new:
     forall Γ T C args paramTs fields methods,
       ct C = Some (class paramTs fields methods) ->
-      [_ Γ, T ⊢ args : paramTs _] ->
-      [Γ, T ⊢ (new C args) : (C, warm)]
+      (Γ, T) ⊩ args : paramTs ->
+      (Γ, T) ⊢ (new C args) : (C, warm)
 
 | t_new_hot:
     forall Γ T C args argsTs paramTs fields methods,
       ct C = Some (class paramTs fields methods) ->
-      [_ Γ, T ⊢ args : argsTs _] ->
+      (Γ, T) ⊩ args : argsTs ->
       P_hots argsTs ->
       S_Typs argsTs paramTs ->
-      [Γ, T ⊢ (new C args) : (C, hot)]
+      (Γ, T) ⊢ (new C args) : (C, hot)
 
 | t_block:
     forall Γ T U e1 f e2 e3 C μ,
-      [Γ, T ⊢ (fld e1 f) : (C, μ)] ->
-      [Γ, T ⊢ e2 : (C, hot)] ->
-      [Γ, T ⊢ e3 : U] ->
-      [Γ, T ⊢ (asgn e1 f e2 e3) : U]
+      (Γ, T) ⊢ (fld e1 f) : (C, μ) ->
+      (Γ, T) ⊢ e2 : (C, hot) ->
+      (Γ, T) ⊢ e3 : U ->
+      (Γ, T) ⊢ (asgn e1 f e2 e3) : U
 
 | t_call:
     forall Γ T e m args paramTs retT body μ0 μ_m C,
-      [Γ, T ⊢ e : (C, μ0)] ->
+      (Γ, T) ⊢ e : (C, μ0) ->
       μ0 ⊑ μ_m ->
       methodInfo C m = Some (μ_m, paramTs, retT, body) ->
-      [_ Γ, T ⊢ args : paramTs _] ->
-      [Γ, T ⊢ (mtd e m args) : retT]
+      (Γ, T) ⊩ args : paramTs ->
+      (Γ, T) ⊢ (mtd e m args) : retT
 
 | t_call_hot:
     forall Γ T e m args argTs paramTs D body μ0 μ_r C,
-      [Γ, T ⊢ e : (C, hot)] ->
+      (Γ, T) ⊢ e : (C, hot) ->
       (C, hot) <: (C, μ0) ->
       methodInfo C m = Some (μ0, paramTs, (D, μ_r), body) ->
-      [_ Γ, T ⊢ args : argTs _] ->
+      (Γ, T) ⊩ args : argTs ->
       P_hots argTs ->
       S_Typs argTs paramTs ->
-      [Γ, T ⊢ (mtd e m args) : (D, hot)]
-where  "'[' Γ ',' T '⊢' e ':' U ']'" := (T_Expr Γ T e U)
+      (Γ, T) ⊢ (mtd e m args) : (D, hot)
+where  "( Γ , T )  ⊢ e : U" := (T_Expr Γ T e U)
 
-with T_Exprs: Env -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
+with T_Exprs: StoreTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
 | t_exprs_nil: forall Γ T, T_Exprs Γ T [] []
 | t_exprs_cons: forall Γ T Ts es Th eh,
-    T_Exprs Γ T es Ts ->
-    [Γ, T ⊢ eh : Th] ->
-    T_Exprs Γ T (eh::es) (Th::Ts)
-where  "'[_' Γ ',' T '⊢' es ':' Us '_]'" := (T_Exprs Γ T es Us).
+    (Γ, T) ⊩ es : Ts ->
+    (Γ, T) ⊢ eh : Th ->
+    (Γ, T) ⊩ (eh::es) : (Th::Ts)
+where  "( Γ , T )  ⊩ es : Us" := (T_Exprs Γ T es Us).
 
 (** ** Field typing *)
-Definition T_Field (Γ:Env) T f :=
+Definition T_Field (Γ:StoreTyping) T f :=
   match f with
-  | field U e => [(nil:Env), T ⊢ e : U]
+  | field U e => ((nil:StoreTyping), T) ⊢ e : U
   end.
 
-Inductive T_Fields: Env -> Tpe -> (list Field) -> Prop :=
+Inductive T_Fields: StoreTyping -> Tpe -> (list Field) -> Prop :=
 | t_fields_nil: forall Γ T, T_Fields Γ T []
 | f_fields_cool_cons: forall Γ C Ω f fs,
     T_Field Γ (C, cool Ω) f ->
@@ -195,7 +171,7 @@ Inductive T_Fields: Env -> Tpe -> (list Field) -> Prop :=
 (** ** Method typing *)
 Definition T_Method C m :=
   match m with
-  | method μ argTs retT body => [ argTs, (C, μ) ⊢ body : retT]
+  | method μ argTs retT body => (argTs, (C, μ)) ⊢ body : retT
   end.
 Definition T_Methods C (methods: Mtd -> option Method) :=
   forall id m, methods id = Some m -> T_Method C m.
@@ -218,6 +194,6 @@ Definition T_Prog :=
   match (ct entry) with
   | Some (class nil nil methods) =>
     exists e T, methods main = Some (method hot nil T e) /\
-    [nil, (entry, hot) ⊢ e : T] /\ T_Classes Ξ 0
+    ((nil, (entry, hot)) ⊢ e : T) /\ T_Classes Ξ 0
   | _ => False
   end.
