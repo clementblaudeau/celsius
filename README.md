@@ -18,36 +18,31 @@ make
 ```
 
 ## Project structure
+The project has three main parts:
+1. **Basics**: Language definition, helpers, notations (in the files `Language.v`, `Helpers.v` and `Notations.v`). The big-step semantics are given in `Semantics.v`. A step-indexed evaluator is also defined and shown equivalent to the semantics in `Eval.v`. The typing rules are given in `Typing.v`. 
+2. **Local reasoning**: The properties of the state of memory (named a `Store`) during initialization are defined and studied in `Compatibility.v`, `Wellformedness.v`, `PartialMonotonicity.v`, `Stackability.v` and `Scopatibility.v`. They all converge to the *local reasoning* theorem in `LocalReasoning.v`. More details below.
+3. **Typing**: The properties of the *abstract* state of memory (named a `StoreTyping`) used for typing are defined in `TypingDefinitions.v`. They are used to show the soundness of typing (yet to be proven).
 
-### Trees.v
+## Local reasoning
 
-Contains the inductive definition of the language and other structures used:
+### Reachability : `σ ⊨ l ⇝ l'`
+Defines the reachability relationship. A location `l'` is reachable from `l` in a store `σ` if either `l = l'` or, by hoping from pointers to pointers we can go from `l` to `l'`.
 
-- `Expr`: language expressions
-- `Method`, `Field`, `Class`, `Program`: Constructors of language structures
-- `Result` : result type for the evaluator
-
-### Eval.v
-
-Defines the evaluator and helpers
-
-### Reachability.v
-
-Defines the reachability relationship. A location `l2` is reachable from `l1` in a store `s` if either `l2 = l1` or, by hoping from pointers to pointers we can go from `l1` to `l2`.
-
-### Compatibility.v
-
+### Compatibility : `σ ⪨ σ'`
 Defines the compatibility relationship. Store are _compatible_ if they have the same objects at the same locations, regardless of the local environments.
 The evaluator's initial and result stores are compatible (`compatibility_theorem`).
 
-### PartialMonotonicity.v
+### PartialMonotonicity : `σ ⪯ σ'`
+Defines the partial monotonicity relationship. Store `σ` and `σ'` are in a _partial monotonicity_ relationship if `σ'` has more fields in every local environments associated with a stored object. The evaluator's initial and result stores are in a partial monotonicity relationship (`pM_theorem`).
 
-Defines the partial monotonicity relationship. Store `s1` and `s2` are in a _partial monotonicity_ relationship if `s2` has more elements in every local environments associated with a stored object. The evaluator's initial and result stores are in a partial monotonicity relationship (`partialMonotonicity_theorem`).
+### Stackability : `σ ≪ σ'`
+Defines the stackability relationship. Stores `σ` and `σ'` are _stackable_ if all objects that are in `σ'` are either `warm` (all fields initialized), or were already in `σ`. The evaluator's initial and result stores are stackable (`stk_theorem`).
 
-### Stackability.v
+### Wellformedness : `wf σ`
+A wellformed store `σ` contains only locations that are within the store.
 
-Defines the stackability relationship. Stores `s1` and `s2` are _stackable_ if all objects that are in `s2` and not in `s1` are `warm` (all fields initialized). The evaluator's initial and result stores are stackable (`stackability_theorem`).
+### Scopability: `(σ, L)  ⋖  (σ', L')`
+A more suble relation that allows to control the set of reachable locations. A set of location `L` and a store `σ` are scoping another set `L'` and store `σ` if all the locations reachable in `σ'` from a point in `L'` are also reachable from `L` in `σ`. This allows us to control what objects can be reached during initialization.
 
-### Scopability.v
-
-By far the most involved file. A set of location `L1` and a store `s1` are scoping another set `L2` and store `s2` if all the locations reachable in `s2` from a point in `L2` are also reachable from `L1` in `s1`.
+### Local reasoning
+All the previous properties are used to show that when initializing an object, we get an object with fields that are all initialized and pointing towards fully initialized objects (an hot object). This is a key property of the semantics.
