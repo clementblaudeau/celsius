@@ -72,7 +72,7 @@ Qed.
 
 
 (** e can have the type U with env Γ and `this` of type T *)
-Inductive T_Expr : StoreTyping -> Tpe -> Expr -> Tpe -> Prop :=
+Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
 | t_sub:
     forall Γ T e U U',
       (Γ, T) ⊢ e : U' ->
@@ -81,7 +81,7 @@ Inductive T_Expr : StoreTyping -> Tpe -> Expr -> Tpe -> Prop :=
 
 | t_var:
     forall Γ T x U,
-      nth_error Γ x = Some U ->
+      typeLookup Γ x = Some U ->
       (Γ, T) ⊢ (var x) : U
 
 | t_this:
@@ -147,7 +147,7 @@ Inductive T_Expr : StoreTyping -> Tpe -> Expr -> Tpe -> Prop :=
       (Γ, T) ⊢ (mtd e m args) : (D, hot)
 where  "( Γ , T )  ⊢ e : U" := (T_Expr Γ T e U)
 
-with T_Exprs: StoreTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
+with T_Exprs: EnvTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
 | t_exprs_nil: forall Γ T, T_Exprs Γ T [] []
 | t_exprs_cons: forall Γ T Ts es Th eh,
     (Γ, T) ⊩ es : Ts ->
@@ -156,12 +156,12 @@ with T_Exprs: StoreTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
 where  "( Γ , T )  ⊩ es : Us" := (T_Exprs Γ T es Us).
 
 (** ** Field typing *)
-Definition T_Field (Γ:StoreTyping) T f :=
+Definition T_Field (Γ:EnvTyping) T f :=
   match f with
-  | field U e => ((nil:StoreTyping), T) ⊢ e : U
+  | field U e => ((nil:EnvTyping), T) ⊢ e : U
   end.
 
-Inductive T_Fields: StoreTyping -> Tpe -> (list Field) -> Prop :=
+Inductive T_Fields: EnvTyping -> Tpe -> (list Field) -> Prop :=
 | t_fields_nil: forall Γ T, T_Fields Γ T []
 | f_fields_cool_cons: forall Γ C Ω f fs,
     T_Field Γ (C, cool Ω) f ->

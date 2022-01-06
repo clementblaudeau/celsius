@@ -2,6 +2,10 @@ From Celsius Require Import Language.
 Import List Ensembles.
 
 (** ** Overloaded notations *)
+Class notation_dash (A B: Type) :=
+  dash_ : A -> B -> Prop.
+Notation "s ⊨ x" := (dash_ s x ) (at level 60, x at level 98).
+
 Class notation_dash_colon (A B C: Type) :=
   dash_colon_ : A -> B -> C -> Prop.
 Notation "s ⊨ x : y" := (dash_colon_ s x y) (at level 60, x at level 98, y at level 98).
@@ -18,7 +22,7 @@ Class notation_big_step (A B : Type) :=
   big_step_ : A -> Store -> Env -> Value -> B -> Store -> Prop.
 Notation "'⟦' x '⟧' '(' σ ',' ρ ',' ψ ')'  '-->'  '(' y ',' σ' ')'" := (big_step_ x σ ρ ψ y σ') (at level 80).
 
-
+Global Hint Unfold dash_: notations.
 Global Hint Unfold dash_arrow_: notations.
 Global Hint Unfold dash_colon_: notations.
 Global Hint Unfold stackability_: notations.
@@ -28,7 +32,6 @@ Global Hint Unfold big_step_: notations.
 (** ** Non-overloaded notations *)
 
 (** *** Store typing properties *)
-Reserved Notation "Σ ⊨ σ" (at level 60, σ at level 98).
 Reserved Notation "Σ1 ▷ Σ2" (at level 60). (* Authority *)
 Reserved Notation "Σ1 ≼ Σ2" (at level 60). (* Monotonicity *)
 

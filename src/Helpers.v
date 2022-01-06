@@ -7,6 +7,7 @@ Open Scope list_scope.
 Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
 Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
 Definition getType (Σ: StoreTyping) : Loc -> option Tpe := nth_error Σ.
+Definition typeLookup (Γ: EnvTyping): Loc -> option Tpe := nth_error Γ.
 
 Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
   match l with
@@ -294,6 +295,26 @@ Proof.
 Qed.
 
 Global Hint Resolve getObj_dom: updates.
+
+
+Lemma getType_dom:
+  forall (Σ: StoreTyping) l T,
+    getType Σ l = Some T -> l < dom Σ.
+Proof.
+  intros.
+  apply nth_error_Some.
+  unfold getType in *; eauto.
+Qed.
+
+Lemma getVal_dom:
+  forall ρ f l,
+    getVal ρ f = Some l -> f < dom ρ.
+Proof.
+  intros.
+  apply nth_error_Some.
+  unfold getVal in *; eauto.
+Qed.
+
 
 (** ** Tactics *)
 (** Finally some tactics : *)

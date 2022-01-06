@@ -49,9 +49,10 @@ Inductive Program: Type :=
 Definition Value : Type := Loc.
 Definition ClassTable: Type := (ClN -> option Class).
 Definition Env: Type   := list Value.
+Definition EnvTyping: Type := list Tpe.
 Definition Obj: Type   := (ClN * Env).
 Definition Store: Type := list Obj.
-Definition StoreTyping : Type := list (Tpe).
+Definition StoreTyping : Type := list Tpe.
 
 Definition LocSet := (Ensemble Loc).
 
@@ -65,4 +66,4 @@ Definition main: Mtd := 0.
 Implicit Type σ : Store.
 Implicit Type l ψ v : Loc.
 Implicit Type L : LocSet.
-Implicit Type Σ ρ : Env.
+Implicit Type ρ : Env.

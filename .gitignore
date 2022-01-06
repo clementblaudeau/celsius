@@ -8,3 +8,5 @@
 *.vos
 .lia.cache
 \#*\#
+.vscode
+*.txt
