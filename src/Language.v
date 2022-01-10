@@ -52,7 +52,7 @@ Definition Env: Type   := list Value.
 Definition EnvTyping: Type := list Tpe.
 Definition Obj: Type   := (ClN * Env).
 Definition Store: Type := list Obj.
-Definition StoreTyping : Type := list Tpe.
+Definition StoreTyping : Type := list (Loc * Tpe).
 
 Definition LocSet := (Ensemble Loc).
 
