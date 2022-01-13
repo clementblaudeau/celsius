@@ -9,7 +9,7 @@ Open Scope list_scope.
 
 (** ** Definitions and notations *)
 (** We first define the reachability predicate between two individual locations *)
-Inductive reachability : Store -> Loc -> Loc ->Prop :=
+Inductive reachability : Store -> Loc -> Loc -> Prop :=
 | rch_heap: (**r we can access the current location *)
     forall l σ,
       l < dom σ ->
@@ -29,6 +29,7 @@ Inductive reachability : Store -> Loc -> Loc ->Prop :=
 Global Instance notation_reachability : notation_dash_arrow Store Loc Loc :=
   { dash_arrow_ := reachability }.
 Global Hint Unfold notation_reachability: notations.
+
 
 Lemma rch_heap_n : forall (l: Loc) (σ: Store), l < dom σ -> σ ⊨ l ⇝ l.
 Proof.
@@ -66,10 +67,10 @@ Definition reachable_cold (σ: Store) (l: Loc) :=
   (l < dom σ).
 
 Definition reachable_warm (σ: Store) (l: Loc) :=
-  (exists C ω args fields methods ,
+  (exists C ω Args Flds Mtds ,
       (getObj σ l) = Some (C, ω) /\
-        ((ct C) = Some (class args fields methods)) /\
-        (length fields <= length ω)).
+        (ct C = (class Args Flds Mtds)) /\
+        (length Flds <= length ω)).
 
 Definition reachable_hot  (σ: Store) (l: Loc) :=
   forall (l': Loc),

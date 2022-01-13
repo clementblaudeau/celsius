@@ -10,7 +10,8 @@ From Celsius Require Export Tactics.
 (** ** Basic types *)
 Definition Var : Type := nat.
 Definition Mtd : Type := nat.
-Definition ClN : Type := nat.
+Parameter ClN_count : nat.
+Definition ClN : Type := {C: nat | C < ClN_count}.
 Definition Loc : Type := nat.
 
 
@@ -47,7 +48,6 @@ Inductive Program: Type :=
 
 (** ** Constructs *)
 Definition Value : Type := Loc.
-Definition ClassTable: Type := (ClN -> option Class).
 Definition Env: Type   := list Value.
 Definition EnvTyping: Type := list Tpe.
 Definition Obj: Type   := (ClN * Env).
@@ -57,13 +57,18 @@ Definition StoreTyping : Type := list (Loc * Tpe).
 Definition LocSet := (Ensemble Loc).
 
 (** ** Global Parameters *)
-Parameter Ξ: list Class.
 Parameter entry: ClN.
-Definition ct: ClassTable := nth_error Ξ.
-Definition main: Mtd := 0.
+Parameter Ξ : {l : list Class | length l = ClN_count}.
+Definition EntryClass: {c:Class | nth_error (proj1_sig Ξ) (proj1_sig entry) = Some c}.
+Proof.
+  destruct ( nth_error (proj1_sig Ξ) (proj1_sig entry)) eqn:H.
+  - exists c; reflexivity.
+  - apply nth_error_None in H.
+    pose proof (proj2_sig entry).
+    pose proof (proj2_sig Ξ).
+    simpl in *.
+    lia.
+Qed.
 
-(** ** Implicit types *)
-Implicit Type σ : Store.
-Implicit Type l ψ v : Loc.
-Implicit Type L : LocSet.
-Implicit Type ρ : Env.
+Definition ct (C:ClN) := nth (proj1_sig C) (proj1_sig Ξ) (proj1_sig EntryClass).
+Definition main: Mtd := 0.

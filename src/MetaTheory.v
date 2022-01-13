@@ -2,7 +2,7 @@
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** Store typing *)
 
-From Celsius Require Export Typing LibTactics Tactics Reachability Wellformedness Scopability.
+From Celsius Require Export Typing LibTactics Tactics Reachability Wellformedness.
 Require Import Coq.ssr.ssreflect Coq.ssr.ssrbool Coq.Lists.List Coq.micromega.Psatz Ensembles Coq.Program.Tactics.
 (* Import ListNotations. *)
 (* Open Scope nat_scope. *)
@@ -57,17 +57,21 @@ Global Hint Unfold notation_stackability_StoreTyping : notations.
 
 (** ** Object typing **)
 Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
-| ot_hot : forall Σ C ω,
-    (forall f v, getVal ω f = Some v -> Σ ⊨ v : hot) ->
+| ot_hot : forall Σ C ω Args Flds Mtds,
+    ct C = class Args Flds Mtds ->
+    (forall f D μ,
+        f < length Flds ->
+        fieldType C f = Some (D, μ) ->
+        exists v,
+          getVal ω f = Some v /\ (Σ ⊨ v : (D, hot))) ->
     object_typing Σ (C,ω) (C, hot)
-| ot_warm : forall Σ C ω,
-    (exists args flds mtds,
-        (ct C = Some (class args flds mtds)) /\
-          (forall f, f < length flds ->
-                exists v D μ,
-                  getVal ω f = Some v ->
-                  fieldType C f = Some (D, μ) ->
-                  Σ ⊨ v : (D, μ))) ->
+| ot_warm : forall Σ C ω Args Flds Mtds,
+    ct C = class Args Flds Mtds ->
+    (forall f D μ,
+        f < length Flds ->
+        fieldType C f = Some (D, μ) ->
+        exists v,
+          getVal ω f = Some v /\ (Σ ⊨ v : (D, μ))) ->
     object_typing Σ (C,ω) (C, warm)
 | ot_cool : forall Σ C ω,
     (forall f v T μ,
@@ -114,6 +118,7 @@ Implicit Type Σ : StoreTyping.
 
 (** * Tactics *)
 Ltac meta :=
+  unfold Value, Var in *;
   repeat
     match goal with
     | H: getObj ?σ ?l = Some ?O,
@@ -150,7 +155,7 @@ Ltac meta :=
         assert (H__eq: μ = hot) by (invert H; steps); subst;
         clear H
     | H: (?C, ?μ) <: (?C', ?μ') |- _ => inverts H
-    end ; sort;
+    end ; sort; cross_rewrites;
   try lia.
 
 (** * Monotonicity results *)
@@ -199,29 +204,27 @@ Proof.
 Qed.
 Global Hint Resolve env_typing_monotonicity: typ.
 
+
 Lemma object_typing_monotonicity: forall (Σ1 Σ2: StoreTyping) (o: Obj) T,
     Σ1 ≼ Σ2 -> Σ1 ⊨ o : T -> Σ2 ⊨ o : T.
 Proof with (meta; eauto with lia typ).
   intros ...
   autounfold with notations in H0.
   inversion H0; steps.
-  - apply ot_hot.
+  - eapply ot_hot ...
     intros.
-    specialize (H3 f v); steps; eauto ...
-    inverts H2. inverts H4 ...
-    exists x, (x, hot)...
-    specialize (H v H4); steps ...
-  - apply ot_warm.
-    exists args, flds, mtds; split => //.
+    specialize (H7 f D μ H1 H2); steps ...
+    exists v ... split => //.
+    exists (D, hot)...
+    lets: H H6. steps ...
+  - eapply ot_warm ...
     intros.
-    specialize (H3 f H1); steps.
-    exists v, D, μ; steps ...
-  - apply ot_cool.
-    intros.
-    specialize (H3 f v T μ H1 H2); steps ...
-  - apply ot_cold.
-    intros.
-    specialize (H3 f v T μ H1 H2); steps ...
+    specialize (H7 f D μ H1 H2); steps ...
+    exists v; steps ...
+    lets: H H6. steps ...
+    exists (D, μ1) ...
+  - apply ot_cool ...
+  - apply ot_cold ...
 Qed.
 Global Hint Resolve object_typing_monotonicity: typ.
 
@@ -269,8 +272,8 @@ Qed.
 
 Lemma env_regularity: forall Γ Σ ρ x U T,
     (Γ, Σ) ⊨ ρ ->
-    (Γ, U) ⊢ (var x) : T ->
-                       exists l, getVal ρ x = Some l /\ Σ ⊨ l : T.
+    ((Γ, U) ⊢ (var x) : T) ->
+    exists l, getVal ρ x = Some l /\ Σ ⊨ l : T.
 Proof.
   intros ...
   remember (var x) as e.
@@ -286,17 +289,23 @@ Proof.
 Qed.
 
 Lemma hot_transitivity : forall (Σ: StoreTyping) (σ: Store) l l',
-    Σ ⊨ l : hot ->
-            Σ ⊨ σ ->
-            σ ⊨ l ⇝ l' ->
-            Σ ⊨ l' : hot.
+    wf σ ->
+    (Σ ⊨ l : hot) ->
+    (Σ ⊨ σ) ->
+    (σ ⊨ l ⇝ l') ->
+    (Σ ⊨ l' : hot).
 Proof with (meta; eauto with lia typ).
   intros.
   gen Σ.
-  induction H1; steps ...
-  specialize (H3 l0) as [ ] ...
+  induction H2; steps ...
+  specialize (H4 l0) as [ ] ...
   steps ...
-  inverts H8; steps ...
+  inverts H10; steps ...
+  lets [? _]: H H8.
+  lets: H6 H11.
+  lets [?C [?μ ?]]: fieldType_exists f H11 ...
+  lets [?v [ ]]: H12 H9 ...
+  exists C...
 Qed.
 
 
@@ -355,13 +364,69 @@ Global Hint Resolve stk_st_trans : typ.
 
 (** ** Selection results *)
 Lemma hot_selection : forall Σ σ (l: Loc) C ω,
+    wf σ ->
     Σ ⊨ σ ->
     (Σ ⊨ l : (C, hot)) ->
     getObj σ l = Some (C, ω) ->
     (forall f D μ, fieldType C f = Some (D, μ) ->
-              exists v, getVal ω f = Some v ->
+              exists v, getVal ω f = Some v /\
                    Σ ⊨ v : (D, hot)).
-Proof with (meta; eauto with typ).
+Proof with (meta; eauto with typ lia).
   intros ...
-  specialize (H l); steps ...
-  inverts H6...
+  lets [ ]: H0 l ... steps ...
+  inverts H8.
+  lets [? _]: H H6.
+  lets: H2 H9.
+  lets [? [ ] ]: H10 f H3...
+Qed.
+
+Lemma warm_selection : forall Σ σ (l: Loc) C ω f T,
+    Σ ⊨ σ ->
+    (Σ ⊨ l : (C, warm)) ->
+    getObj σ l = Some (C, ω) ->
+    fieldType C f = Some T ->
+    exists v, getVal ω f = Some v /\ Σ ⊨ v : T.
+Proof with (meta; eauto with typ lia).
+  intros ...
+  lets [ ]: H l ... steps ...
+  inverts H6.
+  - inverts H8.
+    lets [?v [ ] ] : H9 H2 ...
+  - inverts H8.
+    lets [?v [ ] ] : H9 H2 ...
+    exists v; split ...
+    eapply vt_sub ...
+Qed.
+
+Lemma cool_selection : forall Σ σ C (l: Loc) Ω ω f T,
+    Σ ⊨ σ ->
+    (Σ ⊨ l : (C, cool Ω)) ->
+    getObj σ l = Some (C, ω) ->
+    fieldType C f = Some T ->
+    f < Ω ->
+    exists v, getVal ω f = Some v /\ Σ ⊨ v : T.
+Proof with (meta; eauto with typ lia).
+  intros ...
+  lets [ ]: H l ... steps ...
+  inverts H9 ...
+  - lets [?v [ ] ] : H12 H2 ...
+    exists v; split ...
+    eapply vt_sub ...
+  - inversion H7; subst.
+    + destruct (getVal ω f) eqn:?; try split ...
+      apply nth_error_None in Heqo ...
+    + destruct (getVal ω f) eqn:?; try split ...
+      apply nth_error_None in Heqo ...
+  - invert H7.
+Qed.
+
+
+(* (** ** Initialization results *) *)
+(* Lemma field_initialization: forall Σ σ l l' C Ω ω T, *)
+(*     Σ ⊨ σ -> *)
+(*     getType Σ l = Some (C, cool Ω) *)
+(*     getObj σ l = Some (C, ω) -> *)
+(*     fieldType C f = Some T -> *)
+(*     (Σ ⊨ l' : T) -> *)
+(*     let σ' := [l ↦ (C, [f ↦ l']ω)]σ in *)
+(*     let Σ' := [ ]Σ *)

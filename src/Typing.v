@@ -108,17 +108,17 @@ Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
       (Γ, T) ⊢ (fld e f) : U
 
 | t_new:
-    forall Γ T C args paramTs fields methods,
-      ct C = Some (class paramTs fields methods) ->
-      (Γ, T) ⊩ args : paramTs ->
+    forall Γ T C args Args Flds Mtds,
+      ct C = class Args Flds Mtds ->
+      (Γ, T) ⊩ args : Args ->
       (Γ, T) ⊢ (new C args) : (C, warm)
 
 | t_new_hot:
-    forall Γ T C args argsTs paramTs fields methods,
-      ct C = Some (class paramTs fields methods) ->
+    forall Γ T C args argsTs Args Flds Mtds,
+      ct C = class Args Flds Mtds ->
       (Γ, T) ⊩ args : argsTs ->
       P_hots argsTs ->
-      S_Typs argsTs paramTs ->
+      S_Typs argsTs Args ->
       (Γ, T) ⊢ (new C args) : (C, hot)
 
 | t_block:
@@ -182,18 +182,19 @@ Definition T_Class C cl :=
   | class paramTs fields methods => T_Fields paramTs (C, cold) fields /\ T_Methods C methods
   end.
 
-Fixpoint T_Classes (Ct: list Class) i :=
-  match Ct with
-  | nil => True
-  | C::Ct' => (T_Class i C) /\ (T_Classes Ct' (S i))
-  end.
 
-(** ** Program typing *)
+(* Definition T_Classes (Ct: list Class) (C: ClN) : *)
+(*   match Ct with *)
+(*   | nil => True *)
+(*   | C::Ct' => (T_Class i C) /\ (T_Classes Ct' (S (proj1_sig i))) *)
+(*   end. *)
 
-Definition T_Prog :=
-  match (ct entry) with
-  | Some (class nil nil methods) =>
-    exists e T, methods main = Some (method hot nil T e) /\
-    ((nil, (entry, hot)) ⊢ e : T) /\ T_Classes Ξ 0
-  | _ => False
-  end.
+(* (** ** Program typing *) *)
+
+(* Definition T_Prog := *)
+(*   match (ct entry) with *)
+(*   | Some (class nil nil methods) => *)
+(*     exists e T, methods main = Some (method hot nil T e) /\ *)
+(*     ((nil, (entry, hot)) ⊢ e : T) /\ T_Classes Ξ 0 *)
+(*   | _ => False *)
+(*   end. *)

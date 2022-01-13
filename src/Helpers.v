@@ -1,6 +1,6 @@
-From Celsius Require Import Language Notations Tactics.
+From Celsius Require Import Language Notations Tactics LibTactics.
 Import List ListNotations Psatz Ensembles.
-Require Import ssreflect ssrbool.
+Require Import ssreflect ssrbool Coq.Sets.Finite_sets_facts.
 Open Scope list_scope.
 
 (** ** Helper functions *)
@@ -55,8 +55,7 @@ Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : S
 
 Definition fieldType C f :=
   match ct C with
-  | None => None
-  | Some (class _ flds _ ) =>
+  | class _ flds _  =>
     match nth_error flds f with
     | Some (field (T, μ) _) => Some (T, μ)
     | _ => None
@@ -65,8 +64,7 @@ Definition fieldType C f :=
 
 Definition methodInfo C m :=
   match ct C with
-  | None => None
-  | Some (class _ _ methods) =>
+  | class _ _ methods =>
     match methods m with
     | None => None
     | Some (method μ Ts retT e) => Some (μ, Ts, retT, e)
@@ -411,8 +409,12 @@ Ltac getVal_update :=
 
 
 Ltac update_dom :=
-  repeat rewrite_anywhere update_dom;
-  repeat rewrite update_dom.
+  repeat
+    match goal with
+  | [H: context[dom (?a ++ ?b)] |- _ ] => rewrite app_length in H; simpl in H
+    end || rewrite_anywhere update_dom || rewrite update_dom || (rewrite app_length; simpl).
+
+Global Hint Extern 1 => update_dom: updates.
 
 
 Ltac inSingleton :=
@@ -420,3 +422,218 @@ Ltac inSingleton :=
   | H: ?a ∈ Singleton Loc ?b |- _ => induction H
   | H: {?x} ?y |- _ => induction H
   end.
+
+(** Store Subset results *)
+
+(** A set of locations is contained in a store: [L ⪽ σ] *)
+Definition storeSubset (σ: Store) L :=
+  forall l, l ∈ L ->
+       l < dom σ.
+
+(** The codomain of an environment is the set of locations it contains *)
+Definition codom (ρ: Env) : (LocSet) :=
+  fun l => (List.In l ρ).
+
+Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).
+Notation " a ∪ { b } " := (Union Loc a (Singleton Loc b)) (at level 80).
+
+(** ** Basic results *)
+
+Global Hint Resolve Union_intror: wf.
+Global Hint Resolve Union_introl: wf.
+Global Hint Resolve In_singleton: wf.
+
+
+Lemma storeSubset_trans :
+  forall a s s',
+    dom s <= dom s' ->
+    a ⪽ s ->
+    a ⪽ s'.
+Proof.
+  unfold storeSubset; steps.
+  eapply H0 in H1 ; lia.
+Qed.
+
+Lemma storeSubset_union :
+  forall a b s,
+    a ⪽ s ->
+    b ⪽ s ->
+    (a∪b) ⪽ s.
+Proof.
+  unfold storeSubset; intros.
+  induction H1; eauto.
+Qed.
+
+Lemma storeSubset_union_l :
+  forall a b s,
+    (a∪b) ⪽ s -> a ⪽ s.
+Proof.
+  unfold storeSubset; eauto with wf.
+Qed.
+
+Lemma storeSubset_union_r :
+  forall a b s,
+    (a∪b) ⪽ s -> b ⪽ s.
+Proof.
+  unfold storeSubset; eauto with wf.
+Qed.
+
+Lemma storeSubset_add :
+  forall v a s,
+    codom (v :: a) ⪽ s <-> v < dom s /\ codom a ⪽ s.
+Proof.
+  unfold codom, List.In, In, storeSubset in *; split.
+  + steps; eapply_any; steps; right => //.
+  + steps; move: H0 => [Hl|Hl]; steps.
+Qed.
+
+Lemma storeSubset_singleton :
+  forall a b σ,
+    a ∪ {b} ⪽ σ -> b < dom σ.
+Proof.
+  intros.
+  eapply_any; eauto with wf.
+Qed.
+
+Lemma storeSubset_singleton2 :
+  forall a σ,
+    (Singleton Loc a) ⪽ σ -> a < dom σ.
+Proof.
+  unfold storeSubset; steps.
+  induction (H a) ; steps.
+Qed.
+
+Lemma storeSubset_singleton3 :
+  forall a σ,
+    a < dom σ -> (Singleton Loc a) ⪽ σ.
+Proof.
+  unfold storeSubset; steps;
+    induction H0 ; steps.
+Qed.
+
+Lemma storeSubset_codom_empty : forall s, codom [] ⪽ s.
+Proof.
+  unfold storeSubset; steps.
+Qed.
+
+Lemma codom_empty_union: forall a, (codom [] ∪ a) = a.
+Proof.
+  intros.
+  apply Extensionality_Ensembles.
+  unfold Same_set, Included;
+    repeat steps || destruct H;
+    eauto with wf.
+Qed.
+
+Lemma codom_cons:
+  forall a ρ, codom (a::ρ) = ({a} ∪ (codom ρ)).
+Proof.
+  intros; apply Extensionality_Ensembles.
+  unfold Same_set; steps; intros l; steps; try inversion H; steps;
+    try inSingleton;
+    eauto using Union_introl, Union_intror.
+Qed.
+
+
+Lemma storeSubset_update:
+  forall L l o σ,
+    L ⪽ [l ↦ o] (σ) -> L ⪽ σ.
+Proof.
+  unfold storeSubset; steps; update_dom; eauto.
+Qed.
+
+
+Lemma getVal_codom : forall x l ρ,
+    getVal ρ x = Some l -> l ∈ codom ρ.
+Proof.
+  intros.
+  eapply nth_error_In in H. auto.
+Qed.
+
+Lemma storeSubset_finite: forall σ L,
+    L ⪽ σ ->
+    Finite Loc L.
+Proof.
+  induction σ; steps.
+  - assert (L = Empty_set Loc); subst; eauto using Empty_is_finite.
+    apply Extensionality_Ensembles.
+    unfold Same_set, Included; steps; try specialize (H x); steps; try lia.
+    inversion H0.
+  - assert ((Subtract Loc L (dom σ)) ⪽ σ).
+    + intros l; steps.
+      inverts H0.
+      specialize (H l H1). simpl in H.
+      assert (l < dom σ \/ l = dom σ) as [ ] by lia; steps.
+      exfalso. apply H2.
+      steps.
+    + apply IHσ in H0.
+      apply Finite_downward_closed with (A:= Union Loc ( (Subtract Loc L dom σ)) ({dom σ})).
+      apply Union_preserves_Finite; eauto using Singleton_is_finite.
+      intros l; steps.
+      destruct_eq (l = dom σ).
+      * apply Union_intror; steps.
+      * apply Union_introl; steps.
+        unfold Subtract, Setminus, In.
+        split; steps. apply Heq. inSingleton. steps.
+Qed.
+
+Lemma finite_sets_ind: forall {T: Type} (P: (Ensemble T) -> Prop),
+    (P (Empty_set T)) ->
+    (forall (F: Ensemble T) (a:T), Finite T F -> P F -> P (Add T F a)) ->
+    (forall (F: Ensemble T), Finite T F -> P F).
+Proof.
+  intros.
+  apply Generalized_induction_on_finite_sets; eauto.
+  intros.
+  induction H2; eauto.
+  eapply H0; eauto.
+  apply IHFinite.
+  intros.
+  apply H3.
+  unfold Strict_Included, Included, In, Add in *; steps.
+  - apply Union_introl; eauto.
+    apply H6; eauto.
+  - apply H7, Extensionality_Ensembles.
+    unfold Same_set, Included; steps.
+    apply Union_introl; eauto.
+Qed.
+
+
+
+Global Hint Resolve storeSubset_update: wf.
+Global Hint Resolve storeSubset_trans: wf.
+Global Hint Resolve storeSubset_union: wf.
+Global Hint Resolve storeSubset_union_l: wf.
+Global Hint Resolve storeSubset_add: wf.
+Global Hint Resolve storeSubset_union_r: wf.
+Global Hint Resolve storeSubset_singleton: wf.
+Global Hint Resolve storeSubset_singleton2: wf.
+Global Hint Resolve storeSubset_singleton3: wf.
+Global Hint Resolve storeSubset_codom_empty: wf.
+Global Hint Resolve getVal_codom: wf.
+Global Hint Rewrite codom_cons: wf.
+
+
+Lemma fieldType_exists: forall C Args Flds Mtds f,
+    ct C = class Args Flds Mtds ->
+    f < dom Flds ->
+    exists D μ, fieldType C f = Some (D, μ).
+Proof.
+  intros.
+  destruct (fieldType C f) as [[D μ] |] eqn:?; eauto.
+  unfold fieldType in *.
+  steps.
+  apply nth_error_None in matched0. lia.
+Qed.
+Global Hint Resolve fieldType_exists: typ.
+
+Lemma fieldType_some : forall C Args Flds Mtds f T,
+    ct C = class Args Flds Mtds ->
+    fieldType C f = Some T ->
+    f < dom Flds.
+Proof.
+  intros.
+  unfold fieldType in *. steps.
+  eapply nth_error_Some; eauto.
+Qed.
+Global Hint Resolve fieldType_some: typ.
