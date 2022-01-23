@@ -148,7 +148,16 @@ Proof with (meta; eauto with typ updates lia).
     destruct (reachability_refl σ l l'); steps.
 Qed.
 
-
+Lemma warm_filling: forall Σ σ (l: Loc),
+    wf σ ->
+    Σ ⊨ σ ->
+    (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ ⊨ l' : warm) ->
+    exists Σ',
+      (Σ' ⊨ σ) /\
+        Σ ≼ Σ' /\
+        Σ ▷ Σ' /\
+        Σ ≪ Σ' /\
+        (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ' ⊨ l' : hot).
 
 
 Lemma local_reasoning2: forall Σ1 Σ2 σ1 σ2 (L1 L2: LocSet),
@@ -163,7 +172,7 @@ Lemma local_reasoning2: forall Σ1 Σ2 σ1 σ2 (L1 L2: LocSet),
     (Σ1 ⊨ L1 : hot) ->
     wf σ1 ->
     wf σ2 ->
-    (forall l2, l2 ∈ L2 -> in_dom Σ2 l2) ->
+    (forall l', σ2 ⊨ L2 ⇝ l' -> in_dom Σ2 l') ->
     exists Σ', (Σ2 ≪ Σ') /\
             (Σ2 ≼ Σ') /\
             (Σ2 ▷ Σ') /\
@@ -180,8 +189,8 @@ Proof with (meta; eauto with typ lia).
     unfold Add in *.
     assert ((σ1, L1) ⋖ (σ2, L2)) by eauto with scp.
     pose proof (storeSubset_union_l _ _ _ H2).
-    lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps. apply H_in; eauto with wf.
-    assert (H_in':forall l2 : Loc, l2 ∈ (L2 ∪ {l}) -> in_dom Σ3 l2) ...
+    lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps. apply H_in; eauto with wf. { rch_set. exists l0; steps; eauto with wf... }
+    assert (H_in':forall l', σ2 ⊨ (L2 ∪ {l}) ⇝ l' -> in_dom Σ3 l') ...
     (* clear Σ1 H5 H6 H7 H8 H10 H1. *) clear H1.
     lets [Σ4 [ ]]: synchronization Σ3 σ2 l H17; steps...
     + assert (l' < dom σ1 \/ l' >= dom σ1) as [|] by lia.
@@ -193,8 +202,9 @@ Proof with (meta; eauto with typ lia).
         exists C, (C,hot)...
       * lets: stk_st_trans H5 H14 H16.
         specialize (H20 l') as [ ]; eauto.
-        -- admit.
+        -- apply H_in'.
+           exists l; eauto with wf...
         -- specialize (H8 l' H20); steps ... apply getObj_dom in H21. lia.
     + exists Σ4; repeat split; eauto with typ.
       intros l0 [ l2' | ]; try inSingleton; eauto with rch wf typ.
-Admitted.
+Qed.

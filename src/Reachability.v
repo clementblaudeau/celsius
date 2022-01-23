@@ -72,6 +72,12 @@ Definition reachable_warm (σ: Store) (l: Loc) :=
         (ct C = (class Args Flds Mtds)) /\
         (length Flds <= length ω)).
 
+Definition reachable_cool (σ: Store) (l: Loc) Ω :=
+  exists C ω Args Flds Mtds ,
+    getObj σ l = Some (C, ω) /\
+      ct C = (class Args Flds Mtds) /\
+      Ω <= dom ω.
+
 Definition reachable_hot  (σ: Store) (l: Loc) :=
   forall (l': Loc),
     σ ⊨ l ⇝ l' ->
@@ -83,7 +89,7 @@ Global Instance notation_reachability_mode : notation_dash_colon Store Loc Mode 
                      | cold => (reachable_cold σ l)
                      | warm => (reachable_warm σ l)
                      | hot => (reachable_hot σ l)
-                     | cool _ => False
+                     | cool Ω => reachable_cool σ l Ω
                      end
   }.
 Global Instance notation_reachability_set_mode : notation_dash_colon Store LocSet Mode :=

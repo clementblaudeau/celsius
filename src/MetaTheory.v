@@ -42,9 +42,15 @@ Global Instance notation_value_typing_ClN : notation_dash_colon StoreTyping Loc 
   { dash_colon_ := value_typing_cln }.
 Global Hint Unfold notation_value_typing_ClN: notations.
 
-Definition value_typing_locset Σ L (μ:Mode) :=
+Definition value_typing_mode_locset Σ L (μ:Mode) :=
   forall (l: Loc), (In Loc L l) -> Σ ⊨ l : μ.
-Global Instance notation_value_typing_LocSet : notation_dash_colon StoreTyping LocSet Mode :=
+Global Instance notation_value_typing_mode_LocSet : notation_dash_colon StoreTyping LocSet Mode :=
+  { dash_colon_ := value_typing_mode_locset }.
+Global Hint Unfold notation_value_typing_mode_LocSet: notations.
+
+Definition value_typing_locset (Σ:StoreTyping) (L: list Loc) (vl: list Tpe) :=
+  Forall2 (fun (l: Loc) (T:Tpe) => Σ ⊨ l : T) L vl.
+Global Instance notation_value_typing_LocSet : notation_dash_colon StoreTyping (list Loc) (list Tpe) :=
   { dash_colon_ := value_typing_locset }.
 Global Hint Unfold notation_value_typing_LocSet: notations.
 
@@ -106,8 +112,8 @@ Inductive env_typing : EnvTyping -> StoreTyping -> Env -> Prop :=
 | et_nil : forall Σ, env_typing nil Σ nil
 | et_cons : forall Γ Σ ρ l T,
     env_typing Γ Σ ρ ->
-    Σ ⊨ l : T ->
-            env_typing (T :: Γ) Σ (l :: ρ).
+    (Σ ⊨ l : T) ->
+     env_typing (T :: Γ) Σ (l :: ρ).
 Global Instance notation_env_typing: notation_dash (EnvTyping * StoreTyping) Env :=
   { dash_ := fun a b => env_typing (fst a) (snd a) b }.
 Global Hint Unfold notation_env_typing: notations.
@@ -430,3 +436,21 @@ Qed.
 (*     (Σ ⊨ l' : T) -> *)
 (*     let σ' := [l ↦ (C, [f ↦ l']ω)]σ in *)
 (*     let Σ' := [ ]Σ *)
+
+(** Env typing lemmas *)
+
+Lemma env_typing_subs: forall ρ1 ρ2 Σ vl,
+    (ρ1, Σ) ⊨ vl ->
+    S_Typs ρ1 ρ2 ->
+    (ρ2, Σ) ⊨ vl.
+Proof.
+  induction ρ1; intros.
+  - inverts H0; eauto with typ.
+  - inverts H0; meta.
+    inverts H; simpl in *.
+    eapply IHρ1 in H4; eauto.
+    eapply et_cons; simpl in *; eauto with typ.
+    meta.
+    exists (C, μ1); eauto with typ.
+Qed.
+Global Hint Resolve env_typing_subs: typ.

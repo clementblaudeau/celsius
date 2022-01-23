@@ -21,6 +21,10 @@ Inductive result_l : Type :=
 | Error_l
 | Success_l : (list Value) -> Store -> result_l.
 
+Inductive result_i : Type :=
+| Timeout_i
+| Error_i
+| Success_i : Store -> result_i.
 
 (** ** Big step evaluator (with fuel) *)
 (** We define the [eval] function along with its notations *)
@@ -51,7 +55,7 @@ Fixpoint eval e σ ρ v k :=
                         | Some v1 => Success v1 σ1
                         | _ => Error end
                     | _ => Error end
-                | _ => Error end )
+                | z => z end )
 
           (** Method call : compute object value, compute arguments and do the call*)
           | mtd e0 m el => (**r [e = e0.m(el)] *)
@@ -60,17 +64,19 @@ Fixpoint eval e σ ρ v k :=
                    ( match (getObj σ1 v0) with
                      | Some (C, _) =>
                          ( match (ct C)  with
-                           | Some (class _  _ methods) =>
-                               ( match methods m with
+                           | (class _  _ Mtds) =>
+                               ( match Mtds m with
                                  | Some (method μ x _ e1) =>
                                      ( match (⟦_ el _⟧(σ1, ρ, v)(n)) with
                                        | Success_l args_val σ2 =>
                                            let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0)(n)
-                                       | _ => Error end)
+                                       | Error_l => Error
+                                       | Timeout_l => Timeout
+                                       end)
                                  | _ => Error end)
-                           | _ => Error end)
+                           end )
                      | _ => Error end)
-               | _ => Error end)
+               | z => z end)
 
           (** New class *)
           | new C args => (**r [e = new C(args)] *)
@@ -79,12 +85,17 @@ Fixpoint eval e σ ρ v k :=
                    ( let I := (length σ1) in (* Fresh location for new object *)
                      let ρ_init := args_val in (* Local env during initialization *)
                      let σ2 := σ1 ++ [(C, [])] in (* New object with empty local env *)
-                     match (init I ρ_init C σ2 n) with
-                     | Some σ3 => (Success I σ3) (* Returns new object and updated store *)
-                     | None => Error end )
-               | _ => Error end) (* Invalid args *)
+                     let 'class Args Flds Mtds := (ct C) in
+                     match (init C Flds I ρ_init σ2 n) with
+                     | Success_i σ3 => (Success I σ3) (* Returns new object and updated store *)
+                     | Error_i => Error
+                     | Timeout_i => Timeout
+                     end )
+               | Error_l => Error
+               | Timeout_l => Timeout
+               end) (* Invalid args *)
 
-          (** Field assignement *)
+          (** Field assignment *)
           | asgn e1 x e2 e' => (**r [e = (e1.x ← e2 ; e')] *)
               (match (⟦e1⟧(σ, ρ, v)(n)) with
                | Success v1 σ1 =>
@@ -92,147 +103,80 @@ Fixpoint eval e σ ρ v k :=
                    | Success v2 σ2 =>
                        ( let σ3 := (assign v1 x v2 σ2) in
                          ⟦e'⟧(σ3, ρ, v)(n))
-                   | _ => Error end
-               | _ => Error end )
+                   | z => z end
+               | z => z end )
           end
   end
 where "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"  := (eval e σ ρ v k)
 (** Evaluation of a list of expressions (fold) *)
-with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (v: Value) (k: nat) :=
-       match k with
+with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (ψ: Value) (n: nat) :=
+       match n with
        | 0 => Timeout_l
-       | S n => fold_left (eval_list_aux ρ v n) e_l (Success_l [] σ) end
-where  "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" := (eval_list e σ ρ v k)
-with eval_list_aux (ρ: Env) (v: Value) (k: nat) acc (e: Expr) :=
-       match k with
-       | 0 => Timeout_l
-       | S n => match acc with
-               | Success_l vs σ1 =>
-                   match (⟦e⟧(σ1, ρ, v)(n)) with
-                   | Success v σ2 => Success_l (vs++[v]) σ2
-                   | Timeout => Timeout_l
+       | S n => match e_l with
+               | [] => Success_l [] σ
+               | e::e_l =>
+                   match (⟦e⟧(σ, ρ, ψ)(n)) with
+                   | Success v σ' =>
+                       match ⟦_ e_l _⟧(σ', ρ, ψ)(n) with
+                       | Success_l vl σ'' => Success_l (v::vl) σ''
+                       | z => z
+                       end
                    | Error => Error_l
+                   | Timeout => Timeout_l
                    end
-               | z => z end end
-(** Initialization of a list of fields using (fold) *)
-with init (I : Var) (args_values: list Var) (C: ClN) (σ: Store) (k :nat) : option Store :=
-       match k with | 0 => None | S n =>
-                                   match (ct C) with
-                                   | Some (class x F M) => (fold_left (init_field args_values I n) F (Some σ))
-                                   | None => None
-                                   end
+               end
        end
-with init_field (args_values: list Var) (this: Var) (k: nat) (σ_opt: option Store)  (f: Field): option Store :=
-       match k with
-       | 0 => None
-       | S n =>
-           match σ_opt with
-           | None => None
-           | Some σ =>
-               ( match f with
-                 | field t e =>
-                     ( match (⟦e⟧(σ, args_values, this)(n)) with
-                       | Success v1 σ1 => (assign_new this v1 σ1)
-                       | _ => None
-                       end)
-                 end)
-           end
+where  "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" := (eval_list e σ ρ v k)
+(** Initialization of a list of fields using (fold) *)
+with init (C: ClN) (flds: list Field) (I : Var) (ρ: list Var) (σ: Store) (n :nat) : result_i :=
+       match n with
+       | 0 => Timeout_i
+       | S n => match flds with
+               | [] => Success_i σ
+               | (field T e)::flds =>
+                   match ⟦e⟧(σ, ρ, I)(n) with
+                   | Success v σ' =>
+                       match (assign_new I v σ') with
+                       | Some σ'' => init C flds I ρ σ'' n
+                       | _ => Error_i
+                       end
+                   | Error => Error_i
+                   | Timeout => Timeout_i
+                   end
+               end
        end.
 
-
-
-(** A usefull lemma to show that folds on computations that got stuck (error or timeout) will stay stuck *)
-Lemma foldLeft_constant : forall (A B: Type) (l: list B) (res: A) (f : A -> B -> A),
-    (forall (y:B), f res y = res) -> fold_left f l res = res.
-Proof.
-  intros.
-  induction l => //.
-  simpl. rewrite H. apply IHl.
-Qed.
-
 (** Associated ltac tactics : *)
-Ltac destruct_eval :=
+Ltac destruct_eval He v σ' :=
   match goal with
-  | H: context[⟦ ?e ⟧ (?σ, ?ρ, ?ψ )( ?k)] |- _ =>
-      let fresh_H := fresh H in
-      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
-      try solve [rewrite foldLeft_constant in H => //]
-  end.
+  | H: context[ match ⟦ ?e ⟧ (?σ, ?ρ, ?ψ )(?k) with _ => _ end ] |- _ =>
+      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) as [ | | v σ' ] eqn:He
+  | H: context[ match ⟦_ ?el _⟧ (?σ, ?ρ, ?ψ )(?k) with _ => _ end ] |- _ =>
+      destruct (⟦_ el _⟧ (σ, ρ, ψ )( k)) as [ | | v σ' ] eqn:He
+  end; try congruence.
 
-Ltac destruct_eval_with_name fresh_H :=
-  match goal with
-  | H: context[⟦ ?e ⟧ (?σ, ?ρ, ?ψ )( ?k)] |- _ =>
-      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) eqn:fresh_H ;
-      try solve [rewrite foldLeft_constant in H => //]
-  end.
+Ltac destruct_eval_f :=
+  let freshH := fresh "H" in
+  let freshv := fresh "v" in
+  let freshσ := fresh "σ" in
+  destruct_eval freshH freshv freshσ.
 
 (** A simple result on lengths *)
 Lemma EvalListLength :
-  forall n el σ σ' ρ ψ l ,
+  forall el n σ σ' ρ ψ l ,
     ⟦_ el _⟧(σ, ρ, ψ)(n) = Success_l l σ' ->
     length el = length l.
 Proof.
-  destruct n; simpl; try discriminate.
-  assert
-    (forall l σ σ' ρ v v_list1 v_list2,
-        fold_left (eval_list_aux ρ v n) l (Success_l v_list1 σ) = Success_l v_list2 σ'
-        -> length l + length v_list1 = length v_list2) as H_fold.
-  + induction l as [| e l] ; steps.
-    destruct n; simpl in H ; [rewrite foldLeft_constant in H => // |].
-    destruct_eval.
-    apply IHl in H.
-    rewrite app_length in H.
-    simpl in H. lia.
-  + steps;
-    eapply_anywhere H_fold;
-    rewrite_anywhere PeanoNat.Nat.add_0_r => // .
+  induction el; steps;
+    destruct n; simpl; try discriminate.
+  - inversion H; steps.
+  - inversion H.
+    destruct_eval_f ; steps.
+    eapply IHel in matched1. steps.
 Qed.
 
 
-(** ** Evaluator step-monotonicity *)
-Lemma fold_left_app:
-  forall (n0 : nat) (ρ : Env) (ψ : Value) (σ' : Store) (el0 : list Expr)
-    (vl0 : list Value) (σ1 : Store) vl acc,
-    fold_left (eval_list_aux ρ ψ n0) el0 (Success_l vl σ1) = Success_l vl0 σ' <->
-      fold_left (eval_list_aux ρ ψ n0) el0 (Success_l (acc++vl) σ1) = Success_l (acc++vl0) σ'.
-Proof.
-  intros.
-  move: n0 σ1 σ' vl acc.
-  induction el0; split; intros.
-  + inversion H; steps.
-  + inversion H. steps.
-    eapply app_inv_head in H1. steps.
-  + inversion H; steps.
-    destruct n0; try solve [rewrite foldLeft_constant in H => //].
-    simpl in H |- *.
-    destruct_eval.
-    specialize (IHel0 (S n0) s σ' (vl++[v]) acc) as [IHel0 _].
-    rewrite app_assoc_reverse.
-    eauto.
-  + inversion H; steps.
-    destruct n0; try solve [rewrite foldLeft_constant in H => //].
-    simpl in H |- *.
-    destruct_eval.
-    specialize (IHel0 (S n0) s σ' (vl++[v]) acc) as [ ].
-    rewrite app_assoc_reverse in H.
-    eauto.
-Qed.
-
-Lemma fold_left_app_inv:
-  forall n el σ ρ ψ vl σ' acc,
-    fold_left (eval_list_aux ρ ψ n) el (Success_l acc σ) = Success_l vl σ' ->
-    exists vl', vl = acc ++ vl'.
-Proof.
-  induction el; intros; steps.
-  - exists ([]: list Value). rewrite app_nil_r => //.
-  - destruct n; try solve [rewrite foldLeft_constant in H => //].
-    simpl in H.
-    destruct_eval.
-    eapply IHel in H as [vl' H].
-    exists (v::vl').
-    rewrite -app_assoc in H => //.
-Qed.
-
+(** ** Evaluator fuel-monotonicity *)
 Lemma eval_step_monotonicity_aux: forall n,
     (forall m, m > n ->
           (forall e σ ρ ψ v σ', ⟦ e ⟧ (σ, ρ, ψ)(n) = Success v σ' ->
@@ -241,8 +185,8 @@ Lemma eval_step_monotonicity_aux: forall n,
             (forall el σ ρ ψ vl σ', ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
                                ⟦_ el _⟧ (σ, ρ, ψ)(m) = Success_l vl σ')) /\
       (forall m, m > n ->
-            (forall C σ σ' l vl, init l vl C σ n = Some σ' ->
-                            init l vl C σ m = Some σ')).
+            (forall C flds I ρ σ σ', init C flds I ρ σ n = Success_i σ' ->
+                                init C flds I ρ σ m = Success_i σ')).
 Proof with (try lia).
   induction n as [n IHn] using lt_wf_ind. destruct n.
   - repeat split; intros; inversion H0.
@@ -255,44 +199,34 @@ Proof with (try lia).
       * inversion H0; repeat destruct_match => //.
         rewrite_any.
         eapply (Hexp m) in matched, H2...
-        eapply (Hlist m) in matched6...
+        eapply (Hlist m) in matched5...
         steps.
       * inversion H0; repeat destruct_match => //.
         rewrite_any.
         eapply (Hlist m) in matched...
-        eapply (Hinit m) in matched0...
+        eapply (Hinit m) in matched1...
         steps.
       * inversion H0; repeat destruct_match => //; sort.
         rewrite_any.
         eapply (Hexp m) in matched, matched0, H2...
         steps.
     + (* lists *)
-      simpl in *. move: vl σ σ' H0.
-      set (acc := []).
-      generalize acc.
-      clear acc.
-      induction el => //. intros; simpl in *.
-      destruct n; try solve [rewrite foldLeft_constant in H0 => //]; simpl in * => //.
-      destruct m...
-      destruct_eval. destruct (IHn n) as [He _]...
-      eapply (He m) in H1...
+      simpl in *.
+      destruct el; eauto.
+      destruct_eval_f.
+      eapply (IHn n)  with (m := m) in H1; eauto with lia.
+      destruct_match; try discriminate.
+      destruct_eval_f.
+      inversion H1; subst.
+      eapply (IHn n) with (m := m) in H2; eauto with lia.
       steps.
     + (* init *)
-      simpl in *; destruct_match; steps.
-      gen σ.
-      clear matched.
-      induction fields => //.
-      intros; simpl in *.
-      destruct n; try solve [rewrite foldLeft_constant in H0 => //]; simpl in * => //.
-      destruct m...
-      simpl. destruct a.
-      destruct_eval.
-      destruct (IHn n) as [He _]...
-      eapply (He m) in H1...
-      rewrite H1.
-      unfold assign_new in *.
-      destruct (getObj s l); steps; eauto.
-      rewrite foldLeft_constant in H0 => //.
+      simpl in *.
+      destruct flds as [| [_ e]]; eauto.
+      destruct_eval_f.
+      eapply (IHn n)  with (m := m) in H1; eauto with lia.
+      steps.
+      eapply (IHn n) with (m := m); eauto with lia.
 Qed.
 
 Theorem eval_step_monotonicity:
@@ -318,110 +252,87 @@ Proof.
 Qed.
 
 Theorem init_step_monotonicity:
-  forall n m Flds ρ ψ σ σ',
+  forall n m C flds ρ I σ σ',
     n < m ->
-    fold_left (init_field ρ ψ n) Flds (Some σ)  = Some σ' ->
-    fold_left (init_field ρ ψ m) Flds (Some σ)  = Some σ'.
+    init C flds ρ I σ n = Success_i σ' ->
+    init C flds ρ I σ m = Success_i σ'.
 Proof with try lia.
-  intros. move: σ σ' H0.
-  induction Flds as [| [T e] flds]; [steps |].
   intros.
-  destruct m ...
-  destruct n ; simpl in H0 |- * ; try solve [rewrite foldLeft_constant in H0 => //].
-  destruct_eval.
-  eapply eval_step_monotonicity with (m := m) in H1...
-  rewrite H1.
-  destruct (assign_new ψ v s); try solve [rewrite foldLeft_constant in H0 => //].
-  eauto.
+  pose proof (eval_step_monotonicity_aux n) as [_ [_ H__init]].
+  eauto with lia.
 Qed.
 
 
-Theorem evalListP_eval_list :
+Theorem evalP_eval :
   forall e σ ρ ψ l σ', ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ') <-> exists n, ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ'.
 Proof with (eauto; try lia).
   split; intros.
   - induction H using evalP_ind2 with
       (Pl := fun el σ ρ ψ vl σ' (H__el : evalListP el σ ρ ψ vl σ') =>
                exists n, ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ')
-      (Pin := fun fls I ρ σ σ' (H__init : initP fls I ρ σ σ') =>
-               exists n, fold_left (init_field ρ I n) fls (Some σ) = Some σ');
-      try solve [exists 1; steps].
-    + destruct IHevalP as [n__e0 H__e0].
-      exists (S n__e0); steps.
-    + clear H H__el H0.
-      destruct IHevalP1 as [n__e0 H__e0], IHevalP2 as [n__el H__el], IHevalP3 as [n__e2 H__e2].
-      set (n := S (max n__e0 (max n__el n__e2))).
-      eapply eval_step_monotonicity with (m := n) in H__e0, H__e2...
-      eapply evalList_step_monotonicity with (m := n) in H__el...
-      exists (S n); steps.
-    + clear H__args H__init.
-      destruct IHevalP as [n__args H__args], IHevalP0 as [n__init H__init].
-      remember (S (max n__args n__init)) as n.
-      eapply evalList_step_monotonicity with (m := (S n)) in H__args...
-      eapply init_step_monotonicity with (m := n) in H__init...
-      exists (S (S n)). simpl in H__args |- * .
-      steps.
-    + clear H H0 H1.
-      destruct IHevalP1 as [n__e1 H__e1], IHevalP2 as [n__e2 H__e2], IHevalP3 as [n__e3 H__e3].
-      remember (S (max n__e1 (max n__e2 n__e3))) as n.
-      eapply eval_step_monotonicity with (m := n) in H__e1, H__e2, H__e3 ...
-      exists (S n). steps.
-    + clear H H__el.
-      destruct IHevalP as [n__e H__e], IHevalP0 as [n__el H__el].
-      remember (S (max n__e n__el)) as n.
-      eapply eval_step_monotonicity with (m := n) in H__e ...
-      eapply evalList_step_monotonicity with (m := (S (S n))) in H__el...
-      exists (S (S n)); simpl in H__el |- *.
-      rewrite H__e.
-      eapply fold_left_app with (n0 := S n) (acc := [v1]) in H__el => //.
-    + clear H H__flds.
-      destruct IHevalP as [n__e H__e], IHevalP0 as [n__flds H__flds].
-      remember (S (max n__e n__flds)) as n.
-      eapply eval_step_monotonicity with (m := n) in H__e ...
-      eapply init_step_monotonicity with (m := (S n)) in H__flds...
-      exists (S n). steps.
+      (Pin := fun C flds I ρ σ σ' (H__init : initP C flds I ρ σ σ') =>
+                exists n, init C flds I ρ σ n = Success_i σ');
+      try solve [exists 1; steps];
+      repeat match goal with
+             | H: exists n, _ |- _ => destruct H as [?n H]
+             end.
+    + exists (S n); steps.
+    + set (n2 := S (max n1 (max n0 n))).
+      eapply eval_step_monotonicity with (m := n2) in IHevalP1, IHevalP3...
+      eapply evalList_step_monotonicity with (m := n2) in IHevalP2...
+      exists (S n2); steps.
+    + remember (S (max n n0)) as n1.
+      eapply evalList_step_monotonicity with (m := (S n1)) in IHevalP...
+      eapply init_step_monotonicity with (m := (S n1)) in IHevalP0...
+      exists (S (S n1)). steps.
+    + remember (S (max n (max n0 n1))) as n2.
+      eapply eval_step_monotonicity with (m := n2) in IHevalP1, IHevalP2, IHevalP3...
+      exists (S n2). steps.
+    + remember (S (max n n0)) as n1.
+      eapply eval_step_monotonicity with (m := n1) in IHevalP...
+      eapply evalList_step_monotonicity with (m := n1) in IHevalP0...
+      exists (S n1). steps.
+    + remember (S (max n n0)) as n1.
+      eapply eval_step_monotonicity with (m := n1) in IHevalP...
+      eapply init_step_monotonicity with (m := n1) in IHevalP0...
+      exists (S n1). steps.
   - destruct H as [n H].
     gen e σ ρ ψ l σ'.
     eapply proj1 with (
         (forall el σ ρ ψ vl σ',
-              ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
-              ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ')) /\
-          (forall C Tps Mtds Flds ψ ρ σ σ',
-              ct C = Some (class Tps Flds Mtds) ->
-              fold_left (init_field ρ ψ n) Flds (Some σ) = Some σ' ->
-              initP Flds ψ ρ σ σ' )).
-    induction n as [n IHn] using lt_wf_ind. destruct n.
-    + clear IHn.
-      repeat split => // ; intros; simpl in * => //.
-      destruct Flds; steps; eauto.
-      rewrite foldLeft_constant in H0 => //.
-    + repeat split.
-      * intros.
-        move : (IHn n) => [ ] // => IHn__e [IHn__el _].
-        destruct (IHn (n - 1)) as [_ [ _ IH__init]]...
-        destruct_eval; steps;
-          eauto using evalP.
-        ++ destruct n; [steps |].
-           assert (S n - 1 = n) by lia. rewrite H in IH__init.
-           simpl in matched0.
-           repeat destruct_match; [| steps].
-           eapply e_new; eauto.
-      * move /(_ n): IHn => [ ] // => IHn__e [IHn__el _].
-        induction el; [ steps; eauto |].
-        intros.
-        destruct n ; simpl in H |- *; try solve [rewrite foldLeft_constant in H => //].
-        destruct_eval.
-        lets [vl' Hv] : fold_left_app_inv (S n) [v] H; subst.
-        eapply eval_step_monotonicity with (m := S n) in H0...
-        eapply el_cons; eauto.
-        eapply IHel, fold_left_app with (acc := [v]) => //.
-      * intros.
-        move /(_ n): IHn => [ ] // => IHn__e [IHn__el _].
-        clear H.
-        move: σ σ' H0.
-        induction Flds as [| [T e] flds]; [steps; eauto|].
-        intros.
-        simpl in H0. destruct_eval.
-        destruct (assign_new ψ v s) eqn:H__assign; eauto using initP.
-        rewrite foldLeft_constant in H0 => //.
+            ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
+            ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ')) /\
+          (forall C flds I ρ σ σ',
+              init C flds I ρ σ n = Success_i σ' ->
+              initP C flds I ρ σ σ')).
+    induction n as [n IHn] using lt_wf_ind.
+    destruct n; repeat split => //; intros;
+      move : (IHn n) => [ ] // => IHn__e [IHn__el IHn__init]; clear IHn.
+    + simpl in H. steps; eauto using evalP.
+    + steps; eauto using evalP...
+      apply IHn__e in matched.
+      apply IHn__el in matched0.
+      eapply el_cons...
+    + steps; eauto using evalP...
+      apply IHn__e in matched.
+      apply IHn__init in H.
+      eapply init_cons...
+Qed.
+
+
+Corollary eval_implies_evalp :
+  forall e σ ρ ψ l σ' n, ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ' -> ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ').
+Proof.
+  intros.
+  apply evalP_eval; eauto.
+Qed.
+
+Corollary eval_list_implies_evalp :
+  forall el σ ρ ψ vl σ' n, ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' -> ⟦_ el _⟧p (σ, ρ, ψ) --> (vl,σ').
+Proof.
+  induction el; intros.
+  - destruct n; steps.
+  - destruct n; steps.
+    eapply el_cons;
+      eauto using evalP, eval_implies_evalp.
 Qed.

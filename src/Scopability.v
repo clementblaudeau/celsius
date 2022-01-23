@@ -7,16 +7,22 @@ From Celsius Require Export PartialMonotonicity Wellformedness Reachability Tact
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List.
 Import ListNotations.
 Open Scope nat_scope.
+
+
 (** ** Definitions and Notations *)
 (* The scoping relation, with the hypothesis that the sets of locations are "correct" (within the stores) *)
+
 Definition scoping (σ σ': Store) (L L': Ensemble Loc) :=
   L ⪽ σ ->
   L' ⪽ σ' ->
   (forall (l:Loc), l < dom σ -> (σ' ⊨ L' ⇝ l) -> σ ⊨ L ⇝ l).
+
+
 Notation "( σ1 , L1 )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 L1 L2) (at level 0).
 Notation "( σ1 ,  { l } )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 {l} L2) (at level 0).
 Notation "( σ1 , L1 )  ⋖  ( σ2 ,  { l } )" := (scoping σ1 σ2 L1 {l}) (at level 0).
 Notation "( σ1 ,  { l1 } )  ⋖  ( σ2 ,  { l2 } )" := (scoping σ1 σ2 {l1} {l2}) (at level 0).
+
 (* The scoping preservation, with technical choices of hypothesis: *)
 Definition scoping_preservation (σ1 σ2: Store) (L: LocSet) :=
   (L ⪽ σ1) /\
