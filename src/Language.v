@@ -29,7 +29,6 @@ Inductive Mode: Type :=
 | warm
 | cool : nat -> Mode
 | cold.
-Notation "'@' u " := (u:Mode) (at level 20).
 
 Definition Tpe : Type := ClN * Mode.
 
@@ -52,7 +51,7 @@ Definition Env: Type   := list Value.
 Definition EnvTyping: Type := list Tpe.
 Definition Obj: Type   := (ClN * Env).
 Definition Store: Type := list Obj.
-Definition StoreTyping : Type := list (Loc * Tpe).
+Definition StoreTyping : Type := list Tpe.
 
 Definition LocSet := (Ensemble Loc).
 

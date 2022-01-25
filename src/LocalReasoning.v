@@ -75,6 +75,7 @@ Proof.
   destruct (reachability_refl σ l l'); steps.
 Qed.
 
+
 Lemma synchronization: forall Σ σ (l: Loc),
     wf σ ->
     Σ ⊨ σ ->
@@ -86,78 +87,88 @@ Lemma synchronization: forall Σ σ (l: Loc),
         Σ ≪ Σ' /\
         (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ' ⊨ l' : hot).
 Proof with (meta; eauto with typ updates lia).
+
+  Ltac getType_combine :=
+    lazymatch goal with
+    | H1: getType ?Σ ?l = Some ?T, H__st: ?Σ ⊨ ?σ
+      |- context [getType (map ?f (combine (seq 0 (dom _)) ?Σ)) ?l ] =>
+        try rewrite (proj1 H__st) ;
+        rewrite /getType nth_error_map;
+        rewrite (nth_error_nth' _  (0,(entry,cold)));
+        [rewrite combine_length seq_length PeanoNat.Nat.min_id ; auto |];
+        rewrite ?combine_nth ?seq_nth ?seq_length; eauto using getType_in_dom; simpl;
+        rewrite (nth_error_nth _ _ _ H1)
+    end.
+
   intros Σ σ l H__wf H__st; intros.
   remember ((fun l' '(C,μ) => if (reachabilityb σ l l') then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
-  remember (map (fun '(l, T) => (l, f l T)) Σ) as Σ'.
+  remember (map (fun '(l, T) => f l T) (combine (seq 0 (dom Σ)) Σ)) as Σ'.
   exists Σ'.
   assert (Hyp: forall (A B C D E: Prop), ((D -> B -> A) /\ B /\ C /\ D /\ E) -> (A /\ B /\ C /\ D /\ E)) by firstorder.
   apply Hyp. clear Hyp.
-  repeat split.
-  - intros H__stk H__mn l' H__l'. rewrite HeqΣ' in H__l'.
-    apply in_dom_map in H__l'...
-    specialize (H__st l' H__l') as [C [ω [μ [? [? ?] ]]]] ...
+  assert (H__dom: dom Σ' = dom Σ) by (subst; rewrite map_length combine_length seq_length; lia).
+  splits.
+
+  - intros H__stk H__mn. split; [rewrite (proj1 H__st) |]...
+    intros l' H__l'. rewrite HeqΣ' in H__l'.
+    rewrite map_length combine_length seq_length in H__l'... rewrite PeanoNat.Nat.min_id in H__l'.
+    specialize ((proj2 H__st) l') as [C [ω [μ [? [? ?] ]]]] ...
     destruct (reachability_refl σ l l'); steps.
     + pose proof (H _  r) ...
-      exists C0, ω, hot; repeat split => //.
+      exists C, ω, hot; repeat split => //.
       * apply reachabilityb_true in r.
-        erewrite getType_map; steps; eauto.
-        inverts matched. reflexivity.
-      * inverts H4; meta; eauto with typ.
-        destruct (ct C0) as [Args Flds Mtds] eqn:?.
+        getType_combine. steps.
+      * destruct (ct C) as [Args Flds Mtds] eqn:?.
         eapply ot_hot...
         intros f ?C ?μ. intros.
         assert (f < dom ω). {
-          inverts H3;
-            inverts H2 ...
-          - lets : H9 H1 H4; steps ...
-          - lets : H9 H1 H4; steps ...
+          inverts H3; steps ...
+          inverts H6...
+          inverts H6; inverts H2...
+          all: lets (v & ? & ?): H9 H5...
+          all: apply getVal_dom in H1...
         }
         destruct (getVal ω f) eqn:?H__val ; [| apply nth_error_None in H__val; lia]...
         exists v; split => //.
         assert (σ ⊨ l ⇝ v) by eauto with rch wf.
-        assert (Σ ⊨ v : warm) by eauto.
-        exists (C, hot) ...
-        erewrite getType_map ... step...
+        exists (C0, hot) ...
+        lets: reachability_dom H7.
+        destruct (getType Σ v) eqn:?; [| exfalso; eapply getType_none; meta ] ...
+        getType_combine.
         destruct (reachability_refl σ l v); steps.
-        assert (C1 = C); eauto.
-        invert H3; inverts H2; eauto; try lets [?v [ ] ]: H15 H4...
+        assert (C1 = C0); eauto...
+        inverts H2; meta...
+        all: try lets [?v [ ] ]: H14 H4 ...
+        all: try lets: H11 H5 ...
     + exists C, ω, μ; repeat split => // ...
-      erewrite getType_map ...
+      getType_combine; steps.
       destruct (reachability_refl σ l l'); steps.
+
   - intros l' H__l'.
     destruct (getType Σ l') as [T1 |] eqn:?; [|exfalso; apply getType_none in Heqo; eauto].
-    exists T1. subst.
-    erewrite getType_map; eauto. steps; eexists; steps.
+    exists T1. subst...
+    getType_combine.
+    steps; eexists; steps.
+
   - intros l' C Ω H__l'.
-    erewrite HeqΣ', getType_map; eauto. steps.
+    erewrite HeqΣ'.
+    getType_combine. steps.
     destruct (reachability_refl σ l l'); steps.
     apply H in r.
-    inverts r.
-    inverts H0 ...
+    destruct r as (?D & ? ).
+    inverts H0...
     inverts H4.
+
   - intros l' H__l'.
-    right.
-    destruct (getType (map (fun '(l, T) => (l, f l T)) Σ) l')
-      as [[C μ] |] eqn:?; [| eapply getType_none in Heqo; steps].
-    eapply getType_in_dom_map; eauto.
+    right. rewrite <-H__dom...
+
   - intros l' H__rch.
     specialize (H l' H__rch) as [C H0].
     exists C, (C, hot); eauto with typ.
-    inverts H0; meta.
-    erewrite HeqΣ', getType_map; eauto. steps.
+    inverts H0...
+    erewrite HeqΣ'. getType_combine. steps.
     destruct (reachability_refl σ l l'); steps.
 Qed.
-
-Lemma warm_filling: forall Σ σ (l: Loc),
-    wf σ ->
-    Σ ⊨ σ ->
-    (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ ⊨ l' : warm) ->
-    exists Σ',
-      (Σ' ⊨ σ) /\
-        Σ ≼ Σ' /\
-        Σ ▷ Σ' /\
-        Σ ≪ Σ' /\
-        (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ' ⊨ l' : hot).
 
 
 Lemma local_reasoning2: forall Σ1 Σ2 σ1 σ2 (L1 L2: LocSet),
@@ -172,7 +183,6 @@ Lemma local_reasoning2: forall Σ1 Σ2 σ1 σ2 (L1 L2: LocSet),
     (Σ1 ⊨ L1 : hot) ->
     wf σ1 ->
     wf σ2 ->
-    (forall l', σ2 ⊨ L2 ⇝ l' -> in_dom Σ2 l') ->
     exists Σ', (Σ2 ≪ Σ') /\
             (Σ2 ≼ Σ') /\
             (Σ2 ▷ Σ') /\
@@ -185,26 +195,28 @@ Proof with (meta; eauto with typ lia).
   eapply finite_sets_ind with (F := L2); eauto; intros.
   - exists Σ2; steps ...
     intros l Hl. inversion Hl.
-  - clear H L2. rename F into L2, a into l, H13 into H_in.
+  - clear H L2. rename F into L2, a into l.
     unfold Add in *.
     assert ((σ1, L1) ⋖ (σ2, L2)) by eauto with scp.
     pose proof (storeSubset_union_l _ _ _ H2).
-    lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps. apply H_in; eauto with wf. { rch_set. exists l0; steps; eauto with wf... }
-    assert (H_in':forall l', σ2 ⊨ (L2 ∪ {l}) ⇝ l' -> in_dom Σ3 l') ...
+    lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps.
     (* clear Σ1 H5 H6 H7 H8 H10 H1. *) clear H1.
     lets [Σ4 [ ]]: synchronization Σ3 σ2 l H17; steps...
+
     + assert (l' < dom σ1 \/ l' >= dom σ1) as [|] by lia.
       * lets [l1 [H__l1 H__rch1]] : H4 H3 H2 l' H18; [ exists l; split; eauto with wf |].
         lets : H10 H__l1.  clear H10.
         lets: hot_transitivity H20 H__rch1...
         lets: mn_trans H7 H16.
-        specialize (H22 l' H10) as [?T1 [?T2 [? [ ]]]] ...
+        specialize (H22 l') as [?T1 [?T2 [? [ ]]]] ...
         exists C, (C,hot)...
       * lets: stk_st_trans H5 H14 H16.
         specialize (H20 l') as [ ]; eauto.
-        -- apply H_in'.
-           exists l; eauto with wf...
-        -- specialize (H8 l' H20); steps ... apply getObj_dom in H21. lia.
-    + exists Σ4; repeat split; eauto with typ.
+        -- apply reachability_dom in H1.
+           apply monotonicity_dom in H16.
+           lets: (proj1 H9) ...
+        -- lets: (proj1 H8) ...
+
+    + exists Σ4; splits; eauto with typ.
       intros l0 [ l2' | ]; try inSingleton; eauto with rch wf typ.
 Qed.

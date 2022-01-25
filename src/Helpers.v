@@ -6,10 +6,8 @@ Open Scope list_scope.
 (** ** Helper functions *)
 Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
 Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
-Definition getType (Σ: StoreTyping) (l: Loc): option Tpe := option_map snd (find (fun '(l', _) => Nat.eqb l l') Σ).
+Definition getType (Σ : StoreTyping): Loc -> option Tpe := nth_error Σ.
 Definition typeLookup (Γ: EnvTyping): Loc -> option Tpe := nth_error Γ.
-Definition in_dom (Σ: StoreTyping) (l: Loc) := Exists (fun '(l', _) => Nat.eqb l l') Σ.
-
 
 Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
   match l with
@@ -313,77 +311,39 @@ Proof.
 Qed. *)
 Lemma getType_in_dom:
   forall (Σ: StoreTyping) l T,
-    getType Σ l = Some T -> in_dom Σ l.
+    getType Σ l = Some T -> l < dom Σ.
 Proof.
   intros.
   unfold getType, option_map in H; steps.
-  apply find_some in matched; steps.
-  unfold in_dom.
-  apply Exists_exists; eauto.
+  apply nth_error_Some; eauto.
 Qed.
 
-Lemma in_dom_map:
-  forall (Σ: StoreTyping) l f,
-    in_dom (map (fun '(l, T) => (l, f l T)) Σ) l <-> in_dom Σ l.
-Proof.
-  unfold in_dom.
-  induction Σ; steps; eauto.
-  - inversion H; steps; eauto using Exists.
-    eapply Exists_cons_tl, IHΣ; eauto.
-  - inversion H; steps; eauto using Exists.
-    eapply Exists_cons_tl, IHΣ; eauto.
-Qed.
-
-Lemma in_dom_dec:
-  forall Σ l,
-    {in_dom Σ l} + {~ in_dom Σ l}.
+Lemma dom_map:
+  forall (Σ: StoreTyping) (l: Loc) (f: Tpe -> Tpe),
+    dom (map (fun T => f T) Σ) = dom Σ.
 Proof.
   intros.
-  unfold in_dom in *.
-  eapply Exists_dec.
-  intros [l' _].
-  destruct (Nat.eqb l l'); steps.
-Qed.
-
-
-Lemma getType_in_dom_map:
-  forall (Σ: StoreTyping) l T f,
-    getType (map (fun '(l, T) => (l, f l T)) Σ) l = Some T -> in_dom Σ l.
-Proof.
-  intros. eapply in_dom_map, getType_in_dom; eauto.
+  rewrite map_length. auto.
 Qed.
 
 Lemma getType_none:
   forall (Σ: StoreTyping) l,
-    in_dom Σ l ->
+    l < dom Σ ->
     getType Σ l <> None.
 Proof.
   intros.
-  unfold getType, option_map, in_dom in *; steps.
-  clear H0. move: l H matched.
-  induction Σ; steps; eauto; inversion H; steps; eauto.
+  unfold getType, option_map in *; steps.
+  apply nth_error_None in H0. lia.
 Qed.
 
 Lemma getType_map:
   forall (Σ: StoreTyping) f l T,
     getType Σ l = Some T ->
-    getType (map (fun '(l, T) => (l, f l T)) Σ) l = Some (f l T).
+    getType (map (fun T => f T) Σ) l = Some (f T).
 Proof.
-  induction Σ; steps.
-  unfold getType, option_map in H.
-  destruct_match; try invert_constructor_equalities; subst; try discriminate.
-  steps.
-  - apply PeanoNat.Nat.eqb_eq in matched0; steps.
-    unfold getType; steps.
-    apply PeanoNat.Nat.eqb_neq in matched; steps.
-  - unfold getType, option_map in IHΣ.
-    specialize (IHΣ f l t0).
-    rewrite matched in IHΣ. simpl in *.
-    specialize (IHΣ eq_refl).
-    steps.
-    unfold getType, option_map. steps.
+  unfold getType. intros.
+  rewrite nth_error_map H. steps.
 Qed.
-
 
 Lemma getVal_dom:
   forall ρ f l,

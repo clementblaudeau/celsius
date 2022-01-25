@@ -215,7 +215,7 @@ Proof with (
       IH__expr HT__e0 H0 H1 H3 H__eval0; try inverts H__r ...
     eapply eval_implies_evalp in H__eval0.
     lets H__pM0: pM_theorem H__eval0.
-    lets (?C & ?ω & ?μ & H__obj & ? & ?): H__st0 H11...
+    lets (?C & ?ω & ?μ & H__obj & ? & ?): (proj2 H__st0) v0 ...
     rewrite H__obj in H6 |- *.
 
     (* Destruct method fetch*)
@@ -229,322 +229,69 @@ Proof with (
     destruct HT__em as [_ HT__em].
     specialize (HT__em m _ _ _ _ H__Mtds1).
 
-    (* Destruct argument evaluation *)
+    (* Destruct evaluation of arguments *)
     lets H__env0: env_typing_monotonicity H__mn0 H0.
     eval_dom. eval_wf2...
-    lets (?T & ?T & ? & ? & ?): H__mn0 ψ H2...
+    lets (?T & ?T & ? & ? & ?): H__mn0 ψ ...
     destruct_eval H__eval1 vl σ';
       lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
       IH__list HT__args H__env0 H__st0 H__wf0 H__eval1; try inverts H__r ...
     eapply eval_list_implies_evalp in H__eval1. eval_dom; eval_wf2.
 
     (* Destruct evaluation of method body *)
-    lets (?T & ?T & ? & ? & ?): H__mn1 ψ H5...
-    lets (?T & ?T & ? & ? & ?): H__mn1 v0 H11...
+    lets (?T & ?T & ? & ? & ?): H__mn1 ψ...
+    lets (?T & ?T & ? & ? & ?): H__mn1 v0...
     assert (HT__em': (Args, (C1, μ__m)) ⊢ e__m : (C, μ__r)) by admit.
     destruct (⟦ e__m ⟧ (σ1, args_val, v0 )( n)) as [ | | σ' v' ] eqn:H__eval2; try congruence;
     lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
       IH__expr HT__em' H__v1 H__st1 H__wf1 H__eval2; try inverts H__r ... admit. admit.
-    eapply eval_implies_evalp in H__eval2.
+    eapply eval_implies_evalp in H__eval2. clear H6.
 
     (* Result *)
     destruct H__hots as [? | [ H__hots ?] ]...
-    + exists Σ2, v2, σ2; repeat split...
+    + exists Σ2, v2, σ2; splits...
     + (* Local reasoning *)
       subst...
       destruct (local_reasoning2 Σ1 Σ2 σ1 σ2 (codom args_val ∪ { v0 }) {v2} ) as
         (Σ3 & ? & ? & ? & ? & H__v2)...
       * admit.
       * admit.
-      * intros ? [l H__l | ? ]; rch_set.
-        admit.
-        admit.
-      * intros l Hl; rch_set.
+      * admit.
+      * lets: H__v2 v2 In_singleton...
+        lets (? & ? & ? & ? & ?): H6 v2...
+        exists Σ3, v2, σ2; splits...
 
-
-
-
-    destruct H__hots as [H__hots | H__hots]...
-
-    steps...
-    exists (C, μ6)...
-    eapply s_typ_mode.
-    eapply s_mode_trans; eauto.
-    eapply s_mode_trans; eauto.
-
-
-
-    destruct_eval.
-    meta.
-    meta_clean.
-    eauto with typ wf lia.
-    try match goal with
-    | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
-    end.
-    + steps.
-    + clear H8.
-      destruct (getObj s v) as [[?C ?ω] |]. admit.
-      destruct (ct C3) as [?Args ?Flds ?Mtds] eqn:H__ct3.
-      destruct (Mtds m) as [[_ _ _ e1] |]. eqn:H__mtd.
-
-      steps.
-      eapply H8.
-      eapply IHn in H5...
-      congruence. admit. admit.  ; try congruence.
-
-
-
-    exosts
-    rewrite_any.
-    repeat destruct_match; try congruence.
+  - (* e = new C l *)
     admit.
-    destruct
 
-
-
-(** by induction on evaluation *)
-Theorem semantic_soundness:
-    forall e ρ σ ψ l σ',
-      ⟦e⟧p(σ, ρ, ψ) --> (l, σ') ->
-      wf σ ->
-      (codom ρ ∪ {ψ} ⪽ σ) ->
-      forall Γ U T Σ,
-        ((Γ, U) ⊢ e : T) ->
-        (Γ, Σ) ⊨ ρ ->
-        Σ ⊨ σ ->
-        (Σ ⊨ ψ : U) ->
-        exists Σ',
-          Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
-            Σ' ⊨ l : T.
-Proof with (meta; meta_clean; eauto with typ wf lia; try solve [eapply vt_sub; eauto with typ]).
-
-  introv H.
-  induction H using evalP_ind2 with
-    (Pl := fun el σ ρ ψ vl σ' _ =>
-               wf σ ->
-               (codom ρ ∪ {ψ} ⪽ σ) ->
-             forall Γ U Tl Σ,
-               ((Γ, U) ⊩ el : Tl) ->
-               (Γ, Σ) ⊨ ρ ->
-               Σ ⊨ σ ->
-               (Σ ⊨ ψ : U) ->
-               exists Σ',
-                 Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\ ((Tl, Σ') ⊨ vl))
-    (Pin := fun C fls I _ σ σ' _   => False );
-    intros; eval_dom; eval_wf2; modus...
-  - (* e_var *)
-    pose proof (env_regularity Γ Σ ρ x (C0,μ0) (C, μ) H2) as [?l [ ]]...
-    exists Σ; steps...
-  - (* e_this *)
+  - (* e = e1.f = e2; e3 *)
     admit.
-  - (* e_fld *)
-    admit.
-    (* + (* t_sub *) *)
-    (* + (* t_selhot *) *)
-    (* + (* t_selwarm *) *)
-    (* + (* t_selcool *) *)
-  - (* e_mtd *)
-    clear H1 H2 H7 H8 H9 H__codom H__codom0 H__codom1 H_wf H_wf0 H H__el H0.
-    rename H10 into H__getType, H6 into H__inDom, H4 into H__eT, H5 into H__sT.
-    eapply typ_mtd in H3 as
-        (?C & ?C & ?e__m & ?Args & ?Flds & ?μ__m & ?μ' & ?μ__r &
-           HT__e0 & H__mtdinfo & ? & HT__args & HS__args & [? | (H__hot & ?) ] )...
-    + (* t_block *)
-      lets (Σ0 & H__mn0 & H__stk0 & H__aty0 & H__st0 & _ & ?) : IHevalP1 HT__e0 H__eT... clear IHevalP1.
-      lets H__eT0 : env_typing_monotonicity H__mn0 H__eT ...
-      lets (?U1 & ?U2 & ? & ? & ?): H__mn0 H__inDom...
-      lets (Σ__args & H__mnargs & H__stkargs & H__atyargs & H__stargs & _ & H__eTargs) : IHevalP2 HT__args H__eT0...
-      assert (C2 = C). {
-        match goal with
-        | H1: getObj ?σ ?v = Some (?C, ?μ),
-          H2: ?Σ ⊨ ?σ,
-            H3: in_dom ?Σ ?v |- _ =>
-          lets (?C & ?ω & ?μ & ? & ? & ?) : H2 v H3 ; meta
-      end... } subst.
-      unfold methodInfo in *.
-      pose proof (typable_classes C) as H__C. steps...
-      specialize (H8 _ _ _ _ _ matched0) ...
-      lets: H17 H23; steps...
-      lets [Σ__m ?]: IHevalP3 H34; steps ... clear IHevalP3.
-      exists Σ__m; steps...
 
-      * lets: H27 H23; steps...
-      *
-    + (* t_block_call *)
-
-    remember (mtd e0 m el) as e.
-    induction H1; steps ...
-    + (* t_sub *)
-
-      admit.
-    + (* t_block *)
-      admit.
-    + (* t_block_call *)
-      admit.
-    lets [Σ' ?] : IHevalP1 H11 H2; steps... clear IHT_Expr.
-    lets : env_typing_monotonicity H15 H3; clear H0.
-    lets [?U1 [?U2 [? [? ?]]]]: H15 H5...
-    specialize (IHT_Expr0 Σ' ρ ψ (C1, μ6) σ1 vl2 σ2 H20 H_wf) as [Σ'' [ ]]; steps...
-
-    pose proof (typable_classes C).
-    admit.
-  - (* t_call_hot *)
-    admit.
-  - (* tl_nil *)
-    exists ([]: list Loc), σ, Σ; steps...
-  - (* tl_cons *)
-    admit.
-Admitted.
-
-Theorem syntactic_soundness: forall Γ U e T,
-    ((Γ, U) ⊢ e : T) ->
-    forall ρ σ ψ l σ' Σ,
-      ⟦e⟧p(σ, ρ, ψ) --> (l, σ') ->
-      wf σ ->
-      (codom ρ ∪ {ψ} ⪽ σ) ->
-      (Γ, Σ) ⊨ ρ ->
-      Σ ⊨ σ ->
-      (Σ ⊨ ψ : U) ->
-      exists Σ',
-        Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
-          Σ' ⊨ l : T.
-Proof with (meta; eauto with typ wf lia; try solve [eexists; eauto with typ]).
-
-  introv H.
-  induction H using typing_ind with
-    (Pl := fun Γ T el Ul _ => forall Σ ρ ψ (U:Tpe) σ vl σ',
-               ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') ->
-               wf σ ->
-               (codom ρ ∪ {ψ} ⪽ σ) ->
-               (Γ, Σ) ⊨ ρ ->
-               Σ ⊨ σ ->
-               (Σ ⊨ ψ : U) ->
-               exists Σ',
-                   Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
-                   (forall l, List.In l vl -> Σ' ⊨ l : T));
-    intros ...
-  - (* t_sub *)
-    lets  [Σ' ?] : IHT_Expr H0 H1; steps... clear IHT_Expr.
-    exists Σ'; steps...
-  - (* t_var *)
-    pose proof (env_regularity Γ Σ ρ x (C0,μ1) (C, μ) H2) as [?l [ ]]...
+  - (* el = nil *)
     inverts H.
-    exists Σ; steps...
-  - (* t_this *)
-    inverts H.
-    exists Σ; steps...
-  - (* t_selhot *)
-    inverts H0.
-    lets [Σ' ?] : IHT_Expr H10 H3; steps... clear IHT_Expr.
-    lets [?C [?ω [?μ ?]]]: H12 H15; steps...
-    lets [?v [ ]]: hot_selection l1 H13 H12 H19 H__field...
-    exists Σ'; steps...
-  - (* t_selwarm *)
-    inverts H0.
-    lets [Σ' ?] : IHT_Expr H10 H3; steps... clear IHT_Expr.
-    lets [?C [?ω [?μ ?]]]: H12 H15; steps...
-    lets [?v [ ]]: warm_selection l1 H12 H19 H__field...
-    exists Σ'; steps...
-  - (* t_selcool *)
-    inverts H0.
-    lets [Σ' ?] : IHT_Expr H10 H3; steps... clear IHT_Expr.
-    lets [?C [?ω [?μ ?]]]: H12 H15; steps...
-    lets [?v [ ]]: cool_selection l1 Ω H12 H19 H__field...
-    exists Σ'; steps...
-  - (* t_new *)
-    admit.
-  - (* t_new_hot *)
-    admit.
-  - (* t_block *)
-    admit.
-  - (* t_call *)
-    inverts H0. eval_dom; eval_wf.
-    lets [Σ' ?] : IHT_Expr H11 H2; steps... clear IHT_Expr.
-    lets : env_typing_monotonicity H15 H3; clear H0.
-    lets [?U1 [?U2 [? [? ?]]]]: H15 H5...
-    specialize (IHT_Expr0 Σ' ρ ψ (C1, μ6) σ1 vl2 σ2 H20 H_wf) as [Σ'' [ ]]; steps...
+    exists Σ, ([]: list Loc), σ; splits...
+    apply et_nil.
 
-    pose proof (typable_classes C).
-    admit.
-  - (* t_call_hot *)
-    admit.
-  - (* tl_nil *)
-    exists ([]: list Loc), σ, Σ; steps...
-  - (* tl_cons *)
-    admit.
-Admitted.
+  - (* el = e::el *)
+    specialize (IHn n ltac:(lia)) as [IH__expr IH__list]...
+    inverts H ...
 
-Parameter typable_classes : T_Classes.
+    (* Destruct evaluation of head *)
+    destruct_eval H__eval v' σ';
+      lets (Σ0 & v & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
+      IH__expr H14 H0 H1 H3 H__eval; try inverts H__r ...
+    eapply eval_implies_evalp in H__eval. eval_dom.
 
-Theorem expression_soundness: forall e Γ Σ σ U T ρ ψ,
-    ((Γ, U) ⊢ e : T) ->
-    (Γ, Σ) ⊨ ρ ->
-    Σ ⊨ σ ->
-    (Σ ⊨ ψ : U) ->
-    wf σ ->
-    exists l σ' Σ',
-      ⟦e⟧(σ, ρ, ψ) --> (l, σ') /\
-        Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
-        Σ' ⊨ l : T.
-Proof with (meta; eauto with typ; try solve [eexists; eauto with typ]).
-  intros. gen Σ ρ ψ σ.
-  induction H using typing_ind with
-    (Pl := fun Γ T el Ul _ => forall Σ ρ ψ U σ,
-               (Γ, Σ) ⊨ ρ ->
-               Σ ⊨ σ ->
-               (Σ ⊨ ψ : U) ->
-               wf σ ->
-               exists vl σ' Σ',
-                 ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') /\
-                   Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
-                   (forall l, List.In l vl -> Σ' ⊨ l : T));
-    intros ...
-  - (* t_sub *)
-    lets  [l [σ' [Σ' ?]]] : IHT_Expr H0 ψ H1; steps... clear IHT_Expr.
-    exists l, σ', Σ'; steps...
-  - (* t_var *)
-    pose proof (env_regularity Γ Σ ρ x (C0,μ1) (C, μ) H0) as [?l [ ]]...
-    exists l, σ, Σ; steps...
-    apply e_var...
-  - (* t_this *)
-    exists ψ, σ, Σ; steps...
-  - (* t_selhot *)
-    lets [l [σ' [Σ' ?]]] : IHT_Expr H0 ψ H1; steps... clear IHT_Expr.
-    lets [?C [?ω [?μ ?]]]: H10 H13; steps...
-    lets [?v [ ]]: hot_selection l H11 H10 H15 H__field...
-    exists v σ' Σ'; steps...
-    eapply e_fld...
-  - (* t_selwarm *)
-    lets [l [σ' [Σ' ?]]] : IHT_Expr H0 ψ H1; steps... clear IHT_Expr.
-    lets [?C [?ω [?μ ?]]]: H10 H13; steps...
-    lets [?v [ ]]: warm_selection l H10 H15 H__field...
-    exists v σ' Σ'; steps...
-    eapply e_fld...
-  - (* t_selcool *)
-    lets [l [σ' [Σ' ?]]] : IHT_Expr H0 ψ H1; steps... clear IHT_Expr.
-    lets [?C [?ω [?μ ?]]]: H10 H13; steps...
-    lets [?v [ ]]: cool_selection l Ω H10 H15 H__field...
-    exists v σ' Σ'; steps...
-    eapply e_fld...
-  - (* t_new *)
-    admit.
-  - (* t_new_hot *)
-    admit.
-  - (* t_block *)
-    admit.
-  - (* t_call *)
-    lets [l [σ' [Σ' ?]]] : IHT_Expr H0 ψ H1; steps... clear IHT_Expr.
-    lets [U1 [U2 [? [ ]]]]: H5 ψ H2 ...
-    clear H1 H3 H6 H2 H14.
-    lets : env_typing_monotonicity H5 H0; clear H0.
-    lets [?C [?ω [?μ ?]]]: H10 H13; steps...
-    specialize (IHT_Expr0 Σ' ρ ψ C1 σ' H1 H10) as [vl [σ'' [Σ'' [ ]]]]; steps... exists μ4 ...
-    pose proof (typable_classes C).
-    admit.
-  - (* t_call_hot *)
-    admit.
-  - (* tl_nil *)
-    exists ([]: list Loc), σ, Σ; steps...
-  - (* tl_cons *)
-    admit.
+    (* Destruct evaluation of tail *)
+    lets (?T & ?T & ? & ? & ?): H__mn0 ψ...
+    lets H__env0: env_typing_monotonicity H__mn0 H0.
+    destruct (⟦_ el _⟧ (σ0, ρ, ψ )( n)) as [ | | σ' vl' ] eqn:H__eval1; try congruence;
+    lets (Σ1 & vl & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1):
+      IH__list H12 H__env0 H__st0 H__wf0 H__eval1; try inverts H__r ...
+    exists Σ1, (v::vl), σ1; splits...
+
+    (* Result *)
+    lets (?T & ?T & ? & ? & ?): H__mn1 v ...
+    apply et_cons...
+
 Admitted.

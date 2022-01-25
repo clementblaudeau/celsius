@@ -12,7 +12,7 @@ Require Import Coq.ssr.ssreflect Coq.ssr.ssrbool Coq.Lists.List Coq.micromega.Ps
 
 (** ** Monotonicity *)
 Definition monotonicity Σ1 Σ2 :=
-  forall l, in_dom Σ1 l -> (exists T1 T2, getType Σ1 l = Some T1 /\ getType Σ2 l = Some T2 /\ T2 <: T1).
+  forall l, l < dom Σ1 -> (exists T1 T2, getType Σ1 l = Some T1 /\ getType Σ2 l = Some T2 /\ T2 <: T1).
 Notation "Σ1 ≼ Σ2" := (monotonicity Σ1 Σ2) (at level 60).
 
 (** ** Authority *)
@@ -56,7 +56,7 @@ Global Hint Unfold notation_value_typing_LocSet: notations.
 
 (** ** Stackability *)
 Definition stackability_st (Σ1 Σ2: StoreTyping) :=
-  forall l, in_dom Σ2 l -> (Σ2 ⊨ l : warm) \/ (in_dom Σ1 l).
+  forall l, l < dom Σ2 -> (Σ2 ⊨ l : warm) \/ (l < dom Σ1).
 Global Instance notation_stackability_StoreTyping : notation_stackability StoreTyping :=
   { stackability_ := stackability_st }.
 Global Hint Unfold notation_stackability_StoreTyping : notations.
@@ -99,13 +99,15 @@ Global Hint Unfold notation_object_typing: notations.
 (** ** Store_typing *)
 (** Here is the link between the abstract environment of types and the store used in execution *)
 Definition store_typing (Σ: StoreTyping) (σ: Store) :=
-  forall l, in_dom Σ l ->
+  dom σ = dom Σ /\
+  forall l, l < dom Σ ->
        exists C ω μ, getObj σ l = Some (C,ω) /\
                   getType Σ l = Some (C, μ) /\
                   Σ ⊨ (C, ω) : (C, μ).
 Global Instance notation_store_typing: notation_dash StoreTyping Store :=
   { dash_ := store_typing }.
 Global Hint Unfold notation_store_typing: notations.
+Global Hint Unfold notation_store_typing store_typing: typ.
 
 (** ** Environment typing *)
 Inductive env_typing : EnvTyping -> StoreTyping -> Env -> Prop :=
@@ -113,7 +115,7 @@ Inductive env_typing : EnvTyping -> StoreTyping -> Env -> Prop :=
 | et_cons : forall Γ Σ ρ l T,
     env_typing Γ Σ ρ ->
     (Σ ⊨ l : T) ->
-     env_typing (T :: Γ) Σ (l :: ρ).
+    env_typing (T :: Γ) Σ (l :: ρ).
 Global Instance notation_env_typing: notation_dash (EnvTyping * StoreTyping) Env :=
   { dash_ := fun a b => env_typing (fst a) (snd a) b }.
 Global Hint Unfold notation_env_typing: notations.
@@ -127,21 +129,32 @@ Ltac meta :=
   unfold Value, Var in *;
   repeat
     match goal with
+    (* Cross rewrites *)
     | H: getObj ?σ ?l = Some ?O,
         H': getObj ?σ ?l = Some ?O' |- _ => rewrite H' in H; inverts H
     | H: getType ?Σ ?l = Some ?T,
         H': getType ?Σ ?l = Some ?T' |- _ => rewrite H' in H; inverts H
     | H: getVal ?ρ ?f = Some ?l,
         H': getVal ?ρ ?f = Some ?l' |- _ => rewrite H' in H; inverts H
-    |  H: getType ?Σ ?l = Some ?T |- _ =>
-         let fresh := fresh "H__dom" in
-         add_hypothesis fresh (getType_in_dom Σ l T H)
-    (* |  H: getType ?Σ ?l = Some ?T |- _ =>
-        let fresh := fresh "H__dom" in
-        add_hypothesis fresh (getType_dom Σ l T H) *)
+
+    (* Dom hypothesis *)
+    | H: getType ?Σ ?l = Some ?T |- _ =>
+        match goal with
+        | H': Σ ⊨ ?σ, H'': l < dom ?σ' |- _ => fail 1
+        | H': Σ ⊨ ?σ, H'': S l <= dom ?σ' |- _ => fail 1
+        | _ =>
+            let fresh := fresh "H__dom" in
+            add_hypothesis fresh (getType_in_dom Σ l T H)
+        end
     | H: getVal ?ρ ?f = Some ?l |- _ =>
-        let fresh := fresh "H__dom" in
-        add_hypothesis fresh (getVal_dom ρ f l H)
+        match goal with
+        | H': S f <= dom ρ |- _ => fail 1
+        | H': f < dom ρ |- _ => fail 1
+        | _ => let fresh := fresh "H__dom" in
+              add_hypothesis fresh (getVal_dom ρ f l H)
+        end
+
+    (* Destructs *)
     | H: ?Σ ⊨ ?l : ?x |- _ =>
         match type of l with
         | Loc => match type of x with
@@ -160,30 +173,34 @@ Ltac meta :=
         let H__eq := fresh "H__eq" in
         assert (H__eq: μ = hot) by (invert H; steps); subst;
         clear H
-    | H: (?C, ?μ) <: (?C', ?μ') |- _ => inverts H
+    | H: hot ⊑ ?μ |- _ => clear H
+    | H: ((?C, ?μ) <: (?C', ?μ')) |- _ => inverts H
+    | H: ?Σ ⊨ ?σ |- context [ dom ?Σ ] => rewrite <- (proj1 H)
+    | H: ?Σ ⊨ ?σ, H':context [ dom ?Σ ] |- _ => rewrite <- (proj1 H) in H'
     end ; sort; cross_rewrites;
   try lia.
 
 (** * Monotonicity results *)
 
 Lemma monotonicity_dom :
-  forall Σ1 Σ2, Σ1 ≼ Σ2 -> (forall l, in_dom Σ1 l -> in_dom Σ2 l).
-Proof with meta; eauto.
+  forall Σ1 Σ2, Σ1 ≼ Σ2 -> (dom Σ1 <= dom Σ2).
+Proof with meta; eauto with lia updates .
   intros.
-  specialize (H l); steps ...
+  destruct Σ1; steps...
+  specialize (H (dom Σ1)) as (? & ? & ?); steps ...
 Qed.
 Global Hint Resolve monotonicity_dom: typ.
 
-Ltac monotonicity_dom :=
-  repeat match goal with
-         | H : ?Σ ≼ ?Σ',
-             H': in_dom ?Σ ?l |- _ =>
-             let Hf := fresh "H__dom" in
-             add_hypothesis Hf (monotonicity_dom Σ Σ' H l H')
-         end.
+(* Ltac monotonicity_dom := *)
+(*   repeat match goal with *)
+(*          | H : ?Σ ≼ ?Σ', *)
+(*              H': in_dom ?Σ ?l |- _ => *)
+(*              let Hf := fresh "H__dom" in *)
+(*              add_hypothesis Hf (monotonicity_dom Σ Σ' H l H') *)
+(*          end. *)
 
 Lemma value_typing_dom : forall Σ l T,
-    Σ ⊨ l : T -> in_dom Σ l.
+    Σ ⊨ l : T -> l < dom Σ.
 Proof with meta; eauto.
   intros ...
 Qed.
@@ -249,10 +266,9 @@ Lemma mn_trans: forall Σ1 Σ2 Σ3,
 Proof with (meta; eauto with lia typ).
   intros.
   intros l; steps.
-  monotonicity_dom.
-  specialize (H l H1); steps.
-  specialize (H0 l) as [ ]; steps; try lia.
-  exists T1 T0; steps ...
+  specialize (H l H1); steps...
+  specialize (H0 l) as [ ]; steps...
+  eexists; eexists...
 Qed.
 Global Hint Resolve mn_trans: typ.
 
@@ -294,23 +310,49 @@ Proof.
     induction H; intros; destruct x; steps; eauto.
 Qed.
 
+Ltac storeTyping_update :=
+  repeat (match goal with
+          | H1: ?Σ ⊨ ?σ,
+              H2: getObj ?σ ?l = Some (?C, ?ω) |- _ =>
+              match goal with
+              | H3: getType Σ l = Some (C, ?μ) |- _ => fail 1
+              | _ => let H_obj := fresh "H__getObj" in
+                    let H_tpe := fresh "H__getType" in
+                    let H_vt := fresh "H__vt" in
+                    destruct ((proj2 H1) l (ltac:(rewrite <-(proj1 H1); apply (getObj_dom σ _ l H2)))) as
+                      (?C & ?ω & ?μ & H_obj & H_tpe & H_vt);
+                    symmetry in H_obj;
+                    rewrite H2 in H_obj; inverts H_obj
+              end
+          | H1: ?Σ ⊨ ?σ,
+              H2: getType ?Σ ?l = Some (?C, ?μ) |- _ =>
+              match goal with
+              | H3: getObj ?σ l = Some (C, ?ω) |- _ => fail 1
+              | _ => let H_obj := fresh "H__getObj" in
+                    let H_tpe := fresh "H__getType" in
+                    let H_vt := fresh "H__vt" in
+                    destruct ((proj2 H1) l (ltac:(rewrite <-(proj1 H1); apply (getObj_dom σ _ l H2)))) as
+                      (?C & ?ω & ?μ & H_obj & H_tpe & H_vt);
+                    symmetry in H_tpe;
+                    rewrite H2 in H_tpe; inverts H_tpe
+              end
+          end; cross_rewrites).
+
 Lemma hot_transitivity : forall (Σ: StoreTyping) (σ: Store) l l',
     wf σ ->
     (Σ ⊨ l : hot) ->
     (Σ ⊨ σ) ->
     (σ ⊨ l ⇝ l') ->
     (Σ ⊨ l' : hot).
-Proof with (meta; eauto with lia typ).
+Proof with (storeTyping_update; meta; eauto with lia typ).
   intros.
   gen Σ.
-  induction H2; steps ...
-  specialize (H4 l0) as [ ] ...
-  steps ...
-  inverts H10; steps ...
-  lets [? _]: H H8.
-  lets: H6 H11.
-  lets [?C [?μ ?]]: fieldType_exists f H11 ...
-  lets [?v [ ]]: H12 H9 ...
+  induction H2; steps...
+  inverts H__vt ...
+  lets [? _]: H H1.
+  lets: H3 H10.
+  lets [?C [?μ ?]]:  fieldType_exists f ...
+  lets [?v [ ]]: H11 H9 ...
   exists C...
 Qed.
 
@@ -325,17 +367,10 @@ Global Hint Resolve aty_refl : typ.
 
 Lemma aty_trans: forall Σ1 Σ2 Σ3,
     Σ1 ▷ Σ2 ->
-    Σ1 ≼ Σ2 ->
     Σ2 ▷ Σ3 ->
     Σ1 ▷ Σ3.
 Proof with steps.
   intros. intros l ...
-(*  specialize (H l) ...
-  specialize (H1 l) ...
-  exists T; split ...
-  destruct H1 as [T' [ ]];
-    eauto with lia.
-  monotonicity_dom; eauto. *)
 Qed.
 Global Hint Resolve aty_trans : typ.
 
@@ -379,7 +414,8 @@ Lemma hot_selection : forall Σ σ (l: Loc) C ω,
                    Σ ⊨ v : (D, hot)).
 Proof with (meta; eauto with typ lia).
   intros ...
-  lets [ ]: H0 l ... steps ...
+  lets [ ]: (proj2 H0) l ...
+  steps ...
   inverts H8.
   lets [? _]: H H6.
   lets: H2 H9.
@@ -394,7 +430,7 @@ Lemma warm_selection : forall Σ σ (l: Loc) C ω f T,
     exists v, getVal ω f = Some v /\ Σ ⊨ v : T.
 Proof with (meta; eauto with typ lia).
   intros ...
-  lets [ ]: H l ... steps ...
+  lets [ ]: (proj2 H) l ... steps ...
   inverts H6.
   - inverts H8.
     lets [?v [ ] ] : H9 H2 ...
@@ -413,7 +449,7 @@ Lemma cool_selection : forall Σ σ C (l: Loc) Ω ω f T,
     exists v, getVal ω f = Some v /\ Σ ⊨ v : T.
 Proof with (meta; eauto with typ lia).
   intros ...
-  lets [ ]: H l ... steps ...
+  lets [ ]: (proj2 H) l ... steps ...
   inverts H9 ...
   - lets [?v [ ] ] : H12 H2 ...
     exists v; split ...
@@ -454,3 +490,12 @@ Proof.
     exists (C, μ1); eauto with typ.
 Qed.
 Global Hint Resolve env_typing_subs: typ.
+
+
+Lemma storeTyping_dom:
+  forall Σ σ,
+    Σ ⊨ σ -> dom σ = dom Σ.
+Proof with (meta; eauto with typ lia).
+  intros ...
+Qed.
+Global Hint Resolve storeTyping_dom: typ.
