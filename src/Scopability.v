@@ -420,7 +420,6 @@ Proof with (rch_set; update_dom; timeout 10 eauto with scp wf rch lia).
         split.
         -- eapply scp_trans with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))]σ2) (L2 := codom ρ ∪ {ψ});
              try eapply H8; eauto 3 with wf lia scp updates.
-           eapply storeSubset_trans with σ2; eauto with updates wf lia.
         -- eapply scp_pr_trans_degenerate with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))] (σ2)) ; eauto with scp lia...
     + destruct IHevalP1; eauto.
       destruct IHevalP2; eauto with wf lia.

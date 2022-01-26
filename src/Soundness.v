@@ -7,142 +7,60 @@ Require Import ssreflect ssrbool Psatz Sets.Ensembles List Coq.Sets.Finite_sets_
 Import ListNotations Arith.
 Open Scope nat_scope.
 
-Lemma e_this2:
-  forall Γ U T,
-    (Γ, U) ⊢ this : T -> U <: T.
-Proof.
-  intros. remember this as e.
-  induction H; steps; meta; eauto with typ.
-Qed.
 
 Local Hint Constructors evalP: typ.
 Local Hint Constructors T_Expr: typ.
 
-Lemma typ_mtd: forall Γ T__this e m args T,
-    ((Γ, T__this) ⊢ (mtd e m args) : T) ->
-    exists C D e__m argTs paramTs μ__m μ0 μ__r,
-      ((Γ, T__this) ⊢ e : (C, μ0)) /\
-        methodInfo C m = Some (μ__m, paramTs, (D, μ__r),  e__m) /\
-        μ0 ⊑ μ__m /\
-        ((Γ, T__this) ⊩ args : argTs) /\
-        S_Typs argTs paramTs /\
-        ((D, hot) <: T) /\
-        ((D, μ__r) <: T \/ P_hots argTs /\ μ0 = hot).
-Proof with (meta; eauto with typ wf lia).
-  introv H.
-  remember (mtd e m args) as E.
-  induction H; steps...
-  - repeat eexists...
-  - repeat eexists; steps...
-  - repeat eexists...
-    clear IHT_Expr H1 H H0 H2.
-    induction argsT ; eauto using S_Typs with typ...
-  - repeat eexists...
-Qed.
-
 Parameter typable_classes: T_Classes.
 
-Ltac move_top t :=
-  try match goal with
-  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t, H8:t, H9:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top;
-     move H4 at top;
-     move H5 at top;
-     move H6 at top;
-     move H7 at top;
-     move H8 at top;
-     move H9 at top
-  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t, H8:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top;
-     move H4 at top;
-     move H5 at top;
-     move H6 at top;
-     move H7 at top;
-     move H8 at top
-  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top;
-     move H4 at top;
-     move H5 at top;
-     move H6 at top;
-     move H7 at top
-  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top;
-     move H4 at top;
-     move H5 at top;
-     move H6 at top
-  | H1:t, H2:t, H3:t, H4:t, H5:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top;
-     move H4 at top;
-     move H5 at top
-  | H1:t, H2:t, H3:t, H4:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top;
-     move H4 at top
-  | H1:t, H2:t, H3:t |- _ =>
-     move H1 at top;
-     move H2 at top;
-     move H3 at top
-  | H1:t, H2:t |- _ =>
-     move H1 at top;
-     move H2 at top
-  | H1:t |- _ =>
-     move H1 at top
-  end.
-Ltac meta_clean :=
-  move_top StoreTyping;
-  move_top EnvTyping;
-  move_top Env;
-  move_top Store;
-  move_top (list Loc);
-  move_top Loc;
-  move_top (list Tpe);
-  move_top Mode; move_top ClN; move_top Expr.
+(** ** Weakening *)
 
-Ltac modus :=
-  repeat match goal with
-         | H: ?A -> ?B, H': ?A |- _ => specialize (H H')
-         end.
 
-Ltac eval_wf2 :=
-  repeat
-    match goal with
-    | H: codom ?ρ ∪ {?ψ} ⪽ ?σ1, H2: dom ?σ1 <= dom ?σ2 |- _ =>
-        let name := fresh "H__codom" in
-        add_hypothesis name (storeSubset_trans _ σ1 σ2 H2 H)
-    | H:⟦ ?e ⟧p (?σ, ?ρ, ?ψ) --> (?v, ?σ'),
-        H1:wf ?σ,
-          H2 : codom ?ρ ∪ {?ψ} ⪽ ?σ
-      |- _ =>
-        match goal with
-        | H':wf σ' |- _ => fail 1
-        | _ =>
-            let H_val := fresh "H_val" in
-            let H_wf := fresh "H_wf" in
-            pose proof (wf_theorem e σ ρ ψ v σ' H H1 H2) as [H_wf H_val]
-        end
-    | H:⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ'),
-        H1:wf ?σ,
-          H2 : codom ?ρ ∪ {?ψ} ⪽ ?σ
-      |- _ =>
-        match goal with
-        | H':wf σ' |- _ => fail 1
-        | _ =>
-            let H_val := fresh "H_val" in
-            let H_wf := fresh "H_wf" in
-            pose proof (wf_theorem_list el σ ρ ψ vl σ' H H2 H1) as [H_wf H_vals]
-        end
-    end.
+Lemma S_Typs_weakening:
+  forall Γ Γ',
+    S_Typs Γ' Γ ->
+    forall x T__x, typeLookup Γ x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x.
+Proof with (meta; eauto with typ).
+  intros. gen x T__x.
+  induction H; steps.
+  - destruct x; steps.
+  - destruct x; steps...
+Qed.
+Global Hint Resolve S_Typs_weakening: typ.
+
+
+Theorem weakening: forall Γ Γ' U e T,
+    (forall x T__x, typeLookup Γ x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x) ->
+    ((Γ, U) ⊢ e : T) ->
+    ((Γ', U) ⊢ e : T).
+Proof with (meta; eauto using T_Exprs with typ lia).
+  intros. gen Γ'.
+  induction H0 using typing_ind with
+    (Pl := fun Γ0 T0 el Ul _ =>
+             forall Γ',
+               (forall x T__x, typeLookup Γ0 x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x) ->
+               ((Γ0, T0) ⊩ el : Ul) ->
+               ((Γ', T0) ⊩ el : Ul));
+    intros ...
+  eapply H in H__lkp as [T__x' [ ]]...
+Qed.
+
+Lemma P_Hots_env:
+  forall Args l args_val Σ1,
+    P_hots Args ->
+    (Args, Σ1) ⊨ args_val ->
+    l ∈ codom args_val ->
+    Σ1 ⊨ l : hot.
+Proof with (meta; eauto with typ).
+  induction Args; intros; steps;
+    inverts H0; inverts H1; simpl in * ...
+  - inverts H.
+    unfold P_hot in H6; steps ...
+    exists C. eapply vt_sub ...
+  - inverts H ...
+Qed.
+Global Hint Resolve P_Hots_env: typ.
+
 
 Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
     ((Γ, U) ⊢ e : T) ->
@@ -196,16 +114,17 @@ Proof with (
     rewrite H__get in H6 |- * ...
     exists Σ, l, σ; steps...
   - (* e = this *)
-    eapply e_this2 in H.
+    eapply t_this_inv in H.
     exists Σ, ψ, σ; steps...
   - (* e = fld *)
+
     admit.
   - (* e = mtd e m l *)
     rename l into args.
     specialize (IHn n ltac:(lia)) as [IH__expr IH__list]...
 
     (* Induction on the typing judgment *)
-    eapply typ_mtd in H as
+    eapply t_mtd_inv in H as
         (?C & ?C & ?e__m & ?Args & ?Flds & ?μ__m & ?μ' & ?μ__r &
            HT__e0 & H__mtdinfo & ? & HT__args & HS__args & H__sub & H__hots) ...
 
@@ -231,34 +150,35 @@ Proof with (
 
     (* Destruct evaluation of arguments *)
     lets H__env0: env_typing_monotonicity H__mn0 H0.
-    eval_dom. eval_wf2...
+    eval_dom. eval_wf...
     lets (?T & ?T & ? & ? & ?): H__mn0 ψ ...
     destruct_eval H__eval1 vl σ';
       lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
       IH__list HT__args H__env0 H__st0 H__wf0 H__eval1; try inverts H__r ...
-    eapply eval_list_implies_evalp in H__eval1. eval_dom; eval_wf2.
+    eapply eval_list_implies_evalp in H__eval1. eval_dom; eval_wf.
 
     (* Destruct evaluation of method body *)
     lets (?T & ?T & ? & ? & ?): H__mn1 ψ...
     lets (?T & ?T & ? & ? & ?): H__mn1 v0...
-    assert (HT__em': (Args, (C1, μ__m)) ⊢ e__m : (C, μ__r)) by admit.
+    assert (HT__em': (Args, (C1, μ__m)) ⊢ e__m : (C, μ__r)) by (eapply weakening with (Γ := Flds); eauto with typ).
+    assert (codom args_val ∪ {v0} ⪽ σ1) by (apply storeSubset_union; [eapply wf_theorem_list |]; eauto with wf).
     destruct (⟦ e__m ⟧ (σ1, args_val, v0 )( n)) as [ | | σ' v' ] eqn:H__eval2; try congruence;
     lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
-      IH__expr HT__em' H__v1 H__st1 H__wf1 H__eval2; try inverts H__r ... admit. admit.
+      IH__expr HT__em' H__v1 H__st1 H__wf1 H__eval2; try inverts H__r ...
     eapply eval_implies_evalp in H__eval2. clear H6.
 
     (* Result *)
+    eval_dom; eval_wf.
     destruct H__hots as [? | [ H__hots ?] ]...
     + exists Σ2, v2, σ2; splits...
     + (* Local reasoning *)
       subst...
       destruct (local_reasoning2 Σ1 Σ2 σ1 σ2 (codom args_val ∪ { v0 }) {v2} ) as
         (Σ3 & ? & ? & ? & ? & H__v2)...
-      * admit.
-      * admit.
-      * admit.
+      * apply scopability_theorem with (e:=e__m); eauto with wf lia.
+      * intros l' [l H__l | l H__l]; rch_set; [| exists C1]...
       * lets: H__v2 v2 In_singleton...
-        lets (? & ? & ? & ? & ?): H6 v2...
+        lets (? & ? & ? & ? & ?): H12 v2...
         exists Σ3, v2, σ2; splits...
 
   - (* e = new C l *)

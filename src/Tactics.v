@@ -219,3 +219,77 @@ Ltac nat_le_trans :=
    | _ => assert (a <= c) by lia
    end
   end.
+
+Ltac modus :=
+  repeat match goal with
+         | H: ?A -> ?B, H': ?A |- _ => specialize (H H')
+         end.
+
+Ltac move_top t :=
+  try match goal with
+  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t, H8:t, H9:t, H10:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top;
+     move H5 at top;
+     move H6 at top;
+     move H7 at top;
+     move H8 at top;
+     move H9 at top;
+     move H10 at top
+  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t, H8:t, H9:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top;
+     move H5 at top;
+     move H6 at top;
+     move H7 at top;
+     move H8 at top;
+     move H9 at top
+  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t, H8:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top;
+     move H5 at top;
+     move H6 at top;
+     move H7 at top;
+     move H8 at top
+  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t, H7:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top;
+     move H5 at top;
+     move H6 at top;
+     move H7 at top
+  | H1:t, H2:t, H3:t, H4:t, H5:t, H6:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top;
+     move H5 at top;
+     move H6 at top
+  | H1:t, H2:t, H3:t, H4:t, H5:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top;
+     move H5 at top
+  | H1:t, H2:t, H3:t, H4:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top;
+     move H4 at top
+  | H1:t, H2:t, H3:t |- _ =>
+     move H1 at top;
+     move H2 at top;
+     move H3 at top
+  | H1:t, H2:t |- _ =>
+     move H1 at top;
+     move H2 at top
+  | H1:t |- _ =>
+     move H1 at top
+  end.

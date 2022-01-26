@@ -193,23 +193,47 @@ Definition T_Prog :=
   | _ => False
   end.
 
+
+
+
+
+(** * Inversion lemmas *)
+
+Lemma t_this_inv:
+  forall Γ U T,
+    (Γ, U) ⊢ this : T -> U <: T.
+Proof.
+  intros. remember this as e.
+  induction H; steps; eauto with typ.
+Qed.
+
+Lemma t_mtd_inv: forall Γ T__this e m args T,
+    ((Γ, T__this) ⊢ (mtd e m args) : T) ->
+    exists C D e__m argTs paramTs μ__m μ0 μ__r,
+      ((Γ, T__this) ⊢ e : (C, μ0)) /\
+        methodInfo C m = Some (μ__m, paramTs, (D, μ__r),  e__m) /\
+        μ0 ⊑ μ__m /\
+        ((Γ, T__this) ⊩ args : argTs) /\
+        S_Typs argTs paramTs /\
+        ((D, hot) <: T) /\
+        ((D, μ__r) <: T \/ P_hots argTs /\ μ0 = hot).
+Proof with (eauto with typ wf lia).
+  introv H.
+  remember (mtd e m args) as E.
+  induction H; steps...
+  - repeat eexists...
+  - repeat eexists; steps...
+  - destruct U.
+    repeat eexists...
+    clear IHT_Expr H1 H H0 H2.
+    induction argsT ; eauto using S_Typs with typ...
+  - repeat eexists...
+Qed.
+
+
 (** ** Induction principle for typing *)
-(** The induction assumes the classtable is correct ! *)
+
 Section typing_ind.
-  (* Parameter typable_classes : T_Classes.*)
-
-  (* Lemma typable_method : forall m C μ ρ T e__m, *)
-  (*     methodInfo C m = Some (μ, ρ, T, e__m) -> *)
-  (*     ((ρ, (C, μ)) ⊢ e__m : T). *)
-  (* Proof. *)
-  (*   intros. *)
-  (*   destruct (ct C) as [Args Flds Mtds] eqn: H__ct. *)
-  (*   unfold methodInfo in *. *)
-  (*   pose proof (typable_classes C); steps. *)
-  (*   lets : H2 matched0; assumption. *)
-  (* Qed. *)
-
-
   Variable P : forall Γ T e U, ((Γ, T) ⊢ e : U) -> Prop.
   Variable Pl : forall Γ T el Ul, ((Γ, T) ⊩ el : Ul) -> Prop.
 

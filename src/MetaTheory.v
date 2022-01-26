@@ -180,6 +180,17 @@ Ltac meta :=
     end ; sort; cross_rewrites;
   try lia.
 
+Ltac meta_clean :=
+  move_top StoreTyping;
+  move_top EnvTyping;
+  move_top Env;
+  move_top Store;
+  move_top (list Loc);
+  move_top Loc;
+  move_top (list Tpe);
+  move_top Mode; move_top ClN; move_top Expr.
+
+
 (** * Monotonicity results *)
 
 Lemma monotonicity_dom :

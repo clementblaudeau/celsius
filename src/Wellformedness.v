@@ -254,29 +254,34 @@ Global Hint Resolve correct_value: wf.
 
 (** A useful tactic: *)
 Ltac eval_wf :=
-  repeat match goal with
-  | H: ⟦ ?e ⟧p (?σ, ?ρ, ?ψ ) -->( ?v, ?σ'),
-      H1:wf ?σ
-    |- _ => match goal with
-          | H':wf σ' |- _ => fail 1
-          | _ =>
-              let H_val := fresh "H_val" in
-              let H_wf := fresh "H_wf" in
-              pose proof (wf_theorem e σ ρ ψ v σ' H) as [H_wf H_val]; eauto with wf
-          end
-  | H: ⟦_ ?el _⟧p (?σ, ?ρ, ?ψ ) --> (?vl, ?σ'),
-      H1:wf ?σ
-    |- _ => match goal with
-          | H':wf σ' |- _ => fail 1
-          | _ =>
-              let H_val := fresh "H_val" in
-              let H_wf := fresh "H_wf" in
-              let H_codom := fresh "H_codom" in
-              pose proof (wf_theorem_list el σ ρ ψ vl σ' H)
-                as [H_wf H_vals];
-              eauto with wf pM
-          end
-  end.
+  repeat
+    match goal with
+    | H: codom ?ρ ∪ {?ψ} ⪽ ?σ1, H2: dom ?σ1 <= dom ?σ2 |- _ =>
+        let name := fresh "H__codom" in
+        add_hypothesis name (storeSubset_trans _ σ1 σ2 H2 H)
+    | H:⟦ ?e ⟧p (?σ, ?ρ, ?ψ) --> (?v, ?σ'),
+        H1:wf ?σ,
+          H2 : codom ?ρ ∪ {?ψ} ⪽ ?σ
+      |- _ =>
+        match goal with
+        | H':wf σ' |- _ => fail 1
+        | _ =>
+            let H_val := fresh "H_val" in
+            let H_wf := fresh "H_wf" in
+            pose proof (wf_theorem e σ ρ ψ v σ' H H1 H2) as [H_wf H_val]
+        end
+    | H:⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ'),
+        H1:wf ?σ,
+          H2 : codom ?ρ ∪ {?ψ} ⪽ ?σ
+      |- _ =>
+        match goal with
+        | H':wf σ' |- _ => fail 1
+        | _ =>
+            let H_val := fresh "H_val" in
+            let H_wf := fresh "H_wf" in
+            pose proof (wf_theorem_list el σ ρ ψ vl σ' H H2 H1) as [H_wf H_vals]
+        end
+    end.
 
 (** Partially monotonic wellformed stores keep objects warm *)
 Lemma pM_wf_warm_monotone:
