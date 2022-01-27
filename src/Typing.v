@@ -12,7 +12,7 @@ Inductive S_Mode: Mode -> Mode -> Prop :=
 | s_mode_union: forall Ω1 Ω2, cool (Ω1 + Ω2) ⊑ cool Ω1
 | s_mode_cold: forall μ, μ ⊑ cold
 where "m1 ⊑ m2" := (S_Mode m1 m2).
-Global Hint Resolve s_mode_cold s_mode_hot s_mode_warm s_mode_union: typ.
+Global Hint Resolve s_mode_cold s_mode_hot s_mode_warm s_mode_union s_mode_refl: typ.
 
 Lemma s_mode_trans: forall μ1 μ2 μ3, μ1 ⊑ μ2 -> μ2 ⊑ μ3 -> μ1 ⊑ μ3.
 Proof.
@@ -33,6 +33,7 @@ Proof.
     rewrite H0 in H1.
     assumption.
 Qed.
+Global Hint Resolve s_mode_cool: typ.
 
 (* Subtyping *)
 
@@ -228,6 +229,49 @@ Proof with (eauto with typ wf lia).
     clear IHT_Expr H1 H H0 H2.
     induction argsT ; eauto using S_Typs with typ...
   - repeat eexists...
+Qed.
+
+Lemma t_fld_inv:
+  forall Γ T__this e f C μ,
+    ((Γ, T__this) ⊢ (fld e f) : (C, μ)) ->
+    exists D μ__e μ__f,
+      ((Γ, T__this) ⊢ e : (D, μ__e)) /\
+        fieldType D f = Some (C, μ__f) /\
+        ((μ__e = hot) \/ (μ__e = warm /\ μ__f ⊑ μ) \/ (exists Ω, μ__e = cool Ω /\ f < Ω /\ μ__f ⊑ μ)).
+Proof with (eauto with typ wf lia).
+  introv H.
+  remember (fld e f) as E.
+  remember (C,μ) as T.
+  gen C μ e f.
+  induction H; steps...
+  all: try destruct U' as [?C ?μ]; inverts H0.
+  all: try specialize (IHT_Expr C μ0 eq_refl _ _ eq_refl)
+    as (?D & ?μ__e & ?C & ?μ__f & ? & ? & [|[|]]); steps...
+  all: repeat eexists...
+  all: right; right; eexists...
+Qed.
+
+Lemma t_asgn_inv:
+  forall Γ T__this e1 f e2 e3 C μ,
+    ((Γ, T__this) ⊢ (asgn e1 f e2 e3) : (C, μ)) ->
+    exists D μ1 μ',
+      ((Γ, T__this) ⊢ (fld e1 f) : (D, μ1)) /\
+        ((Γ, T__this) ⊢ e2 : (D, hot)) /\
+        (μ' ⊑ μ) /\
+        ((Γ, T__this) ⊢ e3 : (C, μ')).
+Proof with (eauto with typ wf lia).
+  introv H.
+  remember (asgn e1 f e2 e3) as E.
+  remember (C,μ) as T.
+  gen C μ e1 f e2 e3.
+  induction H; steps...
+  - destruct U' as [?C ?μ]; inverts H0.
+    specialize (IHT_Expr C _ eq_refl _ _ _ _ eq_refl)
+      as (?D & ?μ1 & ?μ' & ? & ? & ? & ?); steps...
+    repeat eexists...
+    eapply t_sub...
+  - clear H2 H3 H4.
+    exists C, μ, μ0; splits...
 Qed.
 
 

@@ -108,21 +108,65 @@ Proof with (
   induction n as [n IHn] using lt_wf_ind. destruct n;
     intros; unfold expr_soundness, expr_list_soundness; split; intros;
     [steps | steps | destruct e | destruct el]; subst;
-    simpl in *...
+    simpl in *;
+    specialize (IHn n ltac:(lia)) as [IH__expr IH__list]...
+
   - (* e = var x *)
     eapply env_regularity in H as (?l & ?H__get & ?)...
     rewrite H__get in H6 |- * ...
     exists Σ, l, σ; steps...
+
   - (* e = this *)
     eapply t_this_inv in H.
     exists Σ, ψ, σ; steps...
-  - (* e = fld *)
 
-    admit.
+  - (*  e = fld e f *)
+    rename v into f.
+    (* Induction on the typing judgment *)
+    eapply t_fld_inv in H as
+        (D & μ__e & μ__f & HT__e & H__fieldType & H__mode) ...
+    destruct (ct D) as [Args Flds Mtds] eqn:H__ct.
+
+    (* Destruct evaluation of e *)
+    destruct_eval H__eval v' σ';
+      lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
+      IH__expr HT__e H0 H1 H3 H__eval; try inverts H__r ...
+    eapply eval_implies_evalp in H__eval.
+    lets (?C & ?ω & ?μ & H__obj & ? & H__ot): (proj2 H__st0) v0 ...
+    rewrite H__obj in H6 |- *.
+
+    (* Case analysis *)
+    destruct H__mode as [ ? |[ [? ?] | [Ω [? [? ?]]]]]; subst...
+    + (* hot *)
+      inverts H__ot...
+      lets [v1 [ ]]: H13 H__fieldType... rewrite_any.
+      exists Σ0, v1, σ0; splits ...
+    + (* warm *)
+      inversion H11; subst;
+        inverts H__ot;
+        lets [v1 [ ]]: H15 H__fieldType...
+      all: rewrite_any.
+      all: exists Σ0, v1, σ0; splits ...
+    + (* cool Ω *)
+      inversion H11; subst;
+        inverts H__ot.
+      * (* cool Ω *)
+        destruct (getVal ω f) as [v1 |] eqn:H__getVal; [|apply nth_error_None in H__getVal] ...
+        lets: H14 H__getVal H__fieldType...
+        exists Σ0, v1, σ0; splits ...
+      * (* hot *)
+        lets [v1 [ ]]: H16 H__fieldType... rewrite_any.
+        exists Σ0, v1, σ0; splits ...
+      * (* warm *)
+        lets [v1 [ ]]: H16 H__fieldType... rewrite_any.
+        exists Σ0, v1, σ0; splits ...
+      * (* cool Ω1 + Ω2 *)
+        destruct (getVal ω f) as [v1 |] eqn:H__getVal; [|apply nth_error_None in H__getVal] ...
+        lets: H14 H__getVal H__fieldType...
+        exists Σ0, v1, σ0; splits ...
+
   - (* e = mtd e m l *)
     rename l into args.
-    specialize (IHn n ltac:(lia)) as [IH__expr IH__list]...
-
     (* Induction on the typing judgment *)
     eapply t_mtd_inv in H as
         (?C & ?C & ?e__m & ?Args & ?Flds & ?μ__m & ?μ' & ?μ__r &
@@ -142,12 +186,6 @@ Proof with (
     destruct (ct C1) as [Args1 Flds1 Mtds1] eqn:H__ct1.
     destruct (Mtds1 m) as [[?μ__r Ts retT ?] |] eqn:H__Mtds1; [| steps] . inverts H__mtdinfo...
 
-    (* Extract typing for method body from Ξ (well-typed) *)
-    pose proof (typable_classes C1) as HT__em.
-    rewrite H__ct1 in HT__em.
-    destruct HT__em as [_ HT__em].
-    specialize (HT__em m _ _ _ _ H__Mtds1).
-
     (* Destruct evaluation of arguments *)
     lets H__env0: env_typing_monotonicity H__mn0 H0.
     eval_dom. eval_wf...
@@ -156,6 +194,12 @@ Proof with (
       lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
       IH__list HT__args H__env0 H__st0 H__wf0 H__eval1; try inverts H__r ...
     eapply eval_list_implies_evalp in H__eval1. eval_dom; eval_wf.
+
+    (* Extract typing for method body from Ξ (well-typed) *)
+    pose proof (typable_classes C1) as HT__em.
+    rewrite H__ct1 in HT__em.
+    destruct HT__em as [_ HT__em].
+    specialize (HT__em m _ _ _ _ H__Mtds1).
 
     (* Destruct evaluation of method body *)
     lets (?T & ?T & ? & ? & ?): H__mn1 ψ...
@@ -185,7 +229,66 @@ Proof with (
     admit.
 
   - (* e = e1.f = e2; e3 *)
-    admit.
+    rename v into f.
+
+    (* Induction on typing derivation *)
+    eapply t_asgn_inv in H as
+        (D & ? & ? & HT__e1 & HT__e2 & ? & HT__e3) ...
+    eapply t_fld_inv in HT__e1 as
+        (?D & μ__e & μ__f & HT__e1 & H__fieldType & H__mode) ...
+
+    (* Destruct evaluation of e1 *)
+    destruct_eval H__eval1 v' σ';
+      lets (Σ1 & v1 & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
+      IH__expr HT__e1 H0 H1 H3 H__eval1; try inverts H__r ...
+    eapply eval_implies_evalp in H__eval1.
+    lets (?C & ?ω & ?μ & H__obj & ? & H__ot): (proj2 H__st1) v1 ...
+
+    (* Destruct evaluation of e2 *)
+    lets (?T & ?T & ? & ? & ?): H__mn1 ψ ...
+    lets H__env1: env_typing_monotonicity H__mn1 H0.
+    eval_dom. eval_wf...
+    destruct_eval H__eval2 v' σ';
+      lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
+      IH__expr HT__e2 H__env1 H__st1 H__wf1 H__eval2; try inverts H__r ...
+    eapply eval_implies_evalp in H__eval2. eval_dom; eval_wf.
+    lets (?T & ?T & ? & ? & ?): H__mn2 ψ ...
+
+    (* Destruct assignment *)
+    unfold assign in *.
+    destruct (getObj σ2 v1) as [[?C ?ω] |] eqn:H__getObj.
+
+    + (* Useful assignment *)
+      remember ([v1 ↦ (C1, [f ↦ v2] (ω0))] (σ2)) as σ2'.
+      assert (H__st2': Σ2 ⊨ σ2'). {
+        subst. rename v1 into l, v2 into v.
+        lets [?ω [H__obj2 _]]: pM_theorem H__eval2 H__obj.
+        lets [v0 [H__v0 ?]]: cool_selection D0 l H__st2 H__obj2... {
+          lets (?T & ?T & ? & ? & ?): H__mn2 l...
+          steps...
+          apply vt_sub with (C1, μ5)...
+          apply s_typ_mode...
+          eapply s_mode_trans...
+          eapply s_mode_trans...
+          apply s_mode_cool...
+        }
+        meta.
+        eapply storeTyping_assgn with (μ0 := μ5) ...
+      }
+      assert (H__wf2': wf σ2') by (subst; eapply wf_assign; eauto).
+      assert (H__codom' : (codom ρ ∪ {ψ}) ⪽ σ2') by (eapply storeSubset_trans; subst; update_dom; eauto).
+      destruct (⟦ e3 ⟧ (σ2', ρ, ψ )( n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
+        lets (Σ3 & v3 & σ3 & H__r & H__mn3 & H__stk3 & H__aty3 & H__st3 & H__wf3 & H__v3) :
+        IH__expr HT__e3 H__st2' H__eval3; try inverts H__r ...
+      (* eapply eval_implies_evalp in H__eval3. eval_dom; eval_wf.*)
+      exists Σ3, v3, σ3; subst; splits...
+
+    + (* Useless assignment *)
+      destruct (⟦ e3 ⟧ (σ2, ρ, ψ )( n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
+        lets (Σ3 & v3 & σ3 & H__r & H__mn3 & H__stk3 & H__aty3 & H__st3 & H__wf3 & H__v3) :
+        IH__expr HT__e3 H__st2 H__wf2 H__eval3; try inverts H__r ...
+      eapply eval_implies_evalp in H__eval3. eval_dom; eval_wf.
+      exists Σ3, v3, σ3; splits...
 
   - (* el = nil *)
     inverts H.
@@ -193,7 +296,6 @@ Proof with (
     apply et_nil.
 
   - (* el = e::el *)
-    specialize (IHn n ltac:(lia)) as [IH__expr IH__list]...
     inverts H ...
 
     (* Destruct evaluation of head *)
