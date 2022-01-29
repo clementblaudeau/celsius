@@ -64,6 +64,14 @@ Proof.
 Qed.
 Global Hint Resolve s_typ_trans: typ.
 
+Lemma S_typs_refl:
+  forall Ts, S_Typs Ts Ts.
+Proof.
+  induction Ts; steps; eauto with typ.
+  apply s_typs_cons; eauto with typ.
+Qed.
+Global Hint Resolve S_typs_refl: typ.
+
 Definition P_hot (T: Tpe) :=
   match T with
   | (_, hot) => True
@@ -208,29 +216,6 @@ Proof.
   induction H; steps; eauto with typ.
 Qed.
 
-Lemma t_mtd_inv: forall Γ T__this e m args T,
-    ((Γ, T__this) ⊢ (mtd e m args) : T) ->
-    exists C D e__m argTs paramTs μ__m μ0 μ__r,
-      ((Γ, T__this) ⊢ e : (C, μ0)) /\
-        methodInfo C m = Some (μ__m, paramTs, (D, μ__r),  e__m) /\
-        μ0 ⊑ μ__m /\
-        ((Γ, T__this) ⊩ args : argTs) /\
-        S_Typs argTs paramTs /\
-        ((D, hot) <: T) /\
-        ((D, μ__r) <: T \/ P_hots argTs /\ μ0 = hot).
-Proof with (eauto with typ wf lia).
-  introv H.
-  remember (mtd e m args) as E.
-  induction H; steps...
-  - repeat eexists...
-  - repeat eexists; steps...
-  - destruct U.
-    repeat eexists...
-    clear IHT_Expr H1 H H0 H2.
-    induction argsT ; eauto using S_Typs with typ...
-  - repeat eexists...
-Qed.
-
 Lemma t_fld_inv:
   forall Γ T__this e f C μ,
     ((Γ, T__this) ⊢ (fld e f) : (C, μ)) ->
@@ -249,6 +234,47 @@ Proof with (eauto with typ wf lia).
     as (?D & ?μ__e & ?C & ?μ__f & ? & ? & [|[|]]); steps...
   all: repeat eexists...
   all: right; right; eexists...
+Qed.
+
+Lemma t_mtd_inv: forall Γ T__this e m args T,
+    ((Γ, T__this) ⊢ (mtd e m args) : T) ->
+    exists C D e__m argTs paramTs μ__m μ0 μ__r,
+      ((Γ, T__this) ⊢ e : (C, μ0)) /\
+        methodInfo C m = Some (μ__m, paramTs, (D, μ__r),  e__m) /\
+        μ0 ⊑ μ__m /\
+        ((Γ, T__this) ⊩ args : argTs) /\
+        S_Typs argTs paramTs /\
+        ((D, hot) <: T) /\
+        ((D, μ__r) <: T \/ P_hots argTs /\ μ0 = hot).
+Proof with (eauto with typ wf lia).
+  introv H.
+  remember (mtd e m args) as E.
+  induction H; steps;
+    try solve [repeat eexists; eauto with typ].
+  destruct U.
+  repeat eexists...
+Qed.
+
+Lemma t_new_inv:
+  forall Γ T__this C args T,
+    ((Γ, T__this) ⊢ (new C args) : T) ->
+    exists Args Flds Mtds argsTs μ,
+      T = (C, μ) /\
+        ct C = class Args Flds Mtds /\
+        ((Γ, T__this) ⊩ args : argsTs) /\
+        S_Typs argsTs Args /\
+        (warm ⊑ μ \/ (P_hots argsTs)).
+Proof with (eauto with typ wf lia).
+  introv H.
+  remember (new C args) as E.
+  induction H; subst; try discriminate...
+  - destruct U as [C' μ], U' as [? μ']. inverts H0.
+    destruct IHT_Expr as (Args & Flds & Mtds & argsTs & μ0 & ? & ? & ? & ? & ?)...
+    inverts H0.
+    exists Args, Flds, Mtds, argsTs, μ; splits...
+    destruct H5...
+  - repeat eexists; steps...
+  - exists Args Flds Mtds argsTs hot; splits ...
 Qed.
 
 Lemma t_asgn_inv:

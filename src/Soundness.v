@@ -76,6 +76,8 @@ Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
         Σ' ⊨ v : T.
 
+(* Expr soundness trans lemma *)
+
 Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
     ((Γ, U) ⊩ el : Tl) ->
     (Γ, Σ) ⊨ ρ ->
@@ -90,13 +92,44 @@ Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
         (Tl, Σ') ⊨ vl.
 
+Definition init_soundness n C flds I ρ σ Γ Σ r :=
+  forall Args Flds Mtds ω,
+    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ σ ->
+
+    wf σ ->
+    (codom ρ ∪ {I} ⪽ σ) ->
+
+    ct C = class Args Flds Mtds ->
+    getObj σ I = Some (C, ω) ->
+    dom ω + dom flds = dom Flds ->
+    (Σ ⊨ I : cool (dom ω)) ->
+
+    init C flds I ρ σ n = r ->
+    r <> Timeout_i ->
+
+    exists Σ' σ',
+      r = Success_i σ' /\
+        Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
+        ( forall L σ0,
+            (* Hypothesis *)
+            ((σ0, L) ⋖ (σ, (codom ρ) ∪ {I})) ->
+            (σ0 ⇝ σ ⋖ L) ->
+            dom σ0 <= dom σ ->
+            (* Conclusions *)
+            ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\
+              (σ0 ⇝ σ' ⋖ L) /\
+              (exists ω', getObj σ' I = Some (C, ω') /\ dom ω' = dom Flds)).
+
 
 Theorem soundness:
   forall n,
     (forall e ρ σ ψ r Γ Σ U T,
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
     (forall el ρ σ ψ r Γ Σ U Tl,
-      expr_list_soundness n el ρ σ ψ r Γ Σ U Tl).
+      expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
+    (forall C flds I ρ σ Γ Σ r,
+       init_soundness n C flds I ρ σ Γ Σ r).
 Proof with (
     meta;
     meta_clean;
@@ -106,10 +139,10 @@ Proof with (
         end
   ).
   induction n as [n IHn] using lt_wf_ind. destruct n;
-    intros; unfold expr_soundness, expr_list_soundness; split; intros;
-    [steps | steps | destruct e | destruct el]; subst;
+    intros; unfold expr_soundness, expr_list_soundness, init_soundness; splits; intros;
+    [steps | steps | steps | destruct e | destruct el | destruct flds ]; subst;
     simpl in *;
-    specialize (IHn n ltac:(lia)) as [IH__expr IH__list]...
+    try specialize (IHn n ltac:(lia)) as [IH__expr [IH__list IH__init]]...
 
   - (* e = var x *)
     eapply env_regularity in H as (?l & ?H__get & ?)...
@@ -219,13 +252,40 @@ Proof with (
       subst...
       destruct (local_reasoning2 Σ1 Σ2 σ1 σ2 (codom args_val ∪ { v0 }) {v2} ) as
         (Σ3 & ? & ? & ? & ? & H__v2)...
-      * apply scopability_theorem with (e:=e__m); eauto with wf lia.
+      * apply scp_theorem with (e:=e__m); eauto with wf lia.
       * intros l' [l H__l | l H__l]; rch_set; [| exists C1]...
       * lets: H__v2 v2 In_singleton...
         lets (? & ? & ? & ? & ?): H12 v2...
         exists Σ3, v2, σ2; splits...
 
   - (* e = new C l *)
+    rename l into args.
+
+    (* Induction on the typing judgment *)
+    eapply t_new_inv in H as
+        (Args & Flds & Mts & argsTs & ?μ & ? & H__ct & HT__args & HS__args & H__mode) ...
+
+    (* Destruct evaluation of arguments *)
+    destruct_eval H__eval1 vl σ';
+      lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
+      IH__list HT__args H0 H1 H3 H__eval1; try inverts H__r ...
+    inverts H... rename c into C.
+    rewrite H__ct in H6 |- *.
+    eapply eval_list_implies_evalp in H__eval1...
+
+    (* Destruct result of initialization *)
+    assert ((codom args_val ∪ {dom σ1}) ⪽ σ1 ++ [(C, [])]). {
+      lets [ ]: wf_theorem_list H__eval1...
+      eapply storeSubset_union; [eapply storeSubset_trans with σ1 |]; update_dom...
+      eapply storeSubset_singleton3; rewrite dom_app... }
+    remember (Σ1 ++ [(C, cool 0)]) as Σ1'.
+    assert (Σ1' ⊨ σ1 ++ [(C, [])]).
+    lets: getObj_last σ1 C ([]:Env).
+    destruct (init C Flds dom σ1 args_val (σ1 ++ [(C, [])]) n) as [ | | σ2] eqn:Heq;
+      rewrite Heq in H6 |- *; [congruence | |].
+    + lets: IH__init H__v1 Heq...
+
+
     admit.
 
   - (* e = e1.f = e2; e3 *)
@@ -310,10 +370,23 @@ Proof with (
     destruct (⟦_ el _⟧ (σ0, ρ, ψ )( n)) as [ | | σ' vl' ] eqn:H__eval1; try congruence;
     lets (Σ1 & vl & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1):
       IH__list H12 H__env0 H__st0 H__wf0 H__eval1; try inverts H__r ...
-    exists Σ1, (v::vl), σ1; splits...
 
     (* Result *)
+    exists Σ1, (v::vl), σ1; splits...
     lets (?T & ?T & ? & ? & ?): H__mn1 v ...
     apply et_cons...
+
+  - (* init [] *)
+    exists Σ σ; splits...
+    intros; splits...
+
+  - (* init f::flds *)
+
+
+
+
+
+
+
 
 Admitted.

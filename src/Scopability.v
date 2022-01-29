@@ -330,7 +330,7 @@ Global Hint Extern 1 => rewrite update_dom : updates.
 
 (** ** Main Scopability theorem *)
 (** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)
-Theorem scopability_theorem:
+Theorem scp_theorem:
   forall e σ ρ ψ v σ',
     ⟦e⟧p (σ, ρ, ψ) --> (v, σ') ->
     (codom ρ) ∪ {ψ} ⪽ σ -> wf σ ->
@@ -460,6 +460,52 @@ Proof with (rch_set; update_dom; timeout 10 eauto with scp wf rch lia).
     + simpl in * ...
     + eapply scp_add_env; eauto with lia wf; update_dom.
       * apply H6.
+      * eapply scp_trans ...
+      * eapply scp_trans ...
+    + eapply scp_pr_trans; eauto.
+      eapply scp_pr_trans; eauto.
+      unfold scoping_preservation; intros ...
+Qed.
+
+Corollary scp_theorem_init:
+  forall C flds I ρ σ σ',
+    initP C flds I ρ σ σ' ->
+    forall L σ0 Args Flds Mtds ω,
+      (* Hypothesis *)
+      wf σ ->
+      (codom ρ ∪ {I}) ⪽ σ ->
+      ct C = class Args Flds Mtds ->
+      getObj σ I = Some (C, ω) ->
+      dom ω + dom flds = dom Flds ->
+      ((σ0, L) ⋖ (σ, (codom ρ) ∪ {I})) ->
+      (σ0 ⇝ σ ⋖ L) ->
+      dom σ0 <= dom σ ->
+      (* Conclusions *)
+      ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\
+        (σ0 ⇝ σ' ⋖ L) /\
+        (exists ω', getObj σ' I = Some (C, ω') /\ dom ω' = dom Flds).
+Proof with (rch_set; update_dom; timeout 10 eauto with scp wf rch lia).
+  introv H.
+  induction H; intros.
+  - splits...
+    simpl in *.
+    exists ω; split...
+  - lets [ ]: scp_theorem H; eauto. unfold assign_new in H0.
+    destruct (getObj σ1 I) as [[?C ?ω] |] eqn:H__obj; [| steps].
+    inverts H0.
+    specialize (IHinitP L σ0 Args Flds Mtds (ω0++[v])).
+    lets [?ω [ ]]: eM_theorem H H5; cross_rewrites. simpl in *.
+    eval_dom; eval_wf.
+    destruct IHinitP as [ ? [ ]]; update_dom; eauto with lia.
+    + unfold wf; intros; update_dom.
+      getObj_update; steps; cross_rewrites; update_dom; eauto with wf lia.
+      * eapply getVal_add in H15; steps ...
+        eapply H_wf ...
+      * eapply H_wf ...
+    + eapply storeSubset_trans with σ1; update_dom...
+    + rewrite getObj_update1...
+    + eapply scp_add_env; eauto with lia wf; update_dom.
+      * apply H8.
       * eapply scp_trans ...
       * eapply scp_trans ...
     + eapply scp_pr_trans; eauto.

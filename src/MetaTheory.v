@@ -79,12 +79,13 @@ Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
         exists v,
           getVal ω f = Some v /\ (Σ ⊨ v : (D, μ))) ->
     object_typing Σ (C,ω) (C, warm)
-| ot_cool : forall Σ C ω,
+| ot_cool : forall Σ C ω n,
     (forall f v T μ,
         getVal ω f = Some v ->
         fieldType C f = Some (T, μ) ->
         Σ ⊨ v : (T, μ)) ->
-    object_typing Σ (C,ω) (C, cool (dom ω))
+    dom ω = n ->
+    object_typing Σ (C,ω) (C, cool n)
 | ot_cold : forall Σ C ω,
     (forall f v T μ,
         getVal ω f = Some v ->
@@ -474,15 +475,92 @@ Proof with (meta; eauto with typ lia).
 Qed.
 
 
-(* (** ** Initialization results *) *)
-(* Lemma field_initialization: forall Σ σ l l' C Ω ω T, *)
-(*     Σ ⊨ σ -> *)
-(*     getType Σ l = Some (C, cool Ω) *)
-(*     getObj σ l = Some (C, ω) -> *)
-(*     fieldType C f = Some T -> *)
-(*     (Σ ⊨ l' : T) -> *)
-(*     let σ' := [l ↦ (C, [f ↦ l']ω)]σ in *)
-(*     let Σ' := [ ]Σ *)
+(** ** Initialization results *)
+Lemma field_initialization: forall C I σ ω T Σ v,
+    wf σ ->
+    Σ ⊨ σ ->
+    getObj σ I = Some (C, ω) ->
+    getType Σ I = Some (C, cool (dom ω)) ->
+    fieldType C (dom ω) = Some T ->
+    (Σ ⊨ v : T) ->
+    forall σ' Σ',
+      assign_new I v σ = Some σ' ->
+      Σ' = [I ↦ (C, cool (S (dom ω)))]Σ ->
+      (Σ' ⊨ σ') /\ Σ ≼ Σ' /\ Σ ≪ Σ'.
+Proof with (meta; eauto with typ lia).
+  intros. subst.
+  assert (H__fo: forall A B C : Prop , (B -> A) -> B -> C -> A /\ B /\ C) by firstorder.
+  unfold assign_new in *.
+  apply H__fo; clear H__fo; steps.
+
+  - (* ⊨ *)
+    split; repeat rewrite update_one3...
+    intros l H__l.
+    lets (?C & ?ω & ?μ & ? & ? & ?): (proj2 H0) l...
+    destruct_eq (I = l); subst...
+    + unfold getType, getObj; repeat rewrite update_one1...
+      exists C, (ω++(v::nil)), (cool (S dom ω)); splits...
+      eapply ot_cool; eauto with updates ...
+      intros.
+      apply getVal_add in H2 as [(? & ?)|(H__f & H__getVal)]; subst...
+      * destruct_eq (v0 = l); subst.
+        -- exists (C, cool (S (dom ω)));
+             unfold getType; try rewrite update_one1...
+           eapply s_typ_mode...
+           eapply s_mode_trans with (cool (dom ω)) ...
+           eapply s_mode_cool...
+        -- exists (T, μ0);
+             unfold getType; try rewrite update_one2...
+      * inverts H10.
+        lets: H15 H11...
+    + exists C1, ω0, μ1; splits;
+        unfold getType, getObj; repeat rewrite update_one2...
+
+  - (* ≼ *)
+    intros l H__l.
+    destruct_eq (l = I); subst...
+    + unfold getType, getObj in *;
+        repeat rewrite update_one1...
+      eexists; eexists; splits ...
+      eapply s_typ_mode...
+      eapply s_mode_trans with (cool (dom ω)) ...
+      eapply s_mode_cool...
+    + destruct (getType Σ l) as [[C' μ'] |] eqn:?; [| exfalso; eapply getType_none; eauto with typ]...
+      exists (C', μ'), (C', μ'); splits...
+      unfold getType;
+        repeat rewrite update_one2...
+
+  - (* ≪ *)
+    intros l H__l. right. rewrite update_one3 in H__l...
+Qed.
+
+Lemma Promotion: forall Σ1 Σ2 C I σ2 Args Flds Mtds,
+    Σ1 ▷ Σ2 ->
+    Σ1 ≼ Σ2 ->
+    ct C = class Args Flds Mtds ->
+    I > dom Σ1 ->
+    getType Σ2 I = Some (C, cool (dom Flds)) ->
+    Σ2 ⊨ σ2 ->
+    forall Σ3,
+      Σ3 = [I ↦ (C, warm)]Σ2 ->
+      Σ1 ▷ Σ3 /\
+      Σ1 ≼ Σ3 /\
+        Σ2 ⊨ σ2.
+Proof with (meta; eauto with typ lia).
+  intros. subst.
+  assert (H__fo: forall A B C : Prop, A -> B -> (A -> B -> C) -> A /\ B /\ C) by firstorder.
+  apply H__fo; clear H__fo; intros.
+
+  - (* ▷ *)
+    intros l H__l Ω. intros.
+    destruct_eq (l = I); subst...
+
+
+
+
+
+
+
 
 (** Env typing lemmas *)
 
