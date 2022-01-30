@@ -116,7 +116,7 @@ Ltac rch_set :=
              exists l; split; [apply In_singleton |]
          end || inSingleton.
 
-Global Hint Rewrite update_dom: rch.
+Global Hint Extern 1 => updates: rch.
 
 (** *** Basic results *)
 (** Rechable locations from a hot location lead to other hot locations *)
@@ -183,10 +183,11 @@ Lemma reachability_add_env:
       (σ ⊨ l1 ⇝ l2) \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
 Proof with eauto with rch notations.
   intros σ x C ω l Hx Hobj.
-  apply reachability_rev_ind; steps; eauto with rch notations;
-    rewrite_anywhere update_dom...
-  eapply_anywhere getObj_update3; steps;
-    try eapply_anywhere getVal_add; steps...
+  apply reachability_rev_ind; steps;
+    updates;
+    eauto with rch notations.
+  destruct_eq (x = l0); subst; updates...
+  eapply_anywhere getVal_add; steps...
 Qed.
 
 (** ** Notions of path into the heap *)
@@ -393,27 +394,20 @@ Lemma contains_edge_assignment :
     not (contains_edge p l l') ->
     reachable_path σ' p ->
     reachable_path σ p.
-Proof.
+Proof with (eauto with rch lia).
   intros.
   generalize dependent p.
   induction p as [| l2 p]; intros; simpl; eauto.
-  destruct p as [| l1 p]; [ simpl in *; subst; rewrite_anywhere update_one3; eauto |].
+  destruct p as [| l1 p]; [ simpl in *; subst; updates; eauto |].
   simpl in H3. destruct_and.
   split.
-  + unfold reachable_one_step in *; flatten.
-    repeat rewrite_anywhere update_dom.
-    destruct_eq (l1 = l); subst.
-    ++ rewrite_anywhere getObj_update1; eauto using getObj_dom.
-       invert_constructor_equalities; subst.
-       destruct_eq (l2 = l'); subst ;
+  + unfold reachable_one_step in *; flatten; updates.
+    destruct_eq (l = l1); subst; updates.
+    ++ destruct_eq (l2 = l'); subst ;
          [exfalso; apply H2; eexists p, []  ; steps |].
-       unfold getVal in *.
        exists C0, ω; repeat split; eauto.
-       destruct_eq (f = f0); subst;
-         rewrite_anywhere  update_one2; eauto.
-       apply_anywhere update_one4; subst. congruence.
-    ++ rewrite_anywhere getObj_update2; eauto using getObj_dom.
-       repeat eexists || split || eauto.
+       destruct_eq (f = f0); subst; updates...
+    ++ repeat eexists...
   + apply IHp; eauto.
     intros [p1 [p2 Hedge]].
     apply H2. exists p1, (l2::p2).
@@ -428,34 +422,26 @@ Lemma reachable_path_assignment :
     σ' = [l ↦ (C, ω')]σ ->
     reachable_path σ' p ->
     contains_edge p l l' \/ reachable_path σ p.
-Proof.
+Proof with (updates; eauto with rch lia).
   intros.
   destruct (contains_edge_dec p l l') as [Hedge | Hedge]; eauto.
   right.
   induction p as [| n p ]; eauto.
   simpl in *.
-  destruct_match; [steps ; rewrite_anywhere update_one3 => // |].
+  destruct_match; [steps => // |].
   subst. flatten. intuition auto.
-  + clear H2. clear H1. unfold reachable_one_step in *; steps.
-    destruct (PeanoNat.Nat.eq_dec l l0); steps.
-    ++ rewrite getObj_update1 in H1 ; eauto using getObj_dom.
-       invert_constructor_equalities; steps.
-       repeat eexists || eassumption. unfold getVal in *.
-       destruct (PeanoNat.Nat.eq_dec f f0); steps.
-       +++ rewrite_anywhere update_one1 ; eauto using nth_error_Some.
-           invert_constructor_equalities; steps.
-           exfalso; apply Hedge.
+  - clear H2. clear H1. unfold reachable_one_step in *; steps...
+    pose proof (getObj_dom _ _ _ H1)...
+    destruct (getObj_Some σ l0 H2) as (C' & ω' & H__getObj).
+    exists C', ω'.
+    destruct_eq (l = l0); subst; updates; cross_rewrites.
+    + destruct_eq (f = f0); subst; updates.
+      * exfalso. apply Hedge.
            unfold contains_edge.
-           exists l1, []; steps.
-           rewrite <- update_one3 with (v := l') (p := f0).
-           eapply nth_error_Some.
-           rewrite H0 => //.
-       +++ rewrite_anywhere update_one2; eauto .
-       +++ erewrite_anywhere update_one3; eauto.
-    ++ rewrite_anywhere getObj_update2; eauto using getObj_dom.
-       repeat eexists || eassumption.
-       erewrite <- update_one3; eauto.
-  + apply H2; clear H2.
+           exists l1, ([]: list Loc); steps.
+      * exists f0; splits...
+    + exists f0; splits...
+  - apply H2; clear H2.
     unfold reachable_one_step, contains_edge in *.
     intros. flatten.
     apply Hedge. exists p1, (n::p2). rewrite H2.

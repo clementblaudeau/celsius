@@ -76,11 +76,9 @@ Lemma pM_assignment :
 Proof.
   autounfold with pM notations.
   intros.
+  lets: getObj_dom H.
   destruct_eq (l = l0); subst;
-    repeat rewrite_any;
-    rewrite getObj_update1 || rewrite getObj_update2;
-    eauto using getObj_dom.
-  steps. eexists; split; eauto.
+    updates; cross_rewrites; eauto.
 Qed.
 Global Hint Resolve pM_assignment: pM.
 
@@ -178,7 +176,6 @@ Proof.
 Qed.
 Global Hint Resolve eM_domains: pM.
 
-
 (** ** Main Monotonicity result *)
 (** We start with two technical results on partial monotonicity for assignment (update) and fresh location *)
 Lemma eM_assignment :
@@ -189,11 +186,9 @@ Lemma eM_assignment :
 Proof.
   autounfold with pM notations.
   intros.
+  lets: getObj_dom H.
   destruct_eq (l = l0); subst;
-    repeat rewrite_any;
-    rewrite getObj_update1 || rewrite getObj_update2;
-    eauto using getObj_dom.
-  steps. eexists; split; eauto.
+    updates; eauto.
 Qed.
 Global Hint Resolve eM_assignment: pM.
 
@@ -201,9 +196,12 @@ Lemma eM_freshness :
   forall σ c ρ,
     σ ⪳ (σ ++ [(c, ρ)]).
 Proof.
-  autounfold with notations pM. unfold getObj; intros.
-  exists ω; steps.
-  rewrite nth_error_app1; eauto using getObj_dom.
+  autounfold with notations pM.
+  intros.
+  lets: getObj_dom H.
+  exists ω; steps;
+    try rewrite getObj_last2;
+    eauto with updates.
 Qed.
 Global Hint Resolve eM_freshness: pM.
 
@@ -211,7 +209,7 @@ Global Hint Resolve eM_freshness: pM.
 Theorem eM_theorem:
   forall e σ σ' ρ ψ v,
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪳ σ'.
-Proof with (update_dom; eauto 3 with pM updates lia).
+Proof with (updates; eauto 3 with pM updates lia).
   intros.
   induction H using evalP_ind2 with
     (Pl := fun _ σ _ _ _ σ' _ => σ ⪳ σ')
@@ -232,35 +230,27 @@ Proof with (update_dom; eauto 3 with pM updates lia).
     lets : getObj_dom H__get1.
     specialize (IHevalP0 l D ω' ltac:(rewrite getObj_last2; eauto using Lt.lt_le_trans with lia)) as [ω'' [ ]].
     exists ω''; split ...
-    getObj_update; steps; try lia.
+    destruct_eq (dom σ1 = l); subst; updates...
   - intros. simpl in H1.
     intros l; steps.
-    destruct_eq (l = I).
-    + exists (repeat 0 dom ω). subst.
-      rewrite getObj_update1 ...
-      rewrite H0 in H2; steps.
-      rewrite repeat_length. reflexivity.
-    + exists ω0.
-      rewrite getObj_update2...
-  - update_dom; steps.
-    intros l D ω' H__get; steps.
-    lets [ω'' [H__get1 ? ]] : IHevalP H3; eauto.
-    rewrite matched in H__get1; steps.
-    lets: getObj_dom matched.
-    lets: eM_domains IHevalP.
-    specialize (IHevalP0 (ω''++[v]) _ _ _ H2
-                         ltac: (eapply getObj_update1; eauto with lia)
-                                 ltac:(rewrite app_length; simpl; lia)).
+    lets: getObj_dom I H0.
+    destruct_eq (I = l); subst; updates...
+    exists (repeat 0 dom ω); split...
+    rewrite repeat_length. steps.
+  - intros ω' Args Flds Mtds H__ct H__getObj ?.
+    intros l D ?ω H__get; steps.
+    lets [ω'' [H__get1 ? ]] : IHevalP H__getObj; eauto. cross_rewrites.
+    lets: getObj_dom I H__getObj.
+    rewrite getObj_update_same in IHevalP0... simpl in *.
+    specialize (IHevalP0 (ω''++[v]) _ _ _ H__ct eq_refl ltac:(rewrite app_length; simpl; lia)).
     lets [ω''' [ ]]: IHevalP l H__get.
-    destruct_eq (l = I); subst.
-    + rewrite H8 in matched; rewrite H__get in H3; steps.
-      exists (repeat 0 dom ω).
-      rewrite getObj_update1; try split ...
-      rewrite repeat_length. reflexivity.
-    + specialize (IHevalP0 l D ω''' ltac:(rewrite getObj_update2; eauto)) as [ω'''' [ ] ]...
-      exists ω''''.
-      getObj_update; steps; eauto; try lia.
-      rewrite getObj_update2 ...
+    destruct_eq (I = l); subst; cross_rewrites; updates.
+    + rewrite getObj_update_same...
+      exists (repeat 0 dom ω); split...
+      rewrite repeat_length...
+    + lets : IHevalP0 l.
+      rewrite getObj_update_diff in H7...
+      lets [?ω [ ]] : H7 H5...
 Qed.
 Global Hint Resolve eM_theorem: pM.
 

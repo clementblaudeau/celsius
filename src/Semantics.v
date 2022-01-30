@@ -170,8 +170,7 @@ Proof with (eauto with updates lia).
     (Pl := fun _ σ _ _ _ σ' _ => dom σ <= dom σ')
     (Pin := fun _ _ _ _ σ σ' _ => dom σ <= dom σ');
     unfold assign, assign_new in *; steps;
-    update_dom;
-    repeat rewrite_anywhere app_length; simpl in * ...
+    updates...
 Qed.
 
 Corollary evalListP_dom:
@@ -191,9 +190,7 @@ Proof with (try lia).
   intros.
   induction H ...
   eapply evalP_dom in H ...
-  unfold assign_new in *; ground;
-    update_dom;
-    eauto with lia updates ...
+  unfold assign_new in *; ground; try discriminate; updates...
 Qed.
 Global Hint Resolve initP_dom: pM.
 

@@ -54,7 +54,6 @@ Lemma stk_assign : forall σ l C ω ω',
     σ ≪ [l ↦ (C, ω')]σ.
 Proof.
   autounfold with stk notations; steps.
-  rewrite_anywhere update_one3; steps.
 Qed.
 Global Hint Resolve stk_assign: stk.
 
@@ -65,7 +64,7 @@ Global Hint Resolve stk_assign: stk.
 Theorem stk_theorem :
   forall e σ σ' ρ ψ v,
     ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ≪ σ'.
-Proof with (update_dom; eauto 3 with stk pM updates lia ).
+Proof with (updates; eauto 3 with stk pM updates lia ).
   intros.
   induction H using evalP_ind2 with
     (Pl := fun _ σ _ _ _ σ' _ => σ ≪ σ')
@@ -87,10 +86,9 @@ Proof with (update_dom; eauto 3 with stk pM updates lia ).
     eapply stk_trans with σ2 ...
   - intros.
     repeat destruct_match => //.
-    invert_constructor_equalities; subst.
-    rewrite getObj_update1 in IHevalP0 ...
-    update_dom.
+    invert_constructor_equalities; subst...
     lets [?ω [ ]]: eM_theorem H H2.
+    rewrite getObj_update_same in IHevalP0 ... eapply getObj_dom...
     cross_rewrites.
     move /(_ _ eq_refl): IHevalP0. steps ...
     eapply stk_trans with ([I ↦ (C, ω0 ++ [v])] (σ1)) ...

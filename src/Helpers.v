@@ -1,6 +1,6 @@
 From Celsius Require Import Language Notations Tactics LibTactics.
 Import List ListNotations Psatz Ensembles.
-Require Import ssreflect ssrbool Coq.Sets.Finite_sets_facts.
+Require Import ssreflect ssrbool Coq.Sets.Finite_sets_facts Coq.Program.Tactics.
 Open Scope list_scope.
 
 (** ** Helper functions *)
@@ -9,26 +9,189 @@ Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
 Definition getType (Σ : StoreTyping): Loc -> option Tpe := nth_error Σ.
 Definition typeLookup (Γ: EnvTyping): Loc -> option Tpe := nth_error Γ.
 
-Fixpoint removeTypes (l : list (Var*Tpe)) : (list Var) :=
-  match l with
-  | [] => []
-  | ((v, t) :: l') => (v::(removeTypes l'))
-  end.
+Global Hint Unfold getObj getVal getType: updates.
 
-Fixpoint update_one {X : Type} (position : nat) (value : X)(l : list X) : list X :=
+(** * Updates **)
+
+Fixpoint update {X : Type} (position : nat) (value : X) (l : list X) : list X :=
   match (l, position) with
   | ([], _) => []
   | (_::t, 0) => value::t
-  | (h::l', S n) => h::(update_one n value l')
+  | (h::l', S n) => h::(update n value l')
   end.
+Notation "[ x ↦  v ] l" := (update x v l) (at level 0).
 
-Fixpoint update_list {X : Type} (positions : list nat) (values : list X) (l : list X) : list X :=
-  match (positions, values) with
-  | (x::xt, v::vt) => update_list xt vt (update_one x v l)
-  | (_, _) => l end.
+Lemma update_same :
+  forall X p v (l: list X),
+    p < (length l) ->
+    (nth_error [p ↦ v]l p) = Some v.
+Proof.
+  intros X p v; generalize dependent p.
+  induction p; steps; eauto with lia.
+Qed.
+Global Hint Resolve update_same: updates.
 
-Notation "[ x ↦  v ] σ" := (update_one x v σ) (at level 0).
-Notation "[ x ⟼ v ] σ" := (update_list x v σ) (at level 0).
+Lemma getObj_update_same:
+  forall σ l O, l < dom σ -> getObj ([l ↦ O]σ) l = Some O.
+Proof.
+  eauto using update_same.
+Qed.
+
+Lemma getVal_update_same:
+  forall ρ l v, l < dom ρ -> getVal ([l ↦ v]ρ) l = Some v.
+Proof.
+  eauto using update_same.
+Qed.
+
+Lemma getType_update_same:
+  forall Σ l T, l < dom Σ -> getType ([l ↦ T]Σ) l = Some T.
+Proof.
+  eauto using update_same.
+Qed.
+
+Lemma update_diff :
+  forall X p p' v (l: list X),
+    p <> p' ->
+    (nth_error [p ↦ v]l p') = (nth_error l p').
+Proof.
+  induction p; intros; destruct l ; destruct p' => //.
+  simpl; eauto.
+Qed.
+Global Hint Resolve update_diff: updates.
+
+Lemma getObj_update_diff:
+  forall σ l l' O,
+    l <> l' ->
+    getObj ([l ↦ O]σ) l' = getObj σ l'.
+Proof.
+  eauto using update_diff.
+Qed.
+
+Lemma getVal_update_diff:
+  forall ρ l l' v,
+    l <> l' ->
+    getVal ([l ↦ v]ρ) l' = getVal ρ l'.
+Proof.
+  eauto using update_diff.
+Qed.
+
+Lemma getType_update_diff:
+  forall Σ l l' T,
+    l <> l' ->
+    getType ([l ↦ T]Σ) l' = getType Σ l'.
+Proof.
+  eauto using update_diff.
+Qed.
+
+Lemma update_length :
+  forall X p v (l: list X),
+    length ([p ↦ v]l) = length l.
+Proof.
+  intros X.
+  induction p; steps.
+Qed.
+Global Hint Resolve update_length: updates.
+
+Lemma getObj_dom:
+  forall l O σ, getObj σ l = Some O -> l < dom σ.
+Proof.
+  unfold getObj.
+  intros; eapply nth_error_Some; eauto.
+Qed.
+Global Hint Resolve getObj_dom: updates.
+
+Lemma getVal_dom:
+  forall l O σ, getVal σ l = Some O -> l < dom σ.
+Proof.
+  unfold getVal.
+  intros; eapply nth_error_Some; eauto.
+Qed.
+Global Hint Resolve getVal_dom: updates.
+
+Lemma getType_dom:
+  forall l O σ, getType σ l = Some O -> l < dom σ.
+Proof.
+  unfold getType.
+  intros; eapply nth_error_Some; eauto.
+Qed.
+Global Hint Resolve getType_dom: updates.
+
+
+Ltac updates :=
+  repeat
+    match goal with
+    |  |- context [ dom (_ ++ _) ] => rewrite app_length; simpl
+    | H: context [ dom (_ ++ _) ] |- _ => rewrite app_length in H; simpl in H
+    |  |- context [ dom ([_ ↦ _] _) ] => rewrite update_length
+    | H: context [ dom ([_ ↦ _] _) ] |- _ => rewrite update_length in H
+
+    | H: context [ getObj ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
+        let H1 := fresh "H__dom" in
+        add_hypothesis H1 (getObj_dom _ _ _ H);
+        rewrite update_length in H1;
+        rewrite (getObj_update_same σ l O H1) in H;
+        inverts H
+    | H1: ?l < dom ?σ |-
+        context [ getObj ([?l ↦ ?O]?σ) ?l ] => rewrite (getObj_update_same σ l O H1)
+
+    | H1: ?l < dom ?σ |-
+        context [ getVal ([?l ↦ ?O]?σ) ?l ] => rewrite (getVal_update_same σ l O H1)
+    | H: context [ getVal ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
+        let H1 := fresh "H__dom" in
+        add_hypothesis H1 (getVal_dom _ _ _ H);
+        rewrite update_length in H1;
+        rewrite (getVal_update_same σ l O H1) in H;
+        inverts H
+
+    | H1: ?l < dom ?σ |-
+        context [ getType ([?l ↦ ?O]?σ) ?l ] => rewrite (getType_update_same σ l O H1)
+
+    | H1: ?l <> ?l',
+        H2: context [ getObj ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getObj_update_diff σ l l' O H1) in H2
+    | H1: ?l <> ?l' |-
+        context [ getObj ([?l ↦ ?O]?σ) ?l' ] => rewrite (getObj_update_diff σ l l' O H1)
+
+    | H1: ?l <> ?l',
+        H2: context [ getVal ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getVal_update_diff σ l l' O H1) in H2
+    | H1: ?l <> ?l' |-
+        context [ getVal ([?l ↦ ?O]?σ) ?l' ] => rewrite (getVal_update_diff σ l l' O H1)
+
+    | H1: ?l <> ?l',
+        H2: context [ getType ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getType_update_diff σ l l' O H1) in H2
+    | H1: ?l <> ?l' |-
+        context [ getType ([?l ↦ ?O]?σ) ?l' ] => rewrite (getType_update_diff σ l l' O H1)
+
+    end.
+Global Hint Extern 1 => updates: core.
+
+Lemma getObj_Some : forall σ l,
+    l < dom σ ->
+    exists C ω, getObj σ l = Some (C, ω).
+Proof.
+  intros.
+  destruct (getObj σ l) as [[C ω]|] eqn:?.
+  exists C, ω; auto.
+  exfalso. eapply nth_error_None in Heqo. lia.
+Qed.
+
+Lemma getVal_Some : forall ρ f,
+    f < dom ρ ->
+    exists v, getVal ρ f = Some v.
+Proof.
+  intros.
+  destruct (getVal ρ f) as [|] eqn:?; eauto.
+  exfalso. eapply nth_error_None in Heqo. lia.
+Qed.
+
+Lemma getType_Some : forall Σ l,
+    l < dom Σ ->
+    exists T, getType Σ l = Some T.
+Proof.
+  intros.
+  destruct (getType Σ l) as [|] eqn:?; eauto.
+  exfalso. eapply nth_error_None in Heqo. lia.
+Qed.
+
 
 (** Update store with new value in local env : adds a new field to an existing object *)
 Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
@@ -42,13 +205,6 @@ Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
   match (getObj σ obj) with
   | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
   | None => σ (* ? *)
-  end.
-
-(** Update store with new values : update already existing fields of an existing object*)
-Definition assign_list (v0: Value) (x: list Var) (v: list Value) (σ: Store) : Store :=
-  match (getObj σ v0) with
-  | Some (C, fields) => [v0 ↦ (C, [x ⟼ v]fields)] σ
-  | None => σ
   end.
 
 Definition fieldType C f :=
@@ -70,12 +226,11 @@ Definition methodInfo C m :=
   end.
 
 
-
 (** ** Basic results on helper functions *)
 (** We then have multiple easy results on those helper functions *)
 Lemma getObj_last :
   forall σ C ρ,
-    getObj (σ++[(C,ρ)]) (length σ) = Some (C, ρ).
+    getObj (σ++[(C,ρ)]) (dom σ) = Some (C, ρ).
 Proof.
   induction σ; steps.
 Qed.
@@ -117,109 +272,46 @@ Proof.
 Qed.
 
 
-Lemma update_one1 :
-  forall X p v (l: list X),
-    p < (length l) ->
-    (nth_error [p ↦ v]l p) = Some v.
-Proof.
-  intros X p v; generalize dependent p.
-  induction p; steps; eauto with lia.
-Qed.
+(* #[export] Hint Extern 1 => rewrite (update_one3): updates. *)
+(* #[export] Hint Extern 1 => rewrite (update_dom): updates. *)
+(* #[export] Hint Extern 1 => rewrite (length_plus_1): updates. *)
+(* Global Hint Resolve update_one1: updates. *)
+(* Global Hint Resolve update_one2: updates. *)
+(* Global Hint Resolve update_one3: updates. *)
+(* Global Hint Resolve update_one4: updates. *)
 
-Lemma update_one2 :
-  forall X p p' v (l: list X),
-    p <> p' ->
-    (nth_error [p ↦ v]l p') = (nth_error l p').
-Proof.
-  induction p; intros; destruct l ; destruct p' => //.
-  simpl; eauto.
-Qed.
+(* Lemma getVal_update1 : *)
+(*   forall ω o x, *)
+(*     x < length ω -> (getVal [x ↦ o]ω x) = Some o. *)
+(* Proof. *)
+(*   unfold getVal; eauto with updates. *)
+(* Qed. *)
 
-Lemma update_one3 :
-  forall X p v (l: list X),
-    length ([p ↦ v]l) = length l.
-Proof.
-  intros X.
-  induction p; steps.
-Qed.
-
-Lemma update_dom :
-  forall (σ:Store) p v,
-    dom [p ↦ v]σ = dom σ.
-Proof.
-   eauto using update_one3.
-Qed.
-
-Lemma update_one4 :
-  forall X p (v v': X) l,
-    nth_error [p ↦ v]l p = Some v' -> v = v'.
-Proof.
-  intros.
-  assert (p < length l). {
-    pose proof (nth_error_Some [p↦v]l p).
-    rewrite update_one3 in H0; apply H0.
-    rewrite H. discriminate.
-  }
-  rewrite update_one1 in H; eauto.
-Qed.
-
-Lemma dom_app:
-  forall (σ: Store) (C: ClN) (ω:Env),
-    dom (σ ++ ((C, ω)::nil)) = S (dom σ).
-Proof.
-  intros.
-   rewrite app_length; simpl; lia.
-Qed.
-
-Lemma length_plus_1:
-  forall (ρ:Env) v,
-    length(ρ ++ [v]) = S(length(ρ)).
-Proof.
-  intros.
-  rewrite app_length; simpl; lia.
-Qed.
+(* Lemma getVal_update2 : *)
+(*   forall ω o x x', *)
+(*     x < length ω -> *)
+(*     x <> x' -> *)
+(*     getVal [x ↦ o]ω x' = getVal ω x'. *)
+(* Proof. *)
+(*   unfold getVal; eauto with updates. *)
+(* Qed. *)
 
 
-#[export] Hint Extern 1 => rewrite (update_one3): updates.
-#[export] Hint Extern 1 => rewrite (update_dom): updates.
-#[export] Hint Extern 1 => rewrite (length_plus_1): updates.
-Global Hint Resolve update_one1: updates.
-Global Hint Resolve update_one2: updates.
-Global Hint Resolve update_one3: updates.
-Global Hint Resolve update_one4: updates.
+(* Lemma getObj_update1 : *)
+(*   forall (σ: Store) o x, *)
+(*     x < dom σ -> (getObj [x ↦ o]σ x) = Some o. *)
+(* Proof. *)
+(*   unfold getObj; eauto with updates. *)
+(* Qed. *)
 
-Lemma getVal_update1 :
-  forall ω o x,
-    x < length ω -> (getVal [x ↦ o]ω x) = Some o.
-Proof.
-  unfold getVal; eauto with updates.
-Qed.
-
-Lemma getVal_update2 :
-  forall ω o x x',
-    x < length ω ->
-    x <> x' ->
-    getVal [x ↦ o]ω x' = getVal ω x'.
-Proof.
-  unfold getVal; eauto with updates.
-Qed.
-
-
-Lemma getObj_update1 :
-  forall (σ: Store) o x,
-    x < dom σ -> (getObj [x ↦ o]σ x) = Some o.
-Proof.
-  unfold getObj; eauto with updates.
-Qed.
-
-Lemma getObj_update2 :
-  forall (σ: Store) o x x',
-    x < dom σ ->
-    x <> x' ->
-    (getObj [x ↦ o]σ x') = (getObj σ x').
-Proof.
-  unfold getObj; eauto with updates.
-Qed.
+(* Lemma getObj_update2 : *)
+(*   forall (σ: Store) o x x', *)
+(*     x < dom σ -> *)
+(*     x <> x' -> *)
+(*     (getObj [x ↦ o]σ x') = (getObj σ x'). *)
+(* Proof. *)
+(*   unfold getObj; eauto with updates. *)
+(* Qed. *)
 
 Lemma getObj_update3:
   forall σ o o' x x',
@@ -227,20 +319,9 @@ Lemma getObj_update3:
     x < dom σ ->
     ((x = x' /\ o = o') \/ (x <> x' /\ (getObj σ x' = Some o'))).
 Proof.
-  steps;
-    destruct (PeanoNat.Nat.eq_dec x x') as [Heq | Hneq]; subst;
-      [ rewrite getObj_update1 in H |
-        rewrite getObj_update2 in H ]; steps.
-Qed.
-
-Lemma getObj_dom :
-  forall (σ: Store) o l,
-    (getObj σ l) = Some o ->
-    l < (dom σ).
-Proof.
-  intros σ o.
-  induction σ ; destruct l; steps; eauto with lia.
-  apply (Lt.lt_n_S _ _ (IHσ _ H)) .
+  intros.
+  destruct (PeanoNat.Nat.eq_dec x x') as [Heq | Hneq]; subst;
+    updates; steps.
 Qed.
 
 Lemma nth_error_Some2 :
@@ -286,36 +367,9 @@ Lemma getVal_update:
     getVal ([f ↦ l] ω) f' = Some l' ->
     (f = f' /\ l = l') \/ (f <> f' /\ getVal ω f' = Some l').
 Proof.
-  unfold getVal; steps.
-  destruct (PeanoNat.Nat.eq_dec f f') as [Heq | Hneq]; subst.
-  + apply update_one4 in H ; steps.
-  + rewrite update_one2 in H; eauto ; steps.
-Qed.
-
-Global Hint Resolve getObj_dom: updates.
-
-(*
-Lemma getType_dom:
-  forall (Σ: StoreTyping) l T,
-    getType Σ l = Some T -> l < dom Σ.
-Proof.
-  intros.
-  unfold getType in *.
-  destruct (find (fun '(l', _) => Nat.eqb l l') Σ) eqn:H__e; steps.
-  apply find_some in H__e; steps.
-  Search (nth _ _ _ = _ -> _).
-  apply  in H; steps.
-
-  apply nth_error_Some.
-  unfold getType in *; eauto.
-Qed. *)
-Lemma getType_in_dom:
-  forall (Σ: StoreTyping) l T,
-    getType Σ l = Some T -> l < dom Σ.
-Proof.
-  intros.
-  unfold getType, option_map in H; steps.
-  apply nth_error_Some; eauto.
+  steps.
+  destruct (PeanoNat.Nat.eq_dec f f') as [Heq | Hneq];
+    subst; updates; steps.
 Qed.
 
 Lemma dom_map:
@@ -344,37 +398,6 @@ Proof.
   unfold getType. intros.
   rewrite nth_error_map H. steps.
 Qed.
-
-Lemma getVal_dom:
-  forall ρ f l,
-    getVal ρ f = Some l -> f < dom ρ.
-Proof.
-  intros.
-  apply nth_error_Some.
-  unfold getVal in *; eauto.
-Qed.
-
-
-(** ** Tactics *)
-(** Finally some tactics : *)
-
-Ltac getObj_update :=
-  match goal with
-  | H: getObj [?x ↦ ?o] (?σ) ?x' = Some ?o' |- _ => eapply getObj_update3 in H; eauto with updates
-  end.
-Ltac getVal_update :=
-  match goal with
-  | H: getVal [?x ↦ ?o] (?σ) ?x' = Some ?o' |- _ => eapply getVal_update in H; eauto with updates
-  end.
-
-
-Ltac update_dom :=
-  repeat
-    match goal with
-  | [H: context[dom (?a ++ ?b)] |- _ ] => rewrite app_length in H; simpl in H
-    end || rewrite_anywhere update_dom || rewrite update_dom || (rewrite app_length; simpl).
-
-Global Hint Extern 1 => update_dom: updates.
 
 
 Ltac inSingleton :=
@@ -499,7 +522,7 @@ Lemma storeSubset_update:
   forall L l o σ,
     L ⪽ [l ↦ o] (σ) -> L ⪽ σ.
 Proof.
-  unfold storeSubset; steps; update_dom; eauto.
+  unfold storeSubset; steps; updates; eauto.
 Qed.
 
 

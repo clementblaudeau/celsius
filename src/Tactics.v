@@ -3,7 +3,6 @@ Require Import Coq.Lists.List.
 Require Import Psatz.
 Require Import Coq.Program.Tactics.
 
-
 (* Borrowed and adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
 Open Scope string.
@@ -204,7 +203,8 @@ Ltac erewrite_anywhere f :=
 
 Ltac destruct_eq H :=
   match H with
-  | ?a = ?b => let fresh_H := fresh "Heq" in pose proof (PeanoNat.Nat.eq_dec a b) as [fresh_H | fresh_H]
+  | ?a = ?b =>
+      let fresh_H := fresh "Heq" in pose proof (PeanoNat.Nat.eq_dec a b) as [fresh_H | fresh_H]
   end.
 
 Ltac modus_ponens :=
@@ -224,6 +224,9 @@ Ltac modus :=
   repeat match goal with
          | H: ?A -> ?B, H': ?A |- _ => specialize (H H')
          end.
+
+
+
 
 Ltac move_top t :=
   try match goal with
@@ -293,3 +296,11 @@ Ltac move_top t :=
   | H1:t |- _ =>
      move H1 at top
   end.
+
+
+From Celsius Require Export LibTactics.
+Ltac cross_rewrites :=
+  repeat match goal with
+         | H: ?A = ?B, H': ?A = ?C |- _ => rewrite H in H'; inverts H'
+         end.
+Hint Extern 1 => cross_rewrites: core.
