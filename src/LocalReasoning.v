@@ -96,7 +96,7 @@ Proof with (meta; eauto with typ updates lia).
         rewrite /getType nth_error_map;
         rewrite (nth_error_nth' _  (0,(entry,cold)));
         [rewrite combine_length seq_length PeanoNat.Nat.min_id ; auto |];
-        rewrite ?combine_nth ?seq_nth ?seq_length; eauto using getType_in_dom; simpl;
+        rewrite ?combine_nth ?seq_nth ?seq_length; eauto with updates; simpl;
         rewrite (nth_error_nth _ _ _ H1)
     end.
 
@@ -133,20 +133,21 @@ Proof with (meta; eauto with typ updates lia).
         assert (σ ⊨ l ⇝ v) by eauto with rch wf.
         exists (C0, hot) ...
         lets: reachability_dom H7.
-        destruct (getType Σ v) eqn:?; [| exfalso; eapply getType_none; meta ] ...
+        lets [ ]: getType_Some Σ v ...
         getType_combine.
         destruct (reachability_refl σ l v); steps.
-        assert (C1 = C0); eauto...
+        assert (C1 = C0); subst; eauto...
         inverts H2; meta...
-        all: try lets [?v [ ] ]: H14 H4 ...
-        all: try lets: H11 H5 ...
+        all: try lets [?v [ ] ]: H15 H5 ...
+        all: try lets: H14 H5 ...
+        all: try lets: H12 H5 ...
     + exists C, ω, μ; repeat split => // ...
       getType_combine; steps.
       destruct (reachability_refl σ l l'); steps.
 
   - intros l' H__l'.
-    destruct (getType Σ l') as [T1 |] eqn:?; [|exfalso; apply getType_none in Heqo; eauto].
-    exists T1. subst...
+    lets [?T ?]: getType_Some H__l'...
+    exists (C, μ). subst...
     getType_combine.
     steps; eexists; steps.
 
@@ -192,19 +193,19 @@ Proof with (meta; eauto with typ lia).
   intros Σ1 Σ2 σ1 σ2 L1 L2 H1 H2.
   pose proof (storeSubset_finite _ _ H2).
   gen Σ1 Σ2 σ1 σ2 L1.
-  eapply finite_sets_ind with (F := L2); eauto; intros.
+  eapply finite_sets_ind with (F := L2); intros.
   - exists Σ2; steps ...
     intros l Hl. inversion Hl.
   - clear H L2. rename F into L2, a into l.
     unfold Add in *.
     assert ((σ1, L1) ⋖ (σ2, L2)) by eauto with scp.
-    pose proof (storeSubset_union_l _ _ _ H2).
+    pose proof (ss_union_l _ _ _ H2).
     lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps.
     (* clear Σ1 H5 H6 H7 H8 H10 H1. *) clear H1.
     lets [Σ4 [ ]]: synchronization Σ3 σ2 l H17; steps...
 
     + assert (l' < dom σ1 \/ l' >= dom σ1) as [|] by lia.
-      * lets [l1 [H__l1 H__rch1]] : H4 H3 H2 l' H18; [ exists l; split; eauto with wf |].
+      * lets [l1 [H__l1 H__rch1]] : H4 H3 H2 l' H18; [ exists l; split; eauto with ss|].
         lets : H10 H__l1.  clear H10.
         lets: hot_transitivity H20 H__rch1...
         lets: mn_trans H7 H16.
@@ -219,4 +220,6 @@ Proof with (meta; eauto with typ lia).
 
     + exists Σ4; splits; eauto with typ.
       intros l0 [ l2' | ]; try inSingleton; eauto with rch wf typ.
+
+  - apply H.
 Qed.

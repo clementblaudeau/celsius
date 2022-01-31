@@ -185,6 +185,16 @@ Inductive T_Fields: EnvTyping -> Tpe -> (list Field) -> Prop :=
     T_Fields Γ (C, cool (S Ω)) fs ->
     T_Fields Γ (C, cool Ω) (f::fs).
 
+Lemma T_Fields_In:
+  forall Γ C Flds1 f Flds2,
+    T_Fields Γ (C, cold) (Flds1 ++ f :: Flds2) ->
+    T_Field Γ (C, cool dom Flds1) f.
+Proof with (eauto using T_Fields, T_Field with typ lia).
+  destruct Flds1; intros.
+  - simpl in H. inverts H...
+  - simpl in H. inverts H...
+Qed.
+
 (** ** Class typing *)
 Definition T_Classes := forall C,
     match (ct C) with
@@ -223,7 +233,7 @@ Lemma t_fld_inv:
       ((Γ, T__this) ⊢ e : (D, μ__e)) /\
         fieldType D f = Some (C, μ__f) /\
         ((μ__e = hot) \/ (μ__e = warm /\ μ__f ⊑ μ) \/ (exists Ω, μ__e = cool Ω /\ f < Ω /\ μ__f ⊑ μ)).
-Proof with (eauto with typ wf lia).
+Proof with (eauto with typ lia).
   introv H.
   remember (fld e f) as E.
   remember (C,μ) as T.
@@ -246,7 +256,7 @@ Lemma t_mtd_inv: forall Γ T__this e m args T,
         S_Typs argTs paramTs /\
         ((D, hot) <: T) /\
         ((D, μ__r) <: T \/ P_hots argTs /\ μ0 = hot).
-Proof with (eauto with typ wf lia).
+Proof with (eauto with typ lia).
   introv H.
   remember (mtd e m args) as E.
   induction H; steps;
@@ -264,7 +274,7 @@ Lemma t_new_inv:
         ((Γ, T__this) ⊩ args : argsTs) /\
         S_Typs argsTs Args /\
         (warm ⊑ μ \/ (P_hots argsTs)).
-Proof with (eauto with typ wf lia).
+Proof with (eauto with typ lia).
   introv H.
   remember (new C args) as E.
   induction H; subst; try discriminate...
@@ -274,7 +284,8 @@ Proof with (eauto with typ wf lia).
     exists Args, Flds, Mtds, argsTs, μ; splits...
     destruct H5...
   - repeat eexists; steps...
-  - exists Args Flds Mtds argsTs hot; splits ...
+  - inverts HeqE.
+    exists Args Flds Mtds argsTs hot; splits ...
 Qed.
 
 Lemma t_asgn_inv:
@@ -285,7 +296,7 @@ Lemma t_asgn_inv:
         ((Γ, T__this) ⊢ e2 : (D, hot)) /\
         (μ' ⊑ μ) /\
         ((Γ, T__this) ⊢ e3 : (C, μ')).
-Proof with (eauto with typ wf lia).
+Proof with (eauto with typ lia).
   introv H.
   remember (asgn e1 f e2 e3) as E.
   remember (C,μ) as T.

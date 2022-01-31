@@ -8,11 +8,10 @@ Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
 Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
 Definition getType (Σ : StoreTyping): Loc -> option Tpe := nth_error Σ.
 Definition typeLookup (Γ: EnvTyping): Loc -> option Tpe := nth_error Γ.
+Local Hint Unfold getObj getVal getType: updates.
 
-Global Hint Unfold getObj getVal getType: updates.
 
 (** * Updates **)
-
 Fixpoint update {X : Type} (position : nat) (value : X) (l : list X) : list X :=
   match (l, position) with
   | ([], _) => []
@@ -21,6 +20,7 @@ Fixpoint update {X : Type} (position : nat) (value : X) (l : list X) : list X :=
   end.
 Notation "[ x ↦  v ] l" := (update x v l) (at level 0).
 
+(** ** Updates lemmas *)
 Lemma update_same :
   forall X p v (l: list X),
     p < (length l) ->
@@ -117,53 +117,8 @@ Qed.
 Global Hint Resolve getType_dom: updates.
 
 
-Ltac updates :=
-  repeat
-    match goal with
-    |  |- context [ dom (_ ++ _) ] => rewrite app_length; simpl
-    | H: context [ dom (_ ++ _) ] |- _ => rewrite app_length in H; simpl in H
-    |  |- context [ dom ([_ ↦ _] _) ] => rewrite update_length
-    | H: context [ dom ([_ ↦ _] _) ] |- _ => rewrite update_length in H
 
-    | H: context [ getObj ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
-        let H1 := fresh "H__dom" in
-        add_hypothesis H1 (getObj_dom _ _ _ H);
-        rewrite update_length in H1;
-        rewrite (getObj_update_same σ l O H1) in H;
-        inverts H
-    | H1: ?l < dom ?σ |-
-        context [ getObj ([?l ↦ ?O]?σ) ?l ] => rewrite (getObj_update_same σ l O H1)
-
-    | H1: ?l < dom ?σ |-
-        context [ getVal ([?l ↦ ?O]?σ) ?l ] => rewrite (getVal_update_same σ l O H1)
-    | H: context [ getVal ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
-        let H1 := fresh "H__dom" in
-        add_hypothesis H1 (getVal_dom _ _ _ H);
-        rewrite update_length in H1;
-        rewrite (getVal_update_same σ l O H1) in H;
-        inverts H
-
-    | H1: ?l < dom ?σ |-
-        context [ getType ([?l ↦ ?O]?σ) ?l ] => rewrite (getType_update_same σ l O H1)
-
-    | H1: ?l <> ?l',
-        H2: context [ getObj ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getObj_update_diff σ l l' O H1) in H2
-    | H1: ?l <> ?l' |-
-        context [ getObj ([?l ↦ ?O]?σ) ?l' ] => rewrite (getObj_update_diff σ l l' O H1)
-
-    | H1: ?l <> ?l',
-        H2: context [ getVal ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getVal_update_diff σ l l' O H1) in H2
-    | H1: ?l <> ?l' |-
-        context [ getVal ([?l ↦ ?O]?σ) ?l' ] => rewrite (getVal_update_diff σ l l' O H1)
-
-    | H1: ?l <> ?l',
-        H2: context [ getType ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getType_update_diff σ l l' O H1) in H2
-    | H1: ?l <> ?l' |-
-        context [ getType ([?l ↦ ?O]?σ) ?l' ] => rewrite (getType_update_diff σ l l' O H1)
-
-    end.
-Global Hint Extern 1 => updates: core.
-
+(** * Domains *)
 Lemma getObj_Some : forall σ l,
     l < dom σ ->
     exists C ω, getObj σ l = Some (C, ω).
@@ -192,6 +147,7 @@ Proof.
   exfalso. eapply nth_error_None in Heqo. lia.
 Qed.
 
+(** * Assignments *)
 
 (** Update store with new value in local env : adds a new field to an existing object *)
 Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
@@ -226,14 +182,14 @@ Definition methodInfo C m :=
   end.
 
 
-(** ** Basic results on helper functions *)
-(** We then have multiple easy results on those helper functions *)
+(** * Additions *)
 Lemma getObj_last :
   forall σ C ρ,
     getObj (σ++[(C,ρ)]) (dom σ) = Some (C, ρ).
 Proof.
   induction σ; steps.
 Qed.
+Global Hint Resolve getObj_last: core.
 
 Lemma getObj_last2 :
   forall σ C ρ l,
@@ -245,6 +201,26 @@ Proof.
     steps;
     eauto with lia.
 Qed.
+
+Lemma getType_last :
+  forall Σ T,
+    getType (Σ++[T]) (dom Σ) = Some T.
+Proof.
+  induction Σ; steps.
+Qed.
+Global Hint Resolve getType_last: core.
+
+Lemma getType_last2 :
+  forall Σ T l,
+    l < (dom Σ) ->
+    getType (Σ++[T]) l = getType Σ l.
+Proof.
+  induction Σ; simpl; intros; try lia.
+  destruct l;
+    steps;
+    eauto with lia.
+Qed.
+
 
 Lemma getObj_last_empty :
   forall (σ: Store) C C' ω l f v,
@@ -271,78 +247,6 @@ Proof.
       destruct f; steps.
 Qed.
 
-
-(* #[export] Hint Extern 1 => rewrite (update_one3): updates. *)
-(* #[export] Hint Extern 1 => rewrite (update_dom): updates. *)
-(* #[export] Hint Extern 1 => rewrite (length_plus_1): updates. *)
-(* Global Hint Resolve update_one1: updates. *)
-(* Global Hint Resolve update_one2: updates. *)
-(* Global Hint Resolve update_one3: updates. *)
-(* Global Hint Resolve update_one4: updates. *)
-
-(* Lemma getVal_update1 : *)
-(*   forall ω o x, *)
-(*     x < length ω -> (getVal [x ↦ o]ω x) = Some o. *)
-(* Proof. *)
-(*   unfold getVal; eauto with updates. *)
-(* Qed. *)
-
-(* Lemma getVal_update2 : *)
-(*   forall ω o x x', *)
-(*     x < length ω -> *)
-(*     x <> x' -> *)
-(*     getVal [x ↦ o]ω x' = getVal ω x'. *)
-(* Proof. *)
-(*   unfold getVal; eauto with updates. *)
-(* Qed. *)
-
-
-(* Lemma getObj_update1 : *)
-(*   forall (σ: Store) o x, *)
-(*     x < dom σ -> (getObj [x ↦ o]σ x) = Some o. *)
-(* Proof. *)
-(*   unfold getObj; eauto with updates. *)
-(* Qed. *)
-
-(* Lemma getObj_update2 : *)
-(*   forall (σ: Store) o x x', *)
-(*     x < dom σ -> *)
-(*     x <> x' -> *)
-(*     (getObj [x ↦ o]σ x') = (getObj σ x'). *)
-(* Proof. *)
-(*   unfold getObj; eauto with updates. *)
-(* Qed. *)
-
-Lemma getObj_update3:
-  forall σ o o' x x',
-    getObj [x ↦ o]σ x' = Some o' ->
-    x < dom σ ->
-    ((x = x' /\ o = o') \/ (x <> x' /\ (getObj σ x' = Some o'))).
-Proof.
-  intros.
-  destruct (PeanoNat.Nat.eq_dec x x') as [Heq | Hneq]; subst;
-    updates; steps.
-Qed.
-
-Lemma nth_error_Some2 :
-  forall {T:Type} e (v:T) f l,
-    nth_error (e ++ [v]) f = Some l ->
-    v = l \/ nth_error e f = Some l.
-Proof.
-  intros.
-  assert (f < length (e++[v])) by (apply nth_error_Some; rewrite H; discriminate).
-  move: H0; rewrite app_length; simpl; rewrite PeanoNat.Nat.add_1_r => H0.
-  apply Lt.le_lt_or_eq in H0. destruct H0 as [H0 | H0].
-  + right.
-    apply Lt.lt_S_n in H0.
-    rewrite nth_error_app1 in H => //.
-  + left.
-    injection H0 => H1; subst.
-    rewrite nth_error_app2 in H => //.
-    rewrite <- Minus.minus_diag_reverse in H.
-    simpl in H. injection H => //.
-Qed.
-
 Lemma getVal_add:
   forall ω l l' f,
     getVal (ω ++ [l]) f = Some l' ->
@@ -362,15 +266,61 @@ Proof.
     rewrite_anywhere PeanoNat.Nat.sub_diag; steps.
 Qed.
 
-Lemma getVal_update:
-  forall ω l l' f f',
-    getVal ([f ↦ l] ω) f' = Some l' ->
-    (f = f' /\ l = l') \/ (f <> f' /\ getVal ω f' = Some l').
-Proof.
-  steps.
-  destruct (PeanoNat.Nat.eq_dec f f') as [Heq | Hneq];
-    subst; updates; steps.
-Qed.
+
+(** * Tactic *)
+Ltac updates :=
+  repeat
+    match goal with
+    (* appends *)
+    |  |- context [ dom (_ ++ _) ] => rewrite app_length; simpl
+    | H: context [ dom (_ ++ _) ] |- _ => rewrite app_length in H; simpl in H
+    |  |- context [ dom ([_ ↦ _] _) ] => rewrite update_length
+    | H: context [ dom ([_ ↦ _] _) ] |- _ => rewrite update_length in H
+
+    (* update_same *)
+    | H: context [ getObj ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
+        let H1 := fresh "H__dom" in
+        add_hypothesis H1 (getObj_dom _ _ _ H);
+        rewrite update_length in H1;
+        rewrite (getObj_update_same σ l O H1) in H;
+        inverts H
+
+    | |- context [ getObj ([?l ↦ ?O]?σ) ?l ] => rewrite (getObj_update_same σ l O)
+    | |- context [ getType ([?l ↦ ?O]?σ) ?l ] => rewrite (getType_update_same σ l O)
+    | |- context [ getVal ([?l ↦ ?O]?σ) ?l ] => rewrite (getVal_update_same σ l O)
+
+    | H: context [ getVal ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
+        let H1 := fresh "H__dom" in
+        add_hypothesis H1 (getVal_dom _ _ _ H);
+        rewrite update_length in H1;
+        rewrite (getVal_update_same σ l O H1) in H;
+        inverts H
+
+
+    (* update_diff *)
+    | H1: ?l <> ?l',
+        H2: context [ getObj ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getObj_update_diff σ l l' O H1) in H2
+    | H1: ?l <> ?l' |-
+        context [ getObj ([?l ↦ ?O]?σ) ?l' ] => rewrite (getObj_update_diff σ l l' O H1)
+
+    | H1: ?l <> ?l',
+        H2: context [ getVal ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getVal_update_diff σ l l' O H1) in H2
+    | H1: ?l <> ?l' |-
+        context [ getVal ([?l ↦ ?O]?σ) ?l' ] => rewrite (getVal_update_diff σ l l' O H1)
+
+    | H1: ?l <> ?l',
+        H2: context [ getType ([?l ↦ ?O]?σ) ?l' ] |- _ => rewrite (getType_update_diff σ l l' O H1) in H2
+    | H1: ?l <> ?l' |-
+        context [ getType ([?l ↦ ?O]?σ) ?l' ] => rewrite (getType_update_diff σ l l' O H1)
+
+    (* get last *)
+    | |- context [getObj (?σ ++ _) (dom ?σ) ] => rewrite getObj_last
+
+    end.
+Global Hint Extern 1 => updates: updates.
+
+
+(** * Maps *)
 
 Lemma dom_map:
   forall (Σ: StoreTyping) (l: Loc) (f: Tpe -> Tpe),
@@ -380,15 +330,6 @@ Proof.
   rewrite map_length. auto.
 Qed.
 
-Lemma getType_none:
-  forall (Σ: StoreTyping) l,
-    l < dom Σ ->
-    getType Σ l <> None.
-Proof.
-  intros.
-  unfold getType, option_map in *; steps.
-  apply nth_error_None in H0. lia.
-Qed.
 
 Lemma getType_map:
   forall (Σ: StoreTyping) f l T,
@@ -399,6 +340,7 @@ Proof.
   rewrite nth_error_map H. steps.
 Qed.
 
+(** * List Loc *)
 
 Ltac inSingleton :=
   match goal with
@@ -406,12 +348,11 @@ Ltac inSingleton :=
   | H: {?x} ?y |- _ => induction H
   end.
 
-(** Store Subset results *)
+(** * Store Subset *)
 
 (** A set of locations is contained in a store: [L ⪽ σ] *)
 Definition storeSubset (σ: Store) L :=
-  forall l, l ∈ L ->
-       l < dom σ.
+  forall l, l ∈ L -> l < dom σ.
 
 (** The codomain of an environment is the set of locations it contains *)
 Definition codom (ρ: Env) : (LocSet) :=
@@ -419,15 +360,14 @@ Definition codom (ρ: Env) : (LocSet) :=
 
 Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).
 Notation " a ∪ { b } " := (Union Loc a (Singleton Loc b)) (at level 80).
+Notation "{ l } ⪽ σ" := (storeSubset σ (Singleton Loc l)) (at level 80).
 
-(** ** Basic results *)
+Local Hint Unfold storeSubset: ss.
+Global Hint Resolve Union_intror: ss.
+Global Hint Resolve Union_introl: ss.
+Global Hint Resolve In_singleton: ss.
 
-Global Hint Resolve Union_intror: wf.
-Global Hint Resolve Union_introl: wf.
-Global Hint Resolve In_singleton: wf.
-
-
-Lemma storeSubset_trans :
+Lemma ss_trans :
   forall a s s',
     dom s <= dom s' ->
     a ⪽ s ->
@@ -436,8 +376,7 @@ Proof.
   unfold storeSubset; steps.
   eapply H0 in H1 ; lia.
 Qed.
-
-Lemma storeSubset_union :
+Lemma ss_union :
   forall a b s,
     a ⪽ s ->
     b ⪽ s ->
@@ -447,21 +386,21 @@ Proof.
   induction H1; eauto.
 Qed.
 
-Lemma storeSubset_union_l :
+Lemma ss_union_l :
   forall a b s,
     (a∪b) ⪽ s -> a ⪽ s.
 Proof.
-  unfold storeSubset; eauto with wf.
+  eauto with ss.
 Qed.
 
-Lemma storeSubset_union_r :
+Lemma ss_union_r :
   forall a b s,
     (a∪b) ⪽ s -> b ⪽ s.
 Proof.
-  unfold storeSubset; eauto with wf.
+  eauto with ss.
 Qed.
 
-Lemma storeSubset_add :
+Lemma ss_add :
   forall v a s,
     codom (v :: a) ⪽ s <-> v < dom s /\ codom a ⪽ s.
 Proof.
@@ -470,34 +409,27 @@ Proof.
   + steps; move: H0 => [Hl|Hl]; steps.
 Qed.
 
-Lemma storeSubset_singleton :
-  forall a b σ,
-    a ∪ {b} ⪽ σ -> b < dom σ.
-Proof.
-  intros.
-  eapply_any; eauto with wf.
-Qed.
-
-Lemma storeSubset_singleton2 :
+Lemma ss_singleton :
   forall a σ,
-    (Singleton Loc a) ⪽ σ -> a < dom σ.
-Proof.
-  unfold storeSubset; steps.
-  induction (H a) ; steps.
-Qed.
-
-Lemma storeSubset_singleton3 :
-  forall a σ,
-    a < dom σ -> (Singleton Loc a) ⪽ σ.
+    a < dom σ -> {a} ⪽ σ.
 Proof.
   unfold storeSubset; steps;
     induction H0 ; steps.
 Qed.
 
-Lemma storeSubset_codom_empty : forall s, codom [] ⪽ s.
+Lemma ss_singleton_inv :
+  forall a σ,
+    {a} ⪽ σ -> a < dom σ.
+Proof.
+  unfold storeSubset; steps.
+  induction (H a) ; steps.
+Qed.
+
+Lemma ss_codom_empty : forall s, codom [] ⪽ s.
 Proof.
   unfold storeSubset; steps.
 Qed.
+Global Hint Resolve ss_codom_empty: core.
 
 Lemma codom_empty_union: forall a, (codom [] ∪ a) = a.
 Proof.
@@ -505,7 +437,7 @@ Proof.
   apply Extensionality_Ensembles.
   unfold Same_set, Included;
     repeat steps || destruct H;
-    eauto with wf.
+    eauto with ss.
 Qed.
 
 Lemma codom_cons:
@@ -517,14 +449,19 @@ Proof.
     eauto using Union_introl, Union_intror.
 Qed.
 
-
-Lemma storeSubset_update:
+Lemma ss_update:
   forall L l o σ,
     L ⪽ [l ↦ o] (σ) -> L ⪽ σ.
 Proof.
   unfold storeSubset; steps; updates; eauto.
 Qed.
 
+Lemma ss_update_inv:
+  forall L l o σ,
+     L ⪽ σ -> L ⪽ [l ↦ o] (σ).
+Proof.
+  unfold storeSubset; steps; updates; eauto.
+Qed.
 
 Lemma getVal_codom : forall x l ρ,
     getVal ρ x = Some l -> l ∈ codom ρ.
@@ -532,6 +469,34 @@ Proof.
   intros.
   eapply nth_error_In in H. auto.
 Qed.
+Global Hint Resolve getVal_codom: ss.
+
+Ltac ss_trans :=
+  repeat match goal with
+         | H: dom ?s <= dom ?s' |- ?a ⪽ ?s => apply (ss_trans a s s' H)
+         | H: dom ?s <= dom ?s', H': ?a ⪽ ?s |- ?a ⪽ ?s' => apply (ss_trans a s s' H)
+         end.
+
+Ltac ss_union :=
+  try match goal with
+  | |- (?a ∪ ?b) ⪽ ?s => apply ss_union
+  | H1: (?a ∪ ?b) ⪽ ?s |- ?a ⪽ ?s => apply (ss_union_l a b s H1)
+  | H1: (?a ∪ ?b) ⪽ ?s |- ?b ⪽ ?s => apply (ss_union_r a b s H1)
+  end.
+
+Ltac ss :=
+  ss_trans;
+  repeat match goal with
+         | H: { ?a } ⪽ ?σ |- _ => apply ss_singleton_inv in H
+         | |- { ?a } ⪽ ?σ => apply ss_singleton
+         | |- ?L ⪽ [?l ↦ ?o] ?σ => apply ss_update_inv
+         | H: ?a ∪ {?l} ⪽ ?σ |- ?l < dom ?σ => apply ss_singleton_inv, ss_union_r with a, H
+         | H: {?l} ∪ ?b ⪽ ?σ |- ?l < dom ?σ => apply ss_singleton_inv, ss_union_l with b, H
+         end || ss_union.
+Global Hint Extern 1 => ss : core.
+
+
+(** * Finite sets results **)
 
 Lemma storeSubset_finite: forall σ L,
     L ⪽ σ ->
@@ -553,7 +518,7 @@ Proof.
       apply Finite_downward_closed with (A:= Union Loc ( (Subtract Loc L dom σ)) ({dom σ})).
       apply Union_preserves_Finite; eauto using Singleton_is_finite.
       intros l; steps.
-      destruct_eq (l = dom σ).
+      destruct_eq (l = dom σ); eauto.
       * apply Union_intror; steps.
       * apply Union_introl; steps.
         unfold Subtract, Setminus, In.
@@ -581,21 +546,7 @@ Proof.
     apply Union_introl; eauto.
 Qed.
 
-
-
-Global Hint Resolve storeSubset_update: wf.
-Global Hint Resolve storeSubset_trans: wf.
-Global Hint Resolve storeSubset_union: wf.
-Global Hint Resolve storeSubset_union_l: wf.
-Global Hint Resolve storeSubset_add: wf.
-Global Hint Resolve storeSubset_union_r: wf.
-Global Hint Resolve storeSubset_singleton: wf.
-Global Hint Resolve storeSubset_singleton2: wf.
-Global Hint Resolve storeSubset_singleton3: wf.
-Global Hint Resolve storeSubset_codom_empty: wf.
-Global Hint Resolve getVal_codom: wf.
-Global Hint Rewrite codom_cons: wf.
-
+(** * FieldType *)
 
 Lemma fieldType_exists: forall C Args Flds Mtds f,
     ct C = class Args Flds Mtds ->
@@ -608,7 +559,6 @@ Proof.
   steps.
   apply nth_error_None in matched0. lia.
 Qed.
-Global Hint Resolve fieldType_exists: typ.
 
 Lemma fieldType_some : forall C Args Flds Mtds f T,
     ct C = class Args Flds Mtds ->

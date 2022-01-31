@@ -68,3 +68,7 @@ Notation "L ∪ L'" := (Union Loc L L') (at level 80, L' at next level).
 Notation "{ l }" := (Singleton Loc l) (at level 0, l at level 99).
 Notation "L ∪ { l }" := (Union Loc L (Singleton Loc l)) (at level 80).
 Notation "{ l } ∪ L" := (Union Loc (Singleton Loc l) L) (at level 80).
+
+(** *** Store subsets *)
+Reserved Notation "L ⪽ σ" (at level 80).
+Reserved Notation "{ l } ⪽ σ" (at level 80).

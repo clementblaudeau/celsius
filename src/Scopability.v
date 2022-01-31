@@ -8,6 +8,7 @@ Require Import ssreflect ssrbool Psatz Sets.Ensembles List.
 Import ListNotations.
 Open Scope nat_scope.
 
+Set Ltac Profiling.
 
 (** ** Definitions and Notations *)
 (* The scoping relation, with the hypothesis that the sets of locations are "correct" (within the stores) *)
@@ -146,7 +147,7 @@ Lemma scp_pr_regularity_degenerate:
 Proof.
   intros.
   destruct H.
-  eapply H1; eauto with lia wf.
+  eapply H1; eauto with lia ss scp.
 Qed.
 Global Hint Resolve scp_pr_regularity_degenerate: scp.
 
@@ -212,7 +213,7 @@ Proof.
       eauto using reachability_add_env with lia updates.
   steps;
     [ eapply H4 | eapply H3] ;
-    simpl; try (eexists; split); eauto with wf.
+    simpl; try (eexists; split); eauto with ss.
 Qed.
 Global Hint Resolve scp_add_env: scp.
 
@@ -241,6 +242,7 @@ Qed.
 
 (** ** Assignment results *)
 (** We prove some specific results on scopability in the context of assignment. The key reasonning technique is to do a case analysis on the presence of the modified entry in the reachability path. *)
+Reset Ltac Profile.
 Lemma scp_assign:
   forall σ1 σ2 σ2' L1 l l' f C ω ω',
     σ1 ⇝ σ2 ⋖ L1 ->
@@ -262,7 +264,7 @@ Proof.
     assert ((σ0, L0) ⋖ (σ2, L)) as B1 by eauto.
     assert ((σ0, L0) ⋖ (σ2, {l'})) as C1 by eauto using scp_trans.
     destruct H7; steps.
-    eapply storeSubset_update in H5.
+    eapply ss_update in H5.
     destruct_eq (l = l'); subst.
     + (* l = l' , the assignment is weakening *)
       eapply B1; simpl; (try exists x); eauto using reachability_weaken_assignment with wf.
@@ -292,9 +294,7 @@ Proof.
 
   - (* (σ1, L1) ⋖ (σ2', {l}) *)
     unfold scoping; simpl. intros.
-    destruct H7; steps; inSingleton.
-    eapply_anywhere storeSubset_singleton2.
-    updates.
+    destruct H7; steps; inSingleton. ss; updates.
     destruct_eq (l = l'); subst.
     + (* if l = l', the assignment is weakening *)
       eapply H0; try (eexists; split);
@@ -358,13 +358,14 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
                 ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\
                   (σ0 ⇝ σ' ⋖ L) /\
                   (exists ω', getObj σ' I = Some (C, ω') /\ dom ω' = dom Flds));
-    unfold assign, assign_new in * ; intros; eval_dom; eval_wf;
-    try solve [rch_singleton; eauto with scp lia].
+    unfold assign, assign_new in * ; intros; eval_dom; eval_wf.
   - (* e = x *)
-    unfold scoping; steps ...
-    exists l ...
+    unfold scoping; steps ... ss.
+    exists l; split; eauto using getVal_codom with ss.
+  - (* this *)
+    split...
   - (* e = e0.f *)
-    unfold scoping; steps; rch_singleton.
+    unfold scoping; steps; rch_set; ss.
     assert ((σ,  (codom ρ) ∪ ({ψ})) ⋖ (σ1, {l})) as C1.
     + eapply scp_trans with σ1 {l1}; eauto with wf.
       unfold scoping; steps. rch_set.
@@ -372,7 +373,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     + eapply C1 ; steps ...
   - (* e = e0.m(l0) *)
     destruct IHevalP1, IHevalP2; eauto with wf.
-    destruct IHevalP3; eauto with wf.
+    destruct IHevalP3; eauto with ss lia.
     assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ1, (codom ρ) ∪ {ψ})) as A4 by eauto with scp wf pM.
     assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, (codom vl2) ∪ {v1}) ) as A6 by
         (eapply scp_union; eauto with scp wf pM lia).
@@ -384,9 +385,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     specialize IHevalP0 with (codom ρ ∪ {ψ}) σ Args Flds Mtds [].
     assert (dom σ1 <= dom (σ1 ++ [(C, [])])); updates; try lia.
     destruct IHevalP0 as [ ? [ ]]; eauto with wf lia.
-    + eapply storeSubset_union; [eapply storeSubset_trans with σ1; eauto with lia updates |].
-      eapply storeSubset_singleton3...
-    + rewrite getObj_last...
+    + ss... eapply ss_trans with σ1...
     + intros ? ; steps.
       move : H9 => [l0 [H__l0 H__rch]].
       inversion H__l0; steps.
@@ -404,11 +403,8 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
       eapply reachability_not_empty in H__rch; steps; try lia.
       apply H11 ... exists l0 ...
     + flatten; split => //.
-      eapply scp_union_intror ; eauto with wf scp.
-      eapply storeSubset_union.
-      eapply storeSubset_trans; eauto with wf lia.
-      eapply storeSubset_trans with σ1; eauto with wf lia ...
-      eapply storeSubset_singleton3 ...
+      eapply scp_union_intror ; eauto with wf scp. ss...
+      eapply ss_trans with σ1...
   - (* e = e0.f = e1; e2 *)
     destruct (getObj σ2 v1) as [[C ω] |] eqn: H__obj.
     + destruct IHevalP1; eauto.
@@ -437,8 +433,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     split.
     + rewrite codom_cons.
       eapply scp_union.
-      * apply H7; eauto with lia wf.
-        apply H5; eauto.
+      * apply H7; eauto with lia wf scp.
       * eapply scp_trans with (σ2 := σ1) (L2 := codom ρ ∪ {ψ}) ...
     + eapply scp_pr_trans_degenerate ...
   - (* init_nil *)
@@ -449,15 +444,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     rewrite H12 in H__assign. inverts H__assign.
     specialize (IHevalP0 L σ0 Args Flds Mtds (ω0++[v])).
     simpl in H4.
-    destruct IHevalP0 as [ ? [ ]]; eauto with updates wf lia.
-    + unfold wf; intros; updates.
-      destruct_eq (I = l); subst; updates; split; intros; cross_rewrites.
-      * lia.
-      * eapply getVal_add in H14; steps...
-        eapply H_wf...
-      * eapply H_wf...
-      * eapply H_wf...
-    + rewrite getObj_update_same...
+    destruct IHevalP0 as [ ? [ ]]; updates; eauto with updates wf lia.
     + eapply scp_add_env; eauto with lia wf; updates.
       * apply H6.
       * eapply scp_trans ...
@@ -495,15 +482,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     rewrite H14 in H0. inverts H0.
     specialize (IHinitP L σ0 Args Flds Mtds (ω0++[v])).
     simpl in *. updates.
-    destruct IHinitP as [ ? [ ]]; eauto with updates wf lia.
-    + unfold wf; intros; updates.
-      destruct_eq (I = l); subst; updates; split; intros; cross_rewrites.
-      * lia.
-      * eapply getVal_add in H0; steps...
-        eapply H_wf...
-      * eapply H_wf...
-      * eapply H_wf...
-    + rewrite getObj_update_same...
+    destruct IHinitP as [ ? [ ]]; updates; eauto with updates wf lia.
     + eapply scp_add_env; eauto with lia wf; updates.
       * apply H8.
       * eapply scp_trans ...

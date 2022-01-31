@@ -336,3 +336,12 @@ Proof.
     eapply el_cons;
       eauto using evalP, eval_implies_evalp.
 Qed.
+
+Corollary init_implies_initP :
+  forall C flds I ρ σ n σ',
+  init C flds I ρ σ n = Success_i σ' -> initP C flds I ρ σ σ'.
+Proof.
+  induction flds; intros; destruct n; steps.
+    eapply init_cons;
+      eauto using evalP, eval_implies_evalp.
+Qed.

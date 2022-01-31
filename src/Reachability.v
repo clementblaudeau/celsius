@@ -428,8 +428,8 @@ Proof with (updates; eauto with rch lia).
   right.
   induction p as [| n p ]; eauto.
   simpl in *.
-  destruct_match; [steps => // |].
-  subst. flatten. intuition auto.
+  subst.
+  destruct_match... intuition auto.
   - clear H2. clear H1. unfold reachable_one_step in *; steps...
     pose proof (getObj_dom _ _ _ H1)...
     destruct (getObj_Some σ l0 H2) as (C' & ω' & H__getObj).
@@ -487,12 +487,13 @@ Lemma reachability_weaken_assignment :
     (l = l') ->
     σ' ⊨ s ⇝ e ->
     σ ⊨ s ⇝ e.
-Proof.
+Proof with (updates; eauto with rch lia).
   intros. move: H3. move: s e.
-  induction 1; repeat steps || rewrite_anywhere update_dom; eauto with rch notations.
-  eapply_anywhere getObj_update3; eauto using getObj_dom; steps; eauto with rch notations.
-  eapply_anywhere getVal_update; steps;  eauto with rch notations.
+  induction 1; subst...
+  destruct_eq (l' = l0); subst ...
+  destruct_eq (f = f0); subst ...
 Qed.
+
 
 Lemma contains_edge_split:
   forall y x p p1 p2 (l l': Loc),

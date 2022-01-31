@@ -54,6 +54,7 @@ Lemma stk_assign : forall σ l C ω ω',
     σ ≪ [l ↦ (C, ω')]σ.
 Proof.
   autounfold with stk notations; steps.
+  updates; eauto.
 Qed.
 Global Hint Resolve stk_assign: stk.
 
@@ -88,7 +89,7 @@ Proof with (updates; eauto 3 with stk pM updates lia ).
     repeat destruct_match => //.
     invert_constructor_equalities; subst...
     lets [?ω [ ]]: eM_theorem H H2.
-    rewrite getObj_update_same in IHevalP0 ... eapply getObj_dom...
+    rewrite getObj_update_same in IHevalP0 ...
     cross_rewrites.
     move /(_ _ eq_refl): IHevalP0. steps ...
     eapply stk_trans with ([I ↦ (C, ω0 ++ [v])] (σ1)) ...

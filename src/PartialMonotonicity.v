@@ -104,6 +104,7 @@ Proof with (eauto with pM updates lia).
     unfold assign, assign_new in *;
     repeat destruct_match;
     flatten; pM_trans ...
+  discriminate.
 Qed.
 Global Hint Resolve pM_theorem: pM.
 
@@ -122,7 +123,8 @@ Corollary pM_theorem_init:
 Proof with (eauto with pM updates lia).
   intros.
   induction H;
-    unfold assign, assign_new in *; ground ...
+    unfold assign, assign_new in *; ground ;
+    try discriminate...
   eapply pM_theorem in H ...
 Qed.
 Global Hint Resolve pM_theorem_init: pM.
@@ -244,13 +246,13 @@ Proof with (updates; eauto 3 with pM updates lia).
     rewrite getObj_update_same in IHevalP0... simpl in *.
     specialize (IHevalP0 (ω''++[v]) _ _ _ H__ct eq_refl ltac:(rewrite app_length; simpl; lia)).
     lets [ω''' [ ]]: IHevalP l H__get.
-    destruct_eq (I = l); subst; cross_rewrites; updates.
-    + rewrite getObj_update_same...
-      exists (repeat 0 dom ω); split...
+    destruct_eq (I = l); subst; cross_rewrites...
+    + exists (repeat 0 dom ω); split...
       rewrite repeat_length...
     + lets : IHevalP0 l.
       rewrite getObj_update_diff in H7...
       lets [?ω [ ]] : H7 H5...
+  - discriminate.
 Qed.
 Global Hint Resolve eM_theorem: pM.
 
@@ -275,4 +277,5 @@ Proof.
   steps.
   lets [?ω' [ ] ] : H H1.
   repeat eexists; eauto.
+  congruence.
 Qed.

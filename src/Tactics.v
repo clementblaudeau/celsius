@@ -8,7 +8,7 @@ Require Import Coq.Program.Tactics.
 Open Scope string.
 
 
-Global Hint Extern 1 => congruence: core.
+(* Global Hint Extern 1 => congruence: core. *)
 Global Hint Extern 50 => lia: lia.
 Global Hint Extern 50 => cbn: cbn.
 Global Hint Extern 50 => cbn; intuition auto: cbn_intuition.
