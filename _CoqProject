@@ -1,16 +1,17 @@
 -Q . Celsius
-src/Tactics.v
 src/LibTactics.v
+src/Tactics.v
 src/Language.v
 src/Helpers.v
 src/Notations.v
 src/Semantics.v
 src/Eval.v
 src/Reachability.v
-src/Compatibility.v
 src/PartialMonotonicity.v
 src/Stackability.v
 src/Wellformedness.v
 src/Scopability.v
 src/LocalReasoning.v
 src/Typing.v
+src/MetaTheory.v
+src/Soundness.v
