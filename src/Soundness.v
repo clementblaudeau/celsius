@@ -569,3 +569,26 @@ Proof with (
            eapply scp_pr_trans; eauto.
            unfold scoping_preservation; intros; eauto with scp.
 Qed.
+
+Corollary Soundness :
+  forall n e ρ σ ψ r Γ Σ U T,
+    ((Γ, U) ⊢ e : T) ->
+    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ σ ->
+    (Σ ⊨ ψ : U) ->
+    wf σ ->
+    (codom ρ ∪ {ψ} ⪽ σ) ->
+    ⟦e⟧(σ, ρ, ψ)(n) = r ->
+    r <> Timeout ->
+    exists Σ' v σ',
+      r = Success v σ' /\
+        Σ ≼ Σ' /\
+        Σ ≪ Σ' /\
+        Σ ▷ Σ' /\
+        (Σ' ⊨ σ') /\
+        Σ' ⊨ v : T.
+Proof with (eauto with typ).
+  intros.
+  lets [(Σ'& v& σ'& ?) _]: soundness n... steps.
+  exists Σ', v, σ'; splits...
+Qed.

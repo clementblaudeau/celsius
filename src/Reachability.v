@@ -528,3 +528,322 @@ Proof.
     eapply app_inv_tail with [y].
     rewrite app_assoc_reverse; eauto.
 Qed.
+
+
+(** Decidability of reachability *)
+
+Section rch_decidability.
+
+
+  Inductive reachability_trace : Store -> Loc -> Loc -> (list Loc) -> Prop :=
+  | rch_t_heap : forall σ l,
+      l < dom σ ->
+      reachability_trace σ l l []
+  | rch_t_step : forall σ l C ω f l',
+      getObj σ l = Some (C, ω) ->
+      getVal ω f = Some l' ->
+      l' < dom σ ->
+      reachability_trace σ l l' []
+  | rch_t_trans : forall σ l0 l1 l2 t1 t2,
+      reachability_trace σ l0 l1 t1 ->
+      reachability_trace σ l1 l2 t2 ->
+      reachability_trace σ l0 l2 (t1++l1::t2).
+  Local Hint Constructors reachability_trace: rch_t.
+
+  Lemma reachability_trace_reachability:
+    forall σ l l',
+      (σ ⊨ l ⇝ l') <-> (exists p, reachability_trace σ l l' p).
+  Proof with (eauto with rch rch_t).
+    split; intros.
+    - induction H...
+      destruct IHreachability1 as [p1 IH1].
+      destruct IHreachability2 as [p2 IH2].
+      exists (p1++(l1::p2))...
+    - destruct H as [p H].
+      induction H...
+  Qed.
+  Local Hint Resolve reachability_trace_reachability: rch_t.
+
+  Lemma reachability_trace_reachability_reverse:
+    forall σ l l' p,
+      reachability_trace σ l l' p -> (σ ⊨ l ⇝ l').
+  Proof.
+    intros.
+    apply reachability_trace_reachability; eauto.
+  Qed.
+  Local Hint Resolve reachability_trace_reachability_reverse: rch_t.
+
+  Lemma reachability_trace_is_reachable:
+    forall σ l l' tr l__m,
+      (reachability_trace σ l l' tr /\
+         List.In l__m tr) <->
+        (exists t0 t1, tr = t0 ++ l__m :: t1 /\
+                    reachability_trace σ l l__m t0 /\
+                    reachability_trace σ l__m l' t1).
+  Proof with (eauto using app_assoc_reverse with rch_t rch).
+    split; intros.
+    - destruct H as [H ?].
+      induction H; steps.
+      apply in_app_iff in H0 as [|[|]].
+      + lets (t & t' & ? & ? & ?): IHreachability_trace1 H0.
+        exists t, (t'++l1::t2); subst; splits... rewrite app_assoc_reverse...
+      + subst.
+        exists t1, t2; splits...
+      + lets (t & t' & ? & ? & ?): IHreachability_trace2 H0.
+        exists (t1++l1::t), t'; subst; splits... rewrite app_assoc_reverse...
+    - destruct H as (t0 & t1 & ? & ? & ?). subst.
+      split...
+      apply in_elt.
+  Qed.
+
+   Lemma reachability_trace_head_reachable:
+    forall σ l l' tr l__m,
+      reachability_trace σ l l' (l__m::tr) ->
+      reachability_trace σ l l__m [] /\
+        reachability_trace σ l__m l' tr.
+  Proof with (eauto using app_assoc_reverse with rch_t rch).
+    intros.
+    remember (l__m::tr) as T. gen l__m tr.
+    induction H; intros... steps. steps.
+    destruct t1; steps...
+  Qed.
+
+  Lemma reachability_trace_no_dup:
+    forall σ l l' tr,
+      reachability_trace σ l l' tr ->
+      exists ntr, reachability_trace σ l l' ntr /\ NoDup ntr.
+  Proof with (eauto using NoDup with rch_t).
+    intros. gen l l'.
+    induction tr; intros.
+    - inverts H;
+        exists ([]: list Loc); splits...
+      exfalso. eapply app_cons_not_nil; eauto.
+    - lets [ ]: reachability_trace_head_reachable H.
+      lets (ntr & ? & ?): IHtr H1.
+      destruct (in_dec (PeanoNat.Nat.eq_dec) a ntr).
+      + clear IHtr H1 H.
+        pose proof (proj1 (iff_and (reachability_trace_is_reachable σ a l' ntr a)))
+          as (t0 & t1 & ? & ? & ?)...
+        exists (a::t1); split.
+        * replace (a::t1) with ([]++a::t1) by steps...
+        * Search NoDup. (* Should be doable *)
+      + exists (a::ntr); split...
+        replace (a::ntr) with ([]++a::ntr) by steps...
+  Qed.
+
+
+
+
+
+
+      lets (th & tt & ?): in_split H0.
+      exists th, (tt++l1::t2); subst.
+
+
+    - exfalso.
+      eapply app_cons_not_nil, Heqtr.
+    - exfalso.
+      eapply app_cons_not_nil, Heqtr.
+    - rename l0 into s, l2 into e, l1 into m.
+      assert (List.In l3 (t1 ++ m::t2)) by (rewrite Heqtr; apply in_elt).
+      apply in_app_iff in H1 as [|].
+      + apply in_split in H1 as [t11 [t12 ?]].
+        apply rch_t_trans.
+
+
+      rename l1 into m.
+destruct_eq (l1 = l3); subst...
+
+
+
+    gen σ l l' l0 tr2.
+
+    induction tr1; simpl; intros...
+    - lets [tl ?]: reachability_trace_head H.
+      inverts H0...
+    - inverts H; [destruct tr1; steps | |].
+      + destruct tr1; steps...
+        destruct tr1; steps.
+      + destruct t1; steps.
+        * inverts H1; steps...
+
+          destruct app_cons_not_nil
+                   *
+
+
+
+  (** Second try **)
+
+
+
+
+
+
+  Inductive reachability_trace : Store -> Loc -> Loc -> (list Loc) -> Prop :=
+  | rch_t_heap : forall σ l,
+      l < dom σ ->
+      reachability_trace σ l l [l]
+  | rch_t_step : forall σ l C ω f l',
+      getObj σ l = Some (C, ω) ->
+      getVal ω f = Some l' ->
+      l' < dom σ ->
+      reachability_trace σ l l' [l; l']
+  | rch_t_trans : forall σ l0 l1 l2 t1 t2,
+      reachability_trace σ l0 l1 (t1++[l1]) ->
+      reachability_trace σ l1 l2 (l1::t2) ->
+      reachability_trace σ l0 l2 (t1++(l1::t2)).
+  Local Hint Constructors reachability_trace: rch_t.
+
+  Lemma reachability_trace_head:
+    forall σ l l' tr,
+      reachability_trace σ l l' tr -> exists tl, tr = l::tl.
+  Proof.
+    intros.
+    induction H; eauto.
+    destruct IHreachability_trace1 as [tl H1].
+    exists (tl++t2).
+    rewrite app_comm_cons -H1 app_assoc_reverse. steps.
+  Qed.
+  Local Hint Resolve reachability_trace_head: rch_t.
+
+  Lemma reachability_trace_tail:
+    forall σ l l' tr,
+      reachability_trace σ l l' tr -> exists hd, tr = hd++[l'].
+  Proof.
+    intros.
+    induction H; eauto.
+    - exists ([]: list Loc); steps...
+    - exists [l]; steps...
+    - destruct IHreachability_trace2 as [hd Heq].
+      exists (t1++hd). rewrite Heq app_assoc_reverse => //.
+  Qed.
+  Local Hint Resolve reachability_trace_tail: rch_t.
+
+  Lemma reachability_trace_reachability:
+    forall σ l l',
+      (σ ⊨ l ⇝ l') <-> (exists p, reachability_trace σ l l' (p++[l'])).
+  Proof with (eauto using reachability_trace with rch).
+    split; intros.
+    - induction H.
+      + exists ([]: list Loc); simpl...
+      + exists ([l0]: list Loc); simpl...
+      + destruct IHreachability1 as [p1 IH1].
+        destruct IHreachability2 as [p2 IH2].
+        lets [tl Heq]: reachability_trace_head IH2.
+        exists (p1++p2). rewrite app_assoc_reverse Heq.
+        apply rch_t_trans... rewrite -Heq...
+    - destruct H as [p H].
+      induction H...
+  Qed.
+  Local Hint Resolve reachability_trace_reachability: rch_t.
+
+  Lemma reachability_trace_reachability_reverse:
+    forall σ l l' p,
+      reachability_trace σ l l' p -> (σ ⊨ l ⇝ l').
+  Proof.
+    intros.
+    apply reachability_trace_reachability.
+    lets [hd Heq] : reachability_trace_tail H; subst.
+    exists hd; eauto.
+  Qed.
+  Local Hint Resolve reachability_trace_reachability_reverse: rch_t.
+
+  Lemma reachability_trace_is_reachable:
+    forall σ l l' tr1 tr2 l0,
+      reachability_trace σ l l' (tr1++l0::tr2) ->
+      reachability_trace σ l l0 (tr1++[l0]).
+  Proof with (eauto using app_cons_not_nil with rch_t rch).
+    intros. gen σ l l' l0 tr2.
+    induction tr1; simpl; intros...
+    - lets [tl ?]: reachability_trace_head H.
+      inverts H0...
+    - inverts H; [destruct tr1; steps | |].
+      + destruct tr1; steps...
+        destruct tr1; steps.
+      + destruct t1; steps.
+        * inverts H1; steps...
+
+        destruct app_cons_not_nil
+        inverts H1.
+
+      apply rch_t_heap. eapply reachability_dom2, reachability_trace_reachability_reverse.
+
+      apply
+
+
+
+
+
+    remember (tr1++l0::tr2) as tr.
+    induction H...
+    - destruct tr1; steps...
+      destruct tr1; steps.
+    - destruct tr1; steps...
+      destruct tr1; steps...
+      destruct tr1; steps...
+    -
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Fixpoint reachable_locs n σ l :=
+    match n with
+    | 0 => if (PeanoNat.Nat.ltb l (dom σ)) then [l] else []
+    | S n => match getObj σ l with
+            | Some (C, ω) => (filter (fun l => PeanoNat.Nat.ltb l (dom σ)) ω) ++ (flat_map (reachable_locs n σ) ω)
+            | None => []
+            end
+    end.
+
+  Definition reachabilityb σ l l' :=
+    existsb (fun l => PeanoNat.Nat.eqb l l') (reachable_locs (dom σ) σ l).
+
+  Lemma existsb_flat_map [A B : Type] f (test: B -> bool) (l: list A):
+    existsb test (flat_map f l) = existsb (fun (a:A) => existsb test (f a)) l.
+  Proof.
+    induction l; simpl => //.
+    rewrite existsb_app IHl => //.
+  Qed.
+
+  Lemma filter_length [A: Type] f (l: list A):
+    length (filter f l) <= length l.
+  Proof.
+    induction l; steps. lia.
+  Qed.
+
+  Lemma reachable_locs_rch :
+    forall σ l l',
+      reachabilityb σ l l' -> σ ⊨ l ⇝ l'.
+  Proof with (eauto with rch lia).
+    unfold reachabilityb. intros.
+    remember (dom σ) as n. clear Heqn. gen l l'.
+    induction n; simpl; intros.
+    - steps.
+      apply PeanoNat.Nat.leb_le in matched.
+      rewrite Bool.orb_false_r in H.
+      apply PeanoNat.Nat.eqb_eq in H; subst...
+    - destruct (getObj σ l) as [[C ω]|] eqn:?; simpl.
+      + rewrite existsb_app in H.
+        apply Bool.orb_prop in H as [|].
+        * apply existsb_exists in H as (l'' & H__in & H__f).
+          rewrite PeanoNat.Nat.eqb_eq in H__f; subst.
+          apply filter_In in H__in as [ ].
+          apply In_nth_error in H as [f H__f].
+          apply PeanoNat.Nat.ltb_lt in H0.
+          apply rch_step_n with C f ω...
+        * rewrite existsb_flat_map in H.
+          apply existsb_exists in H as (l0 & H__in & H__ind).
+          apply In_nth_error in H__in as [f H__f].
+          apply IHn in H__ind.
+          apply rch_trans_n with l0...
+      + steps.
+  Qed.
