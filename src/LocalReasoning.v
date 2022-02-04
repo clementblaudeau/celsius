@@ -6,7 +6,7 @@ From Celsius Require Export Scopability PartialMonotonicity Stackability MetaThe
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List Coq.Sets.Finite_sets_facts.
 Import ListNotations.
 Open Scope nat_scope.
-
+classic
 (** ** Local Reasoning theorem *)
 (** We start with a lemma : *)
 Lemma local_reasoning:
@@ -56,25 +56,6 @@ Qed.
 
 
 (** ** Local reasoning *)
-Parameter reachabilityb : Store -> Loc -> Loc -> bool.
-Parameter reachability_refl: forall σ l l', Bool.reflect (reachability σ l l') (reachabilityb σ l l').
-
-Lemma reachabilityb_true:
-  forall σ l l',
-    (σ ⊨ l ⇝ l') <-> (reachabilityb σ l l' = true).
-Proof.
-  intros.
-  destruct (reachability_refl σ l l'); steps.
-Qed.
-
-Lemma reachabilityb_false:
-  forall σ l l',
-    (~ (σ ⊨ l ⇝ l')) <-> (reachabilityb σ l l' = false).
-Proof.
-  intros.
-  destruct (reachability_refl σ l l'); steps.
-Qed.
-
 
 Lemma synchronization: forall Σ σ (l: Loc),
     wf σ ->
@@ -101,7 +82,7 @@ Proof with (meta; eauto with typ updates lia).
     end.
 
   intros Σ σ l H__wf H__st; intros.
-  remember ((fun l' '(C,μ) => if (reachabilityb σ l l') then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
+  remember ((fun l' '(C,μ) => if (reachability_dec σ l l') then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
   remember (map (fun '(l, T) => f l T) (combine (seq 0 (dom Σ)) Σ)) as Σ'.
   exists Σ'.
   assert (Hyp: forall (A B C D E: Prop), ((D -> B -> A) /\ B /\ C /\ D /\ E) -> (A /\ B /\ C /\ D /\ E)) by firstorder.
@@ -113,13 +94,13 @@ Proof with (meta; eauto with typ updates lia).
     intros l' H__l'. rewrite HeqΣ' in H__l'.
     rewrite map_length combine_length seq_length in H__l'... rewrite PeanoNat.Nat.min_id in H__l'.
     specialize ((proj2 H__st) l') as [C [ω [μ [? [? ?] ]]]] ...
-    destruct (reachability_refl σ l l'); steps.
-    + pose proof (H _  r) ...
+    destruct (reachability_dec σ l l') as [H__rch | H__nrch] eqn:H__rdec; steps.
+    + pose proof (H _ H__rch) ...
       exists C, ω, hot; repeat split => //.
-      * apply reachabilityb_true in r.
-        getType_combine. steps.
+      * getType_combine. steps.
+        rewrite H__rdec in matched; steps.
       * destruct (ct C) as [Args Flds Mtds] eqn:?.
-        eapply ot_hot...
+        eapply ot_hot. eapply Heqc.
         intros f ?C ?μ. intros.
         assert (f < dom ω). {
           inverts H3; steps ...
@@ -135,7 +116,7 @@ Proof with (meta; eauto with typ updates lia).
         lets: reachability_dom H7.
         lets [ ]: getType_Some Σ v ...
         getType_combine.
-        destruct (reachability_refl σ l v); steps.
+        destruct (reachability_dec σ l v); steps.
         assert (C1 = C0); subst; eauto...
         inverts H2; meta...
         all: try lets [?v [ ] ]: H15 H5 ...
@@ -143,7 +124,7 @@ Proof with (meta; eauto with typ updates lia).
         all: try lets: H12 H5 ...
     + exists C, ω, μ; repeat split => // ...
       getType_combine; steps.
-      destruct (reachability_refl σ l l'); steps.
+      destruct (reachability_dec σ l l'); steps.
 
   - intros l' H__l'.
     lets [?T ?]: getType_Some H__l'...
@@ -152,11 +133,11 @@ Proof with (meta; eauto with typ updates lia).
     steps; eexists; steps.
 
   - intros l' C Ω H__l'.
-    erewrite HeqΣ'.
+    rewrite HeqΣ'.
     getType_combine. steps.
-    destruct (reachability_refl σ l l'); steps.
-    apply H in r.
-    destruct r as (?D & ? ).
+    destruct (reachability_dec σ l l'); steps.
+    apply H in d.
+    destruct d as (?D & ? ).
     inverts H0...
     inverts H4.
 
@@ -168,7 +149,7 @@ Proof with (meta; eauto with typ updates lia).
     exists C, (C, hot); eauto with typ.
     inverts H0...
     erewrite HeqΣ'. getType_combine. steps.
-    destruct (reachability_refl σ l l'); steps.
+    destruct (reachability_dec σ l l'); steps.
 Qed.
 
 

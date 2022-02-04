@@ -592,3 +592,6 @@ Proof with (eauto with typ).
   lets [(Σ'& v& σ'& ?) _]: soundness n... steps.
   exists Σ', v, σ'; splits...
 Qed.
+
+Print Assumptions Soundness.
+classic.

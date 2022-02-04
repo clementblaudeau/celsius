@@ -39,6 +39,16 @@ Ltac destruct_and :=
   end.
 
 
+Global Hint Rewrite Bool.andb_true_iff: bools.
+Global Hint Rewrite Bool.andb_false_iff: bools.
+Global Hint Rewrite Bool.orb_true_iff: bools.
+Global Hint Rewrite Bool.orb_false_iff: bools.
+Global Hint Rewrite Bool.negb_true_iff: bools.
+Global Hint Rewrite Bool.negb_false_iff: bools.
+Ltac bools :=
+  autorewrite with bools in *.
+
+
 Ltac destruct_match :=
 match goal with
 | [ |- context[match ?t with _ => _ end]] =>

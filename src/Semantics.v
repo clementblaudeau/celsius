@@ -196,13 +196,13 @@ Global Hint Resolve initP_dom: pM.
 
 Ltac eval_dom :=
   repeat match goal with
-  | H: ⟦ ?e ⟧p (?σ, ?ρ, ?ψ) --> (?v, ?σ') |- _ =>
-    let fresh := fresh "H_dom" in
-    add_hypothesis fresh (evalP_dom e σ ρ ψ v σ' H)
-  | H: ⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ') |- _ =>
-    let fresh := fresh "H_dom" in
-    add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
-  | H: initP ?C ?fls ?ψ ?ρ ?σ ?σ' |- _ =>
-    let fresh := fresh "H_dom" in
-    add_hypothesis fresh (initP_dom C fls ψ ρ σ σ' H)
-  end.
+         | H: ⟦ ?e ⟧p (?σ, ?ρ, ?ψ) --> (?v, ?σ') |- _ =>
+             let fresh := fresh "H_dom" in
+             add_hypothesis fresh (evalP_dom e σ ρ ψ v σ' H)
+         | H: ⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ') |- _ =>
+             let fresh := fresh "H_dom" in
+             add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
+         | H: initP ?C ?fls ?ψ ?ρ ?σ ?σ' |- _ =>
+             let fresh := fresh "H_dom" in
+             add_hypothesis fresh (initP_dom C fls ψ ρ σ σ' H)
+         end.
