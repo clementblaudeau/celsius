@@ -6,7 +6,7 @@ From Celsius Require Export Scopability PartialMonotonicity Stackability MetaThe
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List Coq.Sets.Finite_sets_facts.
 Import ListNotations.
 Open Scope nat_scope.
-classic
+
 (** ** Local Reasoning theorem *)
 (** We start with a lemma : *)
 Lemma local_reasoning:
