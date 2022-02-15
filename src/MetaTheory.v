@@ -4,6 +4,7 @@
 
 From Celsius Require Export Typing LibTactics Tactics Reachability Wellformedness.
 Require Import Coq.ssr.ssreflect Coq.ssr.ssrbool Coq.Lists.List Coq.micromega.Psatz Ensembles Coq.Program.Tactics.
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
 (* Import ListNotations. *)
 (* Open Scope nat_scope. *)
 
@@ -23,7 +24,7 @@ Notation "Σ1 ▷ Σ2" := (authority Σ1 Σ2) (at level 60).
 (** ** Value typing (with variants) *)
 
 Inductive value_typing : StoreTyping -> Loc -> Tpe -> Prop :=
-| vt_sub : forall Σ l (T1 T2: Tpe),
+| vt_sub : forall Σ l T1 T2,
     getType Σ l = Some T1 ->
     (T1 <: T2) -> value_typing Σ l T2.
 Global Instance notation_value_typing_Tpe : notation_dash_colon StoreTyping Loc Tpe :=
@@ -42,20 +43,20 @@ Global Instance notation_value_typing_ClN : notation_dash_colon StoreTyping Loc 
   { dash_colon_ := value_typing_cln }.
 Global Hint Unfold notation_value_typing_ClN: notations.
 
-Definition value_typing_mode_locset Σ L (μ:Mode) :=
+Definition value_typing_mode_locset Σ L μ :=
   forall (l: Loc), (In Loc L l) -> Σ ⊨ l : μ.
 Global Instance notation_value_typing_mode_LocSet : notation_dash_colon StoreTyping LocSet Mode :=
   { dash_colon_ := value_typing_mode_locset }.
 Global Hint Unfold notation_value_typing_mode_LocSet: notations.
 
-Definition value_typing_locset (Σ:StoreTyping) (L: list Loc) (vl: list Tpe) :=
-  Forall2 (fun (l: Loc) (T:Tpe) => Σ ⊨ l : T) L vl.
+Definition value_typing_locset Σ (ll: list Loc) (vl: list Tpe) :=
+  Forall2 (fun (l: Loc) (T:Tpe) => Σ ⊨ l : T) ll vl.
 Global Instance notation_value_typing_LocSet : notation_dash_colon StoreTyping (list Loc) (list Tpe) :=
   { dash_colon_ := value_typing_locset }.
 Global Hint Unfold notation_value_typing_LocSet: notations.
 
 (** ** Stackability *)
-Definition stackability_st (Σ1 Σ2: StoreTyping) :=
+Definition stackability_st Σ1 Σ2 :=
   forall l, l < dom Σ2 -> (Σ2 ⊨ l : warm) \/ (l < dom Σ1).
 Global Instance notation_stackability_StoreTyping : notation_stackability StoreTyping :=
   { stackability_ := stackability_st }.
@@ -80,17 +81,17 @@ Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
           getVal ω f = Some v /\ (Σ ⊨ v : (D, μ))) ->
     object_typing Σ (C,ω) (C, warm)
 | ot_cool : forall Σ C ω n,
-    (forall f v T μ,
+    (forall f v D μ,
         getVal ω f = Some v ->
-        fieldType C f = Some (T, μ) ->
-        Σ ⊨ v : (T, μ)) ->
+        fieldType C f = Some (D, μ) ->
+        Σ ⊨ v : (D, μ)) ->
     dom ω = n ->
     object_typing Σ (C,ω) (C, cool n)
 | ot_cold : forall Σ C ω,
-    (forall f v T μ,
+    (forall f v D μ,
         getVal ω f = Some v ->
-        fieldType C f = Some (T, μ) ->
-        Σ ⊨ v : (T, μ)) ->
+        fieldType C f = Some (D, μ) ->
+        Σ ⊨ v : (D, μ)) ->
     object_typing Σ (C,ω) (C, cold).
 
 Global Instance notation_object_typing : notation_dash_colon StoreTyping Obj Tpe :=
@@ -99,7 +100,7 @@ Global Hint Unfold notation_object_typing: notations.
 
 (** ** Store_typing *)
 (** Here is the link between the abstract environment of types and the store used in execution *)
-Definition store_typing (Σ: StoreTyping) (σ: Store) :=
+Definition store_typing Σ σ :=
   dom σ = dom Σ /\
   forall l, l < dom Σ ->
        exists C ω μ, getObj σ l = Some (C,ω) /\
@@ -121,9 +122,6 @@ Global Instance notation_env_typing: notation_dash (EnvTyping * StoreTyping) Env
   { dash_ := fun a b => env_typing (fst a) (snd a) b }.
 Global Hint Unfold notation_env_typing: notations.
 
-Implicit Type l : Loc.
-Implicit Type T : Tpe.
-Implicit Type Σ : StoreTyping.
 
 (** * Tactics *)
 Ltac meta :=
@@ -218,7 +216,7 @@ Proof with meta; eauto.
 Qed.
 Global Hint Resolve value_typing_dom: typ.
 
-Lemma value_typing_monotonicity: forall (Σ1 Σ2: StoreTyping) l T,
+Lemma value_typing_monotonicity: forall Σ1 Σ2 l T,
     Σ1 ≼ Σ2 -> Σ1 ⊨ l : T -> Σ2 ⊨ l : T.
 Proof with (meta; eauto with lia typ).
   intros ...
@@ -227,7 +225,7 @@ Proof with (meta; eauto with lia typ).
 Qed.
 Global Hint Resolve value_typing_monotonicity: typ.
 
-Lemma env_typing_monotonicity: forall (Σ1 Σ2: StoreTyping) (Γ:EnvTyping) (ρ: Env),
+Lemma env_typing_monotonicity: forall Σ1 Σ2 Γ ρ,
     Σ1 ≼ Σ2 -> (Γ, Σ1) ⊨ ρ -> (Γ, Σ2) ⊨ ρ.
 Proof.
   intros.
@@ -240,7 +238,7 @@ Qed.
 Global Hint Resolve env_typing_monotonicity: typ.
 
 
-Lemma object_typing_monotonicity: forall (Σ1 Σ2: StoreTyping) (o: Obj) T,
+Lemma object_typing_monotonicity: forall Σ1 Σ2 (o: Obj) T,
     Σ1 ≼ Σ2 -> Σ1 ⊨ o : T -> Σ2 ⊨ o : T.
 Proof with (meta; eauto with lia typ).
   intros ...
@@ -348,7 +346,7 @@ Ltac storeTyping_update :=
               end
           end; cross_rewrites).
 
-Lemma hot_transitivity : forall (Σ: StoreTyping) (σ: Store) l l',
+Lemma hot_transitivity : forall Σ σ l l',
     wf σ ->
     (Σ ⊨ l : hot) ->
     (Σ ⊨ σ) ->
@@ -365,6 +363,7 @@ Proof with (storeTyping_update; meta; eauto with lia typ).
   lets [?C [?μ ?]]:  fieldType_exists f ...
   lets [?v [ ]]: H10 H11 ...
   exists C...
+  eexists...
 Qed.
 
 
@@ -415,7 +414,7 @@ Global Hint Resolve stk_st_trans : typ.
 
 
 (** ** Selection results *)
-Lemma hot_selection : forall Σ σ (l: Loc) C ω,
+Lemma hot_selection : forall Σ σ l C ω,
     wf σ ->
     Σ ⊨ σ ->
     (Σ ⊨ l : (C, hot)) ->
@@ -433,7 +432,7 @@ Proof with (meta; eauto with typ lia).
   lets [? [ ] ]: H10 f H3...
 Qed.
 
-Lemma warm_selection : forall Σ σ (l: Loc) C ω f T,
+Lemma warm_selection : forall Σ σ l C ω f T,
     Σ ⊨ σ ->
     (Σ ⊨ l : (C, warm)) ->
     getObj σ l = Some (C, ω) ->
@@ -451,7 +450,7 @@ Proof with (meta; eauto with typ lia).
     eapply vt_sub ...
 Qed.
 
-Lemma cool_selection : forall Σ σ C (l: Loc) Ω ω f T,
+Lemma cool_selection : forall Σ σ C l Ω ω f T,
     Σ ⊨ σ ->
     (Σ ⊨ l : (C, cool Ω)) ->
     getObj σ l = Some (C, ω) ->
@@ -506,7 +505,7 @@ Proof with (updates; meta; eauto with typ lia).
            eapply s_typ_mode...
            eapply s_mode_trans with (cool (dom ω)) ...
            eapply s_mode_cool...
-        -- exists (T, μ0); try rewrite getType_update_diff...
+        -- exists (D, μ0); try rewrite getType_update_diff...
       * inverts H10.
         lets: H15 H11...
     + exists C1, ω0, μ1; splits...
@@ -577,16 +576,16 @@ Qed.
 
 (** Env typing lemmas *)
 
-Lemma env_typing_subs: forall ρ1 ρ2 Σ vl,
-    (ρ1, Σ) ⊨ vl ->
-    S_Typs ρ1 ρ2 ->
-    (ρ2, Σ) ⊨ vl.
+Lemma env_typing_subs: forall Γ1 Γ2 Σ vl,
+    (Γ1, Σ) ⊨ vl ->
+    S_Typs Γ1 Γ2 ->
+    (Γ2, Σ) ⊨ vl.
 Proof.
-  induction ρ1; intros.
+  induction Γ1; intros.
   - inverts H0; eauto with typ.
   - inverts H0; meta.
     inverts H; simpl in *.
-    eapply IHρ1 in H4; eauto.
+    eapply IHΓ1 in H4; eauto.
     eapply et_cons; simpl in *; eauto with typ.
     meta.
     exists (C, μ1); eauto with typ.
@@ -642,10 +641,10 @@ Proof with (updates; meta; eauto with typ updates).
       intros.
       lets: H16 μ__f H1 H2...
       destruct_eq (f = f0); subst...
-      exists (T, μ)...
+      exists (D0, μ)...
     + apply ot_cold. intros.
       lets: H14 H1 H2...
       destruct_eq (f = f0); subst...
-      exists (T, μ)...
+      exists (D0, μ)...
   - exists C', ω', μ'; splits...
 Qed.
