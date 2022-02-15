@@ -75,7 +75,7 @@ Proof with (meta; eauto with typ updates lia).
       |- context [getType (map ?f (combine (seq 0 (dom _)) ?Σ)) ?l ] =>
         try rewrite (proj1 H__st) ;
         rewrite /getType nth_error_map;
-        rewrite (nth_error_nth' _  (0,(entry,cold)));
+        rewrite (nth_error_nth' _  (0,(Entry,cold)));
         [rewrite combine_length seq_length PeanoNat.Nat.min_id ; auto |];
         rewrite ?combine_nth ?seq_nth ?seq_length; eauto with updates; simpl;
         rewrite (nth_error_nth _ _ _ H1)
