@@ -7,6 +7,9 @@ Require Import ssreflect ssrbool Psatz List Sets.Ensembles Coq.Program.Tactics C
 Import ListNotations.
 Open Scope nat_scope.
 
+(** ** Implicit types *)
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (flds: list Field).
+
 (** ** Definitions and notations *)
 (** A wellformed store only contains pointers to locations that are within itself *)
 Definition wf σ :=
@@ -278,7 +281,7 @@ Ltac eval_wf :=
 
 (** Partially monotonic wellformed stores keep objects warm *)
 Lemma pM_wf_warm_monotone:
-  forall σ σ' (l: Loc),
+  forall σ σ' l,
     σ ⪯ σ' ->
     wf σ' ->
     σ  ⊨ l : warm ->

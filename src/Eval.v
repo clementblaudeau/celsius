@@ -7,6 +7,8 @@ Require Import ssreflect ssrbool.
 Require Import List Psatz Arith.
 Import ListNotations.
 Open Scope nat_scope.
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
+
 
 (** ** Evaluation results *)
 
@@ -19,12 +21,12 @@ Inductive result : Type :=
 Inductive result_l : Type :=
 | Timeout_l
 | Error_l
-| Success_l : (list Value) -> Store -> result_l.
+| Success_l ρ σ : result_l.
 
 Inductive result_i : Type :=
 | Timeout_i
 | Error_i
-| Success_i : Store -> result_i.
+| Success_i σ : result_i.
 
 (** ** Big step evaluator (with fuel) *)
 (** We define the [eval] function along with its notations *)
@@ -109,7 +111,7 @@ Fixpoint eval e σ ρ v k :=
   end
 where "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"  := (eval e σ ρ v k)
 (** Evaluation of a list of expressions (fold) *)
-with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (ψ: Value) (n: nat) :=
+with eval_list (e_l: list Expr) σ ρ ψ n :=
        match n with
        | 0 => Timeout_l
        | S n => match e_l with
@@ -128,7 +130,7 @@ with eval_list (e_l: list Expr) (σ: Store) (ρ: Env) (ψ: Value) (n: nat) :=
        end
 where  "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" := (eval_list e σ ρ v k)
 (** Initialization of a list of fields using (fold) *)
-with init (C: ClN) (flds: list Field) (I : Var) (ρ: list Var) (σ: Store) (n :nat) : result_i :=
+with init (C: ClN) (flds: list Field) (I : Var) ρ σ n : result_i :=
        match n with
        | 0 => Timeout_i
        | S n => match flds with
@@ -163,9 +165,9 @@ Ltac destruct_eval_f :=
 
 (** A simple result on lengths *)
 Lemma EvalListLength :
-  forall el n σ σ' ρ ψ l ,
-    ⟦_ el _⟧(σ, ρ, ψ)(n) = Success_l l σ' ->
-    length el = length l.
+  forall el n σ σ' ρ ψ vl ,
+    ⟦_ el _⟧(σ, ρ, ψ)(n) = Success_l vl σ' ->
+    length el = length vl.
 Proof.
   induction el; steps;
     destruct n; simpl; try discriminate.
@@ -254,8 +256,8 @@ Qed.
 Theorem init_step_monotonicity:
   forall n m C flds ρ I σ σ',
     n < m ->
-    init C flds ρ I σ n = Success_i σ' ->
-    init C flds ρ I σ m = Success_i σ'.
+    init C flds I ρ σ n = Success_i σ' ->
+    init C flds I ρ σ m = Success_i σ'.
 Proof with try lia.
   intros.
   pose proof (eval_step_monotonicity_aux n) as [_ [_ H__init]].

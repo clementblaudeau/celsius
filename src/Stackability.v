@@ -6,11 +6,12 @@ From Celsius Require Export PartialMonotonicity Reachability Wellformedness.
 Require Import ssreflect ssrbool Psatz List.
 Import ListNotations.
 Open Scope nat_scope.
-
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet).
 Global Hint Resolve eM_warm_monotone: stk.
 
+
 (** ** Definitions and notations *)
-Definition stackability (σ σ' : Store) :=
+Definition stackability σ σ' :=
   forall l, l < (dom σ') -> ((σ' ⊨ l : warm) \/ (l < (dom σ))).
 Global Instance notation_stackability_store : notation_stackability Store :=
   { stackability_ := stackability }.

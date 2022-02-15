@@ -2,6 +2,8 @@ From Celsius Require Import Language Notations Tactics LibTactics.
 Import List ListNotations Psatz Ensembles.
 Require Import ssreflect ssrbool Coq.Sets.Finite_sets_facts Coq.Program.Tactics.
 Open Scope list_scope.
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
+
 
 (** ** Helper functions *)
 Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
@@ -101,7 +103,7 @@ Qed.
 Global Hint Resolve getObj_dom: updates.
 
 Lemma getVal_dom:
-  forall l O σ, getVal σ l = Some O -> l < dom σ.
+  forall l v ρ, getVal ρ l = Some v -> l < dom ρ.
 Proof.
   unfold getVal.
   intros; eapply nth_error_Some; eauto.
@@ -109,7 +111,7 @@ Qed.
 Global Hint Resolve getVal_dom: updates.
 
 Lemma getType_dom:
-  forall l O σ, getType σ l = Some O -> l < dom σ.
+  forall l O Σ, getType Σ l = Some O -> l < dom Σ.
 Proof.
   unfold getType.
   intros; eapply nth_error_Some; eauto.
@@ -150,14 +152,14 @@ Qed.
 (** * Assignments *)
 
 (** Update store with new value in local env : adds a new field to an existing object *)
-Definition assign_new (obj: Value) (v: Value) (σ: Store) : option Store :=
+Definition assign_new (obj: Value) (v: Value) σ : option Store :=
   match (getObj σ obj) with
   | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
   | None => None (* ? *)
   end.
 
 (** Update store with update in local env : update an already-existing field of an existing object*)
-Definition assign (obj: Value) (f: Var) (v: Value) (σ: Store) : Store :=
+Definition assign (obj: Value) (f: Var) (v: Value) σ : Store :=
   match (getObj σ obj) with
   | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
   | None => σ (* ? *)
@@ -223,7 +225,7 @@ Qed.
 
 
 Lemma getObj_last_empty :
-  forall (σ: Store) C C' ω l f v,
+  forall σ C C' ω l f v,
     getObj (σ++[(C,[])]) l = Some (C', ω) ->
     getVal ω f = Some v ->
     getObj σ l = Some (C', ω) /\ l < dom σ.
@@ -323,7 +325,7 @@ Global Hint Extern 1 => updates: updates.
 (** * Maps *)
 
 Lemma dom_map:
-  forall (Σ: StoreTyping) (l: Loc) (f: Tpe -> Tpe),
+  forall Σ l (f: Tpe -> Tpe),
     dom (map (fun T => f T) Σ) = dom Σ.
 Proof.
   intros.
@@ -332,7 +334,7 @@ Qed.
 
 
 Lemma getType_map:
-  forall (Σ: StoreTyping) f l T,
+  forall Σ f l T,
     getType Σ l = Some T ->
     getType (map (fun T => f T) Σ) l = Some (f T).
 Proof.
@@ -351,11 +353,11 @@ Ltac inSingleton :=
 (** * Store Subset *)
 
 (** A set of locations is contained in a store: [L ⪽ σ] *)
-Definition storeSubset (σ: Store) L :=
+Definition storeSubset σ L :=
   forall l, l ∈ L -> l < dom σ.
 
 (** The codomain of an environment is the set of locations it contains *)
-Definition codom (ρ: Env) : (LocSet) :=
+Definition codom ρ : LocSet :=
   fun l => (List.In l ρ).
 
 Notation "L ⪽ σ" := (storeSubset σ L) (at level 80).

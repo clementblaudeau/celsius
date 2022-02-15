@@ -5,6 +5,7 @@ From Celsius Require Export Language Helpers Notations.
 Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Psatz Ensembles.
 Import ListNotations.
 Open Scope list_scope.
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet).
 
 
 (** ** Definitions and notations *)
@@ -31,11 +32,12 @@ Global Instance notation_reachability : notation_dash_arrow Store Loc Loc :=
 Global Hint Unfold notation_reachability: notations.
 
 
-Lemma rch_heap_n : forall (l: Loc) (σ: Store), l < dom σ -> σ ⊨ l ⇝ l.
+Lemma rch_heap_n : forall l σ, l < dom σ -> σ ⊨ l ⇝ l.
 Proof.
   autounfold with notations. eauto using reachability.
 Qed.
-Lemma rch_step_n : forall (l0 l1 : Loc) C f ω σ,
+
+Lemma rch_step_n : forall l0 l1 C f ω σ,
     l1 < dom σ ->
     getObj σ l0 = Some (C, ω) ->
     getVal ω f = Some l1 ->
@@ -43,7 +45,8 @@ Lemma rch_step_n : forall (l0 l1 : Loc) C f ω σ,
 Proof.
   autounfold with notations. eauto using reachability.
 Qed.
-Lemma rch_trans_n : forall (l0 l1 l2: Loc) σ,
+
+Lemma rch_trans_n : forall l0 l1 l2 σ,
     σ ⊨ l0 ⇝ l1 ->
     σ ⊨ l1 ⇝ l2 ->
     σ ⊨ l0 ⇝ l2.
@@ -53,7 +56,7 @@ Qed.
 Global Hint Resolve rch_heap_n rch_step_n rch_trans_n : rch.
 
 
-Definition reachability_set σ (L: LocSet) l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
+Definition reachability_set σ L l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
 Global Instance notation_reachability_set : notation_dash_arrow Store LocSet Loc :=
   { dash_arrow_ := reachability_set }.
 Notation "σ ⊨ { l } ⇝ l'" := (reachability_set σ {l} l')  (at level 60, l at level 98, l' at level 98).
@@ -63,22 +66,22 @@ Global Hint Unfold notation_reachability_set: notations.
 - [reachable_cold]: if the location is in the heap (but might point to an object with unitialized fields)
 - [reachable_warm]: if the location points to an object with all initialized fields (but those might point to cold objects)
 - [reachable_hot]: if the location points to a hot object (transitively all initialized) *)
-Definition reachable_cold (σ: Store) (l: Loc) :=
+Definition reachable_cold σ l :=
   (l < dom σ).
 
-Definition reachable_warm (σ: Store) (l: Loc) :=
+Definition reachable_warm σ l :=
   (exists C ω Args Flds Mtds ,
       (getObj σ l) = Some (C, ω) /\
         (ct C = (class Args Flds Mtds)) /\
         (length Flds <= length ω)).
 
-Definition reachable_cool (σ: Store) (l: Loc) Ω :=
+Definition reachable_cool σ l Ω :=
   exists C ω Args Flds Mtds ,
     getObj σ l = Some (C, ω) /\
       ct C = (class Args Flds Mtds) /\
       Ω <= dom ω.
 
-Definition reachable_hot  (σ: Store) (l: Loc) :=
+Definition reachable_hot σ l :=
   forall (l': Loc),
     σ ⊨ l ⇝ l' ->
     reachable_warm σ l'.
@@ -121,7 +124,7 @@ Global Hint Extern 1 => updates: rch.
 (** *** Basic results *)
 (** Rechable locations from a hot location lead to other hot locations *)
 Lemma reachability_hot:
-  forall σ (l l': Loc),
+  forall σ l l',
     σ ⊨ l : hot ->
     σ ⊨ l ⇝ l' ->
     σ ⊨ l': hot.
@@ -140,7 +143,7 @@ Qed.
 
 (* Reachable objects are inside the store *)
 Lemma reachability_dom :
-  forall σ (l1 l2: Loc),
+  forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
     l2 < dom σ.
 Proof.
@@ -151,7 +154,7 @@ Global Hint Resolve reachability_dom: rch.
 
 (* Reachable objects are inside the store *)
 Lemma reachability_dom2 :
-  forall σ (l1 l2: Loc),
+  forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
     l1 < dom σ.
 Proof.
@@ -175,7 +178,7 @@ Qed.
 
 (** When we ad a new location inside a local environment of an object, any new paths were either already in the previous store, or go through the added location *)
 Lemma reachability_add_env:
-  forall σ x C ω (l: Loc),
+  forall σ x C ω l,
     x < dom σ ->
     getObj σ x = Some(C, ω) ->
     forall (l1 l2: Loc),
@@ -193,7 +196,7 @@ Qed.
 (** ** Notions of path into the heap *)
 
 (** We define an existential predicate corresponding to the [rch_step] case *)
-Definition reachable_one_step σ (l0 l1: Loc) :=
+Definition reachable_one_step σ l0 l1 :=
   exists C ω f, getObj σ l0 = (Some (C, ω) : option Obj) /\
            getVal ω f = Some l1 /\
            l1 < dom σ.
@@ -216,7 +219,7 @@ Fixpoint reachable_path σ (p: list Loc) {struct p}:=
   end.
 
 (** A key notion for scopability proofs is to know if a path contains a given edge *)
-Definition contains_edge p (l1 l2 :Loc) :=
+Definition contains_edge p l1 l2 :=
   exists p1 p2, p = p2 ++ l2::l1::p1.
 
 (** *** Basic properties of paths *)
@@ -239,7 +242,7 @@ Qed.
 
 (** All elements along a path are reachable from the start: *)
 Lemma reachable_path_is_reachable:
-  forall (σ: Store) p e l,
+  forall σ p e l,
     reachable_path σ (e::p) ->
     List.In l (e::p) ->
     σ ⊨ l ⇝ e.
@@ -280,7 +283,7 @@ Proof.
     ++ intros. repeat ( destruct_match; [apply_anywhere app_eq_nil; steps |]).
        repeat rewrite_back_any.
        steps; eapply_anywhere IHp2; steps.
-  + assert (forall l p s, reachable_path σ (p++s::l) -> reachable_path σ (p++[s])); eauto.
+  + assert (forall (l:list Loc) p s, reachable_path σ (p++s::l) -> reachable_path σ (p++[s])); eauto.
     induction l; steps.
     specialize (IHl (p++[s]) a).
     eapply reachable_path_last.
@@ -416,7 +419,7 @@ Qed.
 
 (** A path in an updated store either goes through the new value or was already valid in the un-updated store*)
 Lemma reachable_path_assignment :
-  forall (σ σ': Store) C ω ω' p (f l l' : Loc),
+  forall σ σ' C ω ω' p (f l l' : Loc),
     (getObj σ l) = Some (C, ω) ->
     ω' = [f ↦ l']ω ->
     σ' = [l ↦ (C, ω')]σ ->
@@ -794,7 +797,6 @@ Section rch_decidability.
   Qed.
   Local Hint Resolve reachability_trace_reachabilityb : rch_t.
 
-  Implicit Type l : Loc.
   Theorem reachability_dec:
     forall σ l l',
       {σ ⊨ l ⇝ l'} + {~ σ ⊨ l ⇝ l'}.

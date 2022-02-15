@@ -6,6 +6,8 @@ From Celsius Require Export Semantics.
 Require Import ssreflect ssrbool List Psatz Coq.Program.Tactics.
 Import ListNotations.
 Open Scope nat_scope.
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
+
 
 (** ** Definitions and notations *)
 Definition partial_monotonicity σ σ' :=
@@ -17,7 +19,6 @@ Notation "s ⪳ s'" := (exact_monotonicity s s') (at level 60).
 
 Local Hint Unfold partial_monotonicity: pM.
 Local Hint Unfold exact_monotonicity: pM.
-Implicit Type σ: Store.
 
 (** ** Basic results on partial monotonicity*)
 (** The relation is trivially reflexive and transitive *)
@@ -69,7 +70,7 @@ Global Hint Resolve pM_domains: pM.
 (** ** Main Monotonicity result *)
 (** We start with two technical results on partial monotonicity for assignment (update) and fresh location *)
 Lemma pM_assignment :
-  forall σ l C (ω ω': Env),
+  forall σ l C ω ω',
     getObj σ l = Some (C, ω) ->
     length ω <= length ω' ->
     σ ⪯ [l ↦ (C, ω')]σ.
@@ -181,7 +182,7 @@ Global Hint Resolve eM_domains: pM.
 (** ** Main Monotonicity result *)
 (** We start with two technical results on partial monotonicity for assignment (update) and fresh location *)
 Lemma eM_assignment :
-  forall σ l C (ω ω': Env),
+  forall σ l C ω ω',
     getObj σ l = Some (C, ω) ->
     length ω = length ω' ->
     σ ⪳ [l ↦ (C, ω')]σ.
@@ -268,7 +269,7 @@ Global Hint Resolve eM_theorem_list: pM.
 (** Exact monotonic stores keep objects warm *)
 From Celsius Require Import Reachability.
 Lemma eM_warm_monotone:
-  forall σ σ' (l: Loc),
+  forall σ σ' l,
     σ ⪳ σ' ->
     σ  ⊨ l : warm ->
     σ' ⊨ l : warm.

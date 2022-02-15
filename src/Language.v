@@ -10,9 +10,8 @@ From Celsius Require Export Tactics.
 (** ** Basic types *)
 Definition Var : Type := nat.
 Definition Mtd : Type := nat.
-Parameter ClN_count : nat.
-Definition ClN : Type := {C: nat | C < ClN_count}.
 Definition Loc : Type := nat.
+Variant ClN : Type := cln(n: nat).
 
 
 (** ** Expression constructors *)
@@ -32,17 +31,10 @@ Inductive Mode: Type :=
 
 Definition Tpe : Type := ClN * Mode.
 
-Inductive Field: Type :=
-| field(type: Tpe)(expr: Expr).
-
-Inductive Method: Type :=
-| method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
-
-Inductive Class: Type :=
-| class(args: list Tpe)(fields: list Field)(methods: Mtd -> (option Method)).
-
-Inductive Program: Type :=
-| program(C: list Class)(entry: Expr).
+Variant Field   : Type := field(type: Tpe)(expr: Expr).
+Variant Method  : Type := method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).
+Variant Class   : Type := class(args: list Tpe)(fields: list Field)(methods: Mtd -> (option Method)).
+Variant Program : Type := program(C: list Class)(entry: Expr).
 
 
 (** ** Constructs *)
@@ -56,18 +48,9 @@ Definition StoreTyping : Type := list Tpe.
 Definition LocSet := (Ensemble Loc).
 
 (** ** Global Parameters *)
-Parameter entry: ClN.
-Parameter Ξ : {l : list Class | length l = ClN_count}.
-Definition EntryClass: {c:Class | nth_error (proj1_sig Ξ) (proj1_sig entry) = Some c}.
-Proof.
-  destruct ( nth_error (proj1_sig Ξ) (proj1_sig entry)) eqn:H.
-  - exists c; reflexivity.
-  - apply nth_error_None in H.
-    pose proof (proj2_sig entry).
-    pose proof (proj2_sig Ξ).
-    simpl in *.
-    lia.
-Qed.
+Parameter Ξ: list Class.
+Parameter Entry: ClN.
+Parameter EntryClass: Class.
 
-Definition ct (C:ClN) := nth (proj1_sig C) (proj1_sig Ξ) (proj1_sig EntryClass).
+Definition ct (C:ClN) := match C with | cln n => nth n Ξ EntryClass end.
 Definition main: Mtd := 0.
