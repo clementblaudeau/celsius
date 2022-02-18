@@ -38,9 +38,10 @@ Definition scoping_preservation σ1 σ2 L :=
 Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 99).
 Local Hint Unfold scoping : scp.
 Local Hint Unfold scoping_preservation : scp.
-Global Hint Unfold reachability_set: scp.
-Global Hint Resolve Union_introl: scp.
-Global Hint Resolve Union_intror: scp.
+Local Hint Unfold reachability_set: scp.
+Local Hint Resolve Union_introl: scp.
+Local Hint Resolve Union_intror: scp.
+Local Hint Resolve In_singleton: core.
 
 (** ** Basic results *)
 (** We first show a set of basic results about scoping. The premisses can sometime look a bit arbitrary, but they are actually fine-tuned *)
@@ -75,29 +76,40 @@ Lemma scp_union :
     (σ1, L)  ⋖ (σ2, L1) ->
     (σ1, L)  ⋖ (σ2, L2) ->
     (σ1, L)  ⋖ (σ2, L1∪L2).
-Proof.
-  autounfold with notations scp. steps.
-  inversion H4; steps; eauto with wf.
+Proof with (eauto with wf rch).
+  unfold scoping; intros.
+  inversion H4; steps...
+  inversion H6; steps...
+  - apply H5...
+    exists x...
+  - apply H...
+    exists x...
 Qed.
 Global Hint Resolve scp_union: scp.
+
 Lemma scp_union_introl :
   forall σ1 σ2 L L1 L2,
     (L1 ∪ L2) ⪽ σ2 ->
     (σ1, L) ⋖ (σ2, L1∪L2) ->
     (σ1, L) ⋖ (σ2, L1).
-Proof.
-  autounfold with notations scp ; steps.
-  eauto with scp.
+Proof with (eauto with wf rch).
+  unfold scoping; intros.
+  inversion H4; steps...
+  apply H0...
+  exists x; split... apply Union_introl...
 Qed.
 Global Hint Resolve scp_union_introl: scp.
+
 Lemma scp_union_intror :
   forall σ1 σ2 L L1 L2,
     (L1 ∪ L2) ⪽ σ2 ->
-    (σ1, L)  ⋖ (σ2, L1∪L2) ->
-    (σ1, L)  ⋖ (σ2, L2).
-Proof.
-  autounfold with notations scp ; steps.
-  eauto with scp.
+    (σ1, L) ⋖ (σ2, L1∪L2) ->
+    (σ1, L) ⋖ (σ2, L2).
+Proof with (eauto with wf rch).
+  unfold scoping; intros.
+  inversion H4; steps...
+  apply H0...
+  exists x; split... apply Union_intror...
 Qed.
 Global Hint Resolve scp_union_intror: scp.
 
@@ -105,10 +117,8 @@ Lemma scp_reachability:
   forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
     (σ, {l1}) ⋖ (σ, {l2}).
-Proof.
-  autounfold with notations scp ; steps.
-  exists l1; try inSingleton; steps; eauto with scp rch.
-  eapply rch_trans; eauto.
+Proof with (eauto with rch).
+  unfold scoping; intros; rch_set...
 Qed.
 Global Hint Resolve scp_reachability: scp.
 
@@ -119,7 +129,7 @@ Lemma scp_trans:
     (σ1, L1) ⋖ (σ2, L2) ->
     (σ2, L2) ⋖ (σ3, L3) ->
     (σ1, L1) ⋖ (σ3, L3).
-Proof with eauto with scp lia.
+Proof with (eauto with scp lia).
   autounfold with notations scp. steps...
 Qed.
 Global Hint Resolve scp_trans: scp.
@@ -217,32 +227,31 @@ Proof.
 Qed.
 Global Hint Resolve scp_add_env: scp.
 
-Lemma reachability_not_empty: forall σ C l1 l2,
+Lemma rch_add_empty: forall σ C l1 l2,
     wf σ ->
-    (σ++[(C, [])]) ⊨ l1 ⇝ l2 ->
+    (σ ++ [(C, [])]) ⊨ l1 ⇝ l2 ->
     (l1 = dom σ /\ l2 = dom σ) \/ ( σ ⊨ l1 ⇝ l2).
 Proof with (updates; eauto with wf rch lia).
   intros.
   remember (σ++[(C,[])]) as σ0.
   induction H0; steps ...
-  - destruct (Lt.le_lt_or_eq _ _ H0); steps ...
+  - assert (l = dom σ \/ l < dom σ) as [|] by lia...
   - eapply getObj_last_empty in H1; steps ...
+    right...
 Qed.
 
-Lemma reachability_add_empty: forall σ C L l,
+Lemma rch_add_empty_set: forall σ C L l,
     wf σ ->
     (σ++[(C, [])]) ⊨ L ⇝ l ->
     (σ ⊨ L ⇝ l) \/ l = length σ.
 Proof.
   intros.
   inversion H0 as [l1 [Hl1 Hrch]].
-  eapply reachability_not_empty in Hrch; steps.
+  eapply rch_add_empty in Hrch; steps.
   left. exists l1; eauto.
 Qed.
 
-(** ** Assignment results *)
 (** We prove some specific results on scopability in the context of assignment. The key reasonning technique is to do a case analysis on the presence of the modified entry in the reachability path. *)
-Reset Ltac Profile.
 Lemma scp_assign:
   forall σ1 σ2 σ2' L1 l l' f C ω ω',
     σ1 ⇝ σ2 ⋖ L1 ->
@@ -252,79 +261,34 @@ Lemma scp_assign:
     ω' = [f ↦ l']ω ->
     σ2' = [l ↦ (C, ω')]σ2 ->
     (σ1 ⇝ σ2' ⋖ L1) /\ ((σ1, L1) ⋖ (σ2', {l})).
-Proof.
+Proof with (eauto with rch scp wf).
   unfold scoping_preservation; light; flatten.
   split.
+
   - (* σ1 ⇝ σ2' ⋖ L1 *)
-    split; eauto.
+    split => //.
     move => σ0 L0 L H_dom1 H_dom2' H_subL H_subL0 A1 A2.
     intros. updates.
     unfold scoping; simpl.
     intros.
     assert ((σ0, L0) ⋖ (σ2, L)) as B1 by eauto.
     assert ((σ0, L0) ⋖ (σ2, {l'})) as C1 by eauto using scp_trans.
-    destruct H7; steps.
+    destruct H7 as [l1 [H__l1 H__rch]].
+    steps. ss; updates.
     eapply ss_update in H5.
-    destruct_eq (l = l'); subst.
-    + (* l = l' , the assignment is weakening *)
-      eapply B1; simpl; (try exists x); eauto using reachability_weaken_assignment with wf.
-    + (* l ≠ l' *)
-      pose proof (reachability_dom _ _ _ H9).
-      (* Key case analysis : is the modified value in the path ? *)
-      eapply reachable_path_reachability in H9; light; flatten; subst; updates.
-      * eapply B1; (try exists l0); simpl; eauto with rch.
-      * pose proof H7.
-        eapply reachable_path_assignment in H7 as [Hedge | Hpath]; eauto.
-        ** eapply contains_edge_last_edge in Hedge; flatten.
-           assert (σ2 ⊨ l' ⇝ l0). {
-             eapply reachable_path_reachability.
-             eapply contains_edge_split in Hedge0 ; flatten; eauto.
-             rewrite H10 in H9.
-             eapply (reachable_path_app2 _ l' (l::p2) (l0::p1')) in H9.
-             eapply reachable_path_assignment in H9; eauto.
-             flatten; eauto with rch.
-             exfalso; apply Hedge1.
-             eapply contains_edge_last; eauto. }
-           eapply C1; simpl; eauto with wf rch.
-           exists l'; split => //.
-        ** eapply B1; simpl; eauto.
-           exists x; split; eauto using reachable_path_reachability.
-           eapply reachable_path_reachability.
-           right. eauto.
+    eapply rch_asgn_split in H__rch as [| [H__rch1 H__rch2 ]]...
+    + eapply B1... exists l1...
+    + eapply C1... exists l'...
 
   - (* (σ1, L1) ⋖ (σ2', {l}) *)
     unfold scoping; simpl. intros.
-    destruct H7; steps; inSingleton. ss; updates.
-    destruct_eq (l = l'); subst.
-    + (* if l = l', the assignment is weakening *)
-      eapply H0; try (eexists; split);
-        eauto using In_singleton, reachability_weaken_assignment with wf rch updates.
-    + eapply reachable_path_reachability in H9; light; flatten; subst; updates.
-      * eapply H0; try (eexists; split);
-          eauto using In_singleton, reachability_weaken_assignment with wf rch updates.
-      * pose proof H.
-      (* Key case analysis : is the modified value in the path ? *)
-        eapply reachable_path_assignment in H as [Hedge | Hpath]; eauto.
-        ++ assert (l' < dom σ2). {
-             unfold contains_edge in Hedge; flatten.
-             apply reachable_path_is_reachable with (l := l') in H7.
-             eapply reachability_dom2 in H7; updates => //.
-             rewrite Hedge; apply in_app_iff; steps. }
-           eapply H1; try (eexists; split); eauto using In_singleton with rch wf.
-           eapply_anywhere contains_edge_last_edge; flatten.
-           eapply reachable_path_reachability.
-           destruct_eq (l' = l0); subst ; [left; split; eauto; lia | right ].
-           eapply contains_edge_split in Hedge0 ; flatten; [steps | eauto].
-           rewrite H9 in H7.
-           eapply (reachable_path_app2 _ l' (l::p2) (l0::p1')) in H7.
-           eapply reachable_path_assignment in H7; eauto.
-           flatten; eauto with rch.
-           exfalso; apply Hedge1.
-           eapply contains_edge_last; eauto.
-        ++ eapply H0; try (eexists; split);
-             eauto using In_singleton with wf rch updates.
-           eapply reachable_path_reachability; eauto.
+    destruct H7 as [l1 [H__l1 H__rch]].
+    ss; updates. inSingleton.
+    eapply rch_asgn_split in H__rch as [| [H__rch1 H__rch2 ]]...
+    + eapply H0... exists l...
+    + eapply H1... exists l'...
 Qed.
+
 (** ** Evaluation-maintained results *)
 Global Hint Extern 1 => repeat rch_singleton: scp.
 
@@ -369,7 +333,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     assert ((σ,  (codom ρ) ∪ ({ψ})) ⋖ (σ1, {l})) as C1.
     + eapply scp_trans with σ1 {l1}; eauto with wf.
       unfold scoping; steps. rch_set.
-      eapply rch_trans_n with v1; eauto with rch.
+      eapply rch_trans with v1; eauto with rch.
     + eapply C1 ; steps ...
   - (* e = e0.m(l0) *)
     destruct IHevalP1, IHevalP2; eauto with wf.
@@ -390,17 +354,17 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
       move : H9 => [l0 [H__l0 H__rch]].
       inversion H__l0; steps.
       * eapply H3 ...
-        eapply reachability_not_empty in H__rch ...
+        eapply rch_add_empty in H__rch ...
         exists l0; steps.
         eapply H_vals in H6 ...
       * inSingleton.
-        eapply reachability_not_empty in H__rch; steps; try lia.
+        eapply rch_add_empty in H__rch; steps; try lia.
         eapply reachability_dom2 in H6. lia.
     + eapply scp_pr_trans; eauto.
       unfold scoping_preservation; steps; eauto.
       unfold scoping; steps.
       move: H15 => [l0 [Hl0 H__rch]].
-      eapply reachability_not_empty in H__rch; steps; try lia.
+      eapply rch_add_empty in H__rch; steps; try lia.
       apply H11 ... exists l0 ...
     + flatten; split => //.
       eapply scp_union_intror ; eauto with wf scp. ss...

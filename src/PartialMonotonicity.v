@@ -274,7 +274,8 @@ Lemma eM_warm_monotone:
     σ  ⊨ l : warm ->
     σ' ⊨ l : warm.
 Proof.
-  autounfold with pM core notations. unfold reachable_warm.
+  intros. cbn in *.
+  unfold reachable_warm in *.
   steps.
   lets [?ω' [ ] ] : H H1.
   repeat eexists; eauto.

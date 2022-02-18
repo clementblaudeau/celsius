@@ -280,6 +280,7 @@ Ltac eval_wf :=
     end.
 
 (** Partially monotonic wellformed stores keep objects warm *)
+
 Lemma pM_wf_warm_monotone:
   forall σ σ' l,
     σ ⪯ σ' ->
@@ -287,7 +288,8 @@ Lemma pM_wf_warm_monotone:
     σ  ⊨ l : warm ->
     σ' ⊨ l : warm.
 Proof.
-  autounfold with pM core notations. unfold reachable_warm.
+  intros. cbn in *.
+  unfold reachable_warm in *.
   steps.
   lets [?ω' [ ] ] : H H2.
   lets [ ? _ ]: H0 H3.

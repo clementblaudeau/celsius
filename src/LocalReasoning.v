@@ -58,6 +58,8 @@ Qed.
 
 (** ** Local reasoning *)
 
+Axiom classicT : forall (P : Prop), {P} + {~ P}.
+
 Lemma synchronization: forall Σ σ l,
     wf σ ->
     Σ ⊨ σ ->
@@ -83,7 +85,7 @@ Proof with (meta; eauto with typ updates lia).
     end.
 
   intros Σ σ l H__wf H__st; intros.
-  remember ((fun l' '(C,μ) => if (reachability_dec σ l l') then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
+  remember ((fun l' '(C,μ) => if (classicT (σ ⊨ l ⇝ l')) then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
   remember (map (fun '(l, T) => f l T) (combine (seq 0 (dom Σ)) Σ)) as Σ'.
   exists Σ'.
   assert (Hyp: forall (A B C D E: Prop), ((D -> B -> A) /\ B /\ C /\ D /\ E) -> (A /\ B /\ C /\ D /\ E)) by firstorder.
@@ -95,11 +97,12 @@ Proof with (meta; eauto with typ updates lia).
     intros l' H__l'. rewrite HeqΣ' in H__l'.
     rewrite map_length combine_length seq_length in H__l'... rewrite PeanoNat.Nat.min_id in H__l'.
     specialize ((proj2 H__st) l') as [C [ω [μ [? [? ?] ]]]] ...
-    destruct (reachability_dec σ l l') as [H__rch | H__nrch] eqn:H__rdec; steps.
+    destruct (classicT (σ ⊨ l ⇝ l')) as [H__rch | H__nrch]; steps.
     + pose proof (H _ H__rch) ...
       exists C0, ω, hot; repeat split => //.
       * getType_combine. steps.
-        rewrite H__rdec in matched; steps.
+        inverts matched. Set Printing Coercions.
+        destruct (classicT (σ ⊨ l ⇝ l')); steps.
       * destruct (ct C0) as [Args Flds Mtds] eqn:?.
         eapply ot_hot. eapply Heqc.
         intros f ?C ?μ. intros.
@@ -118,12 +121,12 @@ Proof with (meta; eauto with typ updates lia).
         }
         destruct (getVal ω f) eqn:?H__val ; [| apply nth_error_None in H__val; lia]...
         exists v; split => //.
-        assert (σ ⊨ l ⇝ v) by eauto with rch wf.
+        assert (σ ⊨ l ⇝ v) by (eapply rch_trans with l'; eauto with wf rch).
         exists (C, hot) ...
         lets: reachability_dom H7.
         lets [ ]: getType_Some Σ v ...
         getType_combine.
-        destruct (reachability_dec σ l v); steps.
+        destruct (classicT (σ ⊨ l ⇝ v)); steps.
         assert (C1 = C); subst; eauto...
         inverts H2; meta...
         all: try lets [?v [ ] ]: H15 H5 ...
@@ -131,7 +134,7 @@ Proof with (meta; eauto with typ updates lia).
         all: try lets: H12 H5 ...
     + exists C, ω, μ; repeat split => // ...
       getType_combine; steps.
-      destruct (reachability_dec σ l l'); steps.
+      destruct (classicT (σ ⊨ l ⇝ l')); steps.
 
   - intros l' H__l'.
     lets [?T ?]: getType_Some H__l'...
@@ -142,9 +145,8 @@ Proof with (meta; eauto with typ updates lia).
   - intros l' C Ω H__l'.
     rewrite HeqΣ'.
     getType_combine. steps.
-    destruct (reachability_dec σ l l'); steps.
-    apply H in d.
-    destruct d as (?D & ? ).
+    destruct (classicT (σ ⊨ l ⇝ l')); steps.
+    apply H in d. inverts d.
     inverts H0...
     inverts H4.
 
@@ -156,7 +158,7 @@ Proof with (meta; eauto with typ updates lia).
     exists C, (C, hot); eauto with typ.
     inverts H0...
     erewrite HeqΣ'. getType_combine. steps.
-    destruct (reachability_dec σ l l'); steps.
+    destruct (classicT (σ ⊨ l ⇝ l')); steps.
 Qed.
 
 
