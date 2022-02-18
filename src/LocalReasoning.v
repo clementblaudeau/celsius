@@ -33,7 +33,7 @@ Proof.
     * rch_set.
       eapply H5; eauto with rch.
   + (* l ∉ (dom σ) *)
-    pose proof (reachability_dom _ _ _ H6).
+    pose proof (rch_dom _ _ _ H6).
     destruct (H3 l); eauto with lia.
 Qed.
 
@@ -123,7 +123,7 @@ Proof with (meta; eauto with typ updates lia).
         exists v; split => //.
         assert (σ ⊨ l ⇝ v) by (eapply rch_trans with l'; eauto with wf rch).
         exists (C, hot) ...
-        lets: reachability_dom H7.
+        lets: rch_dom H7.
         lets [ ]: getType_Some Σ v ...
         getType_combine.
         destruct (classicT (σ ⊨ l ⇝ v)); steps.
@@ -203,7 +203,7 @@ Proof with (meta; eauto with typ lia).
         exists C, (C,hot)...
       * lets: stk_st_trans H5 H14 H16.
         specialize (H20 l') as [ ]; eauto.
-        -- apply reachability_dom in H1.
+        -- apply rch_dom in H1.
            apply monotonicity_dom in H16.
            lets: (proj1 H9) ...
         -- lets: (proj1 H8) ...

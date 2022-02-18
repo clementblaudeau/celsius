@@ -295,6 +295,8 @@ Global Hint Extern 1 => repeat rch_singleton: scp.
 
 (** ** Main Scopability theorem *)
 (** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)
+
+
 Theorem scp_theorem:
   forall e σ ρ ψ v σ',
     ⟦e⟧p (σ, ρ, ψ) --> (v, σ') ->

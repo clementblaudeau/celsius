@@ -355,7 +355,7 @@ Proof with (
           rch_set. exists (dom σ1); split; eauto with ss. }
         eapply rch_add_empty_set in H17 as [|]...
         inversion H17 as (l' & ? & H__rch').
-        lets: reachability_dom2 H__rch'.
+        lets: rch_dom2 H__rch'.
         inverts H18; rch_set...
         exists l'; splits; eauto with ss.
       * intros l H__l.
