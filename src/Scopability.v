@@ -220,7 +220,7 @@ Proof.
   intros; unfold scoping; simpl; intros.
   destruct H8; steps.
   assert ((s ⊨ x ⇝ l) \/ ((s ⊨ x ⇝ I) /\ (s ⊨ v ⇝ l))) by
-      eauto using reachability_add_env with lia updates.
+      eauto using rch_asgn_new with lia updates.
   steps;
     [ eapply H4 | eapply H3] ;
     simpl; try (eexists; split); eauto with ss.
@@ -276,7 +276,7 @@ Proof with (eauto with rch scp wf).
     destruct H7 as [l1 [H__l1 H__rch]].
     steps. ss; updates.
     eapply ss_update in H5.
-    eapply rch_asgn_split in H__rch as [| [H__rch1 H__rch2 ]]...
+    eapply rch_asgn in H__rch as [| [H__rch1 H__rch2 ]]...
     + eapply B1... exists l1...
     + eapply C1... exists l'...
 
@@ -284,7 +284,7 @@ Proof with (eauto with rch scp wf).
     unfold scoping; simpl. intros.
     destruct H7 as [l1 [H__l1 H__rch]].
     ss; updates. inSingleton.
-    eapply rch_asgn_split in H__rch as [| [H__rch1 H__rch2 ]]...
+    eapply rch_asgn in H__rch as [| [H__rch1 H__rch2 ]]...
     + eapply H0... exists l...
     + eapply H1... exists l'...
 Qed.
@@ -359,7 +359,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
         eapply H_vals in H6 ...
       * inSingleton.
         eapply rch_add_empty in H__rch; steps; try lia.
-        eapply reachability_dom2 in H6. lia.
+        eapply rch_dom2 in H6. lia.
     + eapply scp_pr_trans; eauto.
       unfold scoping_preservation; steps; eauto.
       unfold scoping; steps.

@@ -112,7 +112,7 @@ Global Hint Extern 1 => updates: rch.
 
 (** *** Basic results *)
 (** Rechable locations from a hot location lead to other hot locations *)
-Lemma reachability_hot:
+Lemma rch_hot_trans:
   forall σ l l',
     σ ⊨ l : hot ->
     σ ⊨ l ⇝ l' ->
@@ -124,7 +124,7 @@ Proof.
 Qed.
 
 (** Reaching from a singleton is the same as reaching from the only element of the singleton *)
-Lemma reachability_singleton :
+Lemma rch_singleton :
   forall σ l1 l2,
     (σ ⊨ {l1} ⇝ l2) <-> σ ⊨ l1 ⇝ l2.
 Proof.
@@ -132,7 +132,7 @@ Proof.
 Qed.
 
 (* Reachable objects are inside the store *)
-Lemma reachability_dom :
+Lemma rch_dom :
   forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
     l2 < dom σ.
@@ -140,10 +140,10 @@ Proof.
   intros.
   induction H; steps.
 Qed.
-Global Hint Resolve reachability_dom: rch.
+Global Hint Resolve rch_dom: rch.
 
 (* Reachable objects are inside the store *)
-Lemma reachability_dom2 :
+Lemma rch_dom2 :
   forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
     l1 < dom σ.
@@ -152,146 +152,41 @@ Proof.
   induction H;
     repeat steps || eapply_anywhere getObj_dom.
 Qed.
-Global Hint Resolve reachability_dom2: rch.
+Global Hint Resolve rch_dom2: rch.
 
 (** We define a custom induction predicate. If a transitive property is true along heap paths, then it is true between any two reachable locations. *)
-Lemma reachability_rev_ind:
-  forall (P: Loc -> Loc -> Prop) σ,
-    (forall l, l < dom σ -> P l l) -> (**r Heap case *)
-    (forall l1 l2 l3, P l1 l2 -> P l2 l3 -> P l1 l3) -> (**r Transitive case *)
-    (forall l l' C ω f , l' < dom σ -> getObj σ l = Some(C, ω) /\ getVal ω f = Some l' -> P l l') -> (**r Hop case *)
-    (forall l l', σ ⊨ l ⇝ l' -> P l l').
-Proof.
-  intros.
-  induction H2; eauto.
-Qed.
+(* Lemma reachability_rev_ind: *)
+(*   forall (P: Loc -> Loc -> Prop) σ, *)
+(*     (forall l, l < dom σ -> P l l) -> (**r Heap case *) *)
+(*     (forall l1 l2 l3, P l1 l2 -> P l2 l3 -> P l1 l3) -> (**r Transitive case *) *)
+(*     (forall l l' C ω f , l' < dom σ -> getObj σ l = Some(C, ω) /\ getVal ω f = Some l' -> P l l') -> (**r Hop case *) *)
+(*     (forall l l', σ ⊨ l ⇝ l' -> P l l'). *)
+(* Proof. *)
+(*   intros. *)
+(*   induction H2; eauto. *)
+(* Qed. *)
 
 (** When we ad a new location inside a local environment of an object, any new paths were either already in the previous store, or go through the added location *)
-Lemma reachability_add_env:
-  forall σ x C ω l,
-    x < dom σ ->
-    getObj σ x = Some(C, ω) ->
-    forall (l1 l2: Loc),
-      ([x ↦ (C, ω ++ [l])]σ) ⊨ l1 ⇝ l2 ->
-      (σ ⊨ l1 ⇝ l2) \/ ((σ ⊨ l1 ⇝ x) /\ σ ⊨ l ⇝ l2).
+Lemma rch_asgn_new:
+  forall σ l0 l1 C ω,
+    getObj σ l0 = Some(C, ω) ->
+    forall l l' σ',
+      σ' ⊨ l ⇝ l' ->
+      σ' = ([l0 ↦ (C, ω ++ [l1])]σ) ->
+      (σ ⊨ l ⇝ l') \/ ((σ ⊨ l ⇝ l0) /\ (σ ⊨ l1 ⇝ l')).
 Proof with eauto with rch notations.
-  intros σ x C ω l Hx Hobj.
-  apply reachability_rev_ind; steps;
-    updates; try solve [right; eauto with rch]...
-  destruct_eq (x = l0); subst; updates...
-  eapply_anywhere getVal_add; steps...
-  right; split...
-Qed.
-
-(** Decidability of reachability *)
-
-Reserved Notation "s ⊨ x ⇝ y ↑ tr" (at level 60, x at level 98, y at level 98, tr at level 98).
-Inductive reachability_trace : Store -> Loc -> Loc -> (list Loc) -> Prop :=
-| rch_t_heap : forall σ l,
-    l < dom σ ->
-    σ ⊨ l ⇝ l ↑ []
-| rch_t_step : forall σ l C ω f l',
-    getObj σ l = Some (C, ω) ->
-    getVal ω f = Some l' ->
-    l' < dom σ ->
-    σ ⊨ l ⇝ l' ↑ []
-| rch_t_trans : forall σ l0 l1 l2 t1 t2,
-    σ ⊨ l0 ⇝ l1 ↑ t1 ->
-    σ ⊨ l1 ⇝ l2 ↑ t2 ->
-    σ ⊨ l0 ⇝ l2 ↑ (t1++l1::t2)
-where "s ⊨ x ⇝ y ↑ tr" := (reachability_trace s x y tr).
-Local Hint Constructors reachability_trace: rch.
-
-Lemma rch_iff_rch_tr:
-  forall σ l l',
-    (σ ⊨ l ⇝ l') <-> (exists tr, σ ⊨ l ⇝ l' ↑ tr).
-Proof with (eauto with rch).
-  split; intros.
-  - induction H; flatten; eexists...
-  - destruct H as [tr H].
-    induction H...
-Qed.
-Local Hint Resolve rch_iff_rch_tr: rch.
-
-Lemma rch_tr_implies_rch:
-  forall σ l l' tr,
-    σ ⊨ l ⇝ l' ↑ tr ->
-    σ ⊨ l ⇝ l'.
-Proof with (eauto with rch).
   intros.
-  eapply rch_iff_rch_tr...
-Qed.
-Local Hint Resolve rch_tr_implies_rch: rch.
-
-Lemma rch_tr_in_rch:
-  forall σ l l' tr l__m,
-    ((σ ⊨ l ⇝ l' ↑ tr) /\ (List.In l__m tr)) <->
-      (exists t0 t1, tr = t0 ++ l__m :: t1 /\
-                  (σ ⊨ l ⇝ l__m ↑ t0) /\
-                  (σ ⊨ l__m ⇝ l' ↑ t1)).
-Proof with (eauto using app_assoc_reverse with rch).
-  split; intros.
-  - destruct H as [H ?].
-    induction H; steps.
-    apply in_app_iff in H0 as [|[|]].
-    + lets (t & t' & ? & ? & ?): IHreachability_trace1 H0.
-      exists t, (t'++l1::t2); subst; splits... rewrite app_assoc_reverse...
-    + subst.
-      exists t1, t2; splits...
-    + lets (t & t' & ? & ? & ?): IHreachability_trace2 H0.
-      exists (t1++l1::t), t'; subst; splits... rewrite app_assoc_reverse...
-  - destruct H as (t0 & t1 & ? & ? & ?). subst.
-    split...
-    apply in_elt.
-Qed.
-
-Lemma rch_tr_hd_rch:
-  forall σ l l' tr l__m,
-    (σ ⊨ l ⇝ l' ↑ (l__m::tr)) ->
-    (σ ⊨ l ⇝ l__m ↑ []) /\
-      (σ ⊨ l__m ⇝ l' ↑ tr).
-Proof with (eauto using app_assoc_reverse with rch).
-  intros.
-  remember (l__m::tr) as T. gen l__m tr.
-  induction H; intros; steps;
-  destruct t1; steps...
-Qed.
-
-Lemma NoDup_app:
-  forall [A: Type] (l l': list A),
-    NoDup (l++l') -> NoDup l /\ NoDup l'.
-Proof with (eauto using NoDup).
-  induction l; simpl; intros...
-  inverts H...
-  apply IHl in H3 as [ ]. split...
-  apply NoDup_cons...
-  intros Hf; apply H2, in_app_iff...
-Qed.
-
-Lemma rch_tr_NoDup:
-  forall σ l l' tr,
-    σ ⊨ l ⇝ l' ↑ tr ->
-    exists tr__nd, (σ ⊨ l ⇝ l' ↑ tr__nd) /\ NoDup tr__nd.
-Proof with (eauto using NoDup with rch).
-  intros. gen l l'.
-  induction tr; intros.
-  - inverts H;
-      exists ([]: list Loc); splits...
-  - lets [ ]: rch_tr_hd_rch H.
-    lets (tr__nd & ? & ?): IHtr H1.
-    destruct (in_dec (PeanoNat.Nat.eq_dec) a tr__nd).
-    + clear IHtr H1 H.
-      pose proof (proj1 (iff_and (rch_tr_in_rch σ a l' tr__nd a)))
-        as (t0 & t1 & ? & ? & ?)...
-      exists (a::t1); split.
-      * replace (a::t1) with ([]++a::t1) by steps...
-      * subst. eapply NoDup_app...
-    + exists (a::tr__nd); split...
-      replace (a::tr__nd) with ([]++a::tr__nd) by steps...
+  induction H0; subst; updates...
+  - destruct_eq (l0 = l2); subst; updates...
+    apply getVal_add in H3; steps...
+    right; split...
+  - intuition auto...
+    + right; split...
+    + right; split...
 Qed.
 
 (** A path in an updated store either goes through the new value or was already valid in the un-updated store*)
-Lemma rch_asgn_split :
+Lemma rch_asgn :
   forall σ C ω f l0 l1,
     getObj σ l0 = Some (C, ω) ->
     forall l l' σ',
@@ -300,7 +195,6 @@ Lemma rch_asgn_split :
       (σ ⊨ l ⇝ l') \/ ((σ ⊨ l ⇝ l0) /\ (σ ⊨ l1 ⇝ l')).
 Proof with (eauto with rch).
   intros.
-  (* apply rch_iff_rch_tr in H0 as [tr H0]. *)
   induction H0; subst; updates...
   - destruct_eq (l0 = l2); subst; updates...
     destruct_eq (f = f0); subst; updates...
@@ -309,6 +203,115 @@ Proof with (eauto with rch).
     + right; split...
     + right; split...
 Qed.
+
+
+(** Decidability of reachability *)
+
+(* Reserved Notation "s ⊨ x ⇝ y ↑ tr" (at level 60, x at level 98, y at level 98, tr at level 98). *)
+(* Inductive reachability_trace : Store -> Loc -> Loc -> (list Loc) -> Prop := *)
+(* | rch_t_heap : forall σ l, *)
+(*     l < dom σ -> *)
+(*     σ ⊨ l ⇝ l ↑ [] *)
+(* | rch_t_step : forall σ l C ω f l', *)
+(*     getObj σ l = Some (C, ω) -> *)
+(*     getVal ω f = Some l' -> *)
+(*     l' < dom σ -> *)
+(*     σ ⊨ l ⇝ l' ↑ [] *)
+(* | rch_t_trans : forall σ l0 l1 l2 t1 t2, *)
+(*     σ ⊨ l0 ⇝ l1 ↑ t1 -> *)
+(*     σ ⊨ l1 ⇝ l2 ↑ t2 -> *)
+(*     σ ⊨ l0 ⇝ l2 ↑ (t1++l1::t2) *)
+(* where "s ⊨ x ⇝ y ↑ tr" := (reachability_trace s x y tr). *)
+(* Local Hint Constructors reachability_trace: rch. *)
+
+(* Lemma rch_iff_rch_tr: *)
+(*   forall σ l l', *)
+(*     (σ ⊨ l ⇝ l') <-> (exists tr, σ ⊨ l ⇝ l' ↑ tr). *)
+(* Proof with (eauto with rch). *)
+(*   split; intros. *)
+(*   - induction H; flatten; eexists... *)
+(*   - destruct H as [tr H]. *)
+(*     induction H... *)
+(* Qed. *)
+(* Local Hint Resolve rch_iff_rch_tr: rch. *)
+
+(* Lemma rch_tr_implies_rch: *)
+(*   forall σ l l' tr, *)
+(*     σ ⊨ l ⇝ l' ↑ tr -> *)
+(*     σ ⊨ l ⇝ l'. *)
+(* Proof with (eauto with rch). *)
+(*   intros. *)
+(*   eapply rch_iff_rch_tr... *)
+(* Qed. *)
+(* Local Hint Resolve rch_tr_implies_rch: rch. *)
+
+(* Lemma rch_tr_in_rch: *)
+(*   forall σ l l' tr l__m, *)
+(*     ((σ ⊨ l ⇝ l' ↑ tr) /\ (List.In l__m tr)) <-> *)
+(*       (exists t0 t1, tr = t0 ++ l__m :: t1 /\ *)
+(*                   (σ ⊨ l ⇝ l__m ↑ t0) /\ *)
+(*                   (σ ⊨ l__m ⇝ l' ↑ t1)). *)
+(* Proof with (eauto using app_assoc_reverse with rch). *)
+(*   split; intros. *)
+(*   - destruct H as [H ?]. *)
+(*     induction H; steps. *)
+(*     apply in_app_iff in H0 as [|[|]]. *)
+(*     + lets (t & t' & ? & ? & ?): IHreachability_trace1 H0. *)
+(*       exists t, (t'++l1::t2); subst; splits... rewrite app_assoc_reverse... *)
+(*     + subst. *)
+(*       exists t1, t2; splits... *)
+(*     + lets (t & t' & ? & ? & ?): IHreachability_trace2 H0. *)
+(*       exists (t1++l1::t), t'; subst; splits... rewrite app_assoc_reverse... *)
+(*   - destruct H as (t0 & t1 & ? & ? & ?). subst. *)
+(*     split... *)
+(*     apply in_elt. *)
+(* Qed. *)
+
+(* Lemma rch_tr_hd_rch: *)
+(*   forall σ l l' tr l__m, *)
+(*     (σ ⊨ l ⇝ l' ↑ (l__m::tr)) -> *)
+(*     (σ ⊨ l ⇝ l__m ↑ []) /\ *)
+(*       (σ ⊨ l__m ⇝ l' ↑ tr). *)
+(* Proof with (eauto using app_assoc_reverse with rch). *)
+(*   intros. *)
+(*   remember (l__m::tr) as T. gen l__m tr. *)
+(*   induction H; intros; steps; *)
+(*   destruct t1; steps... *)
+(* Qed. *)
+
+(* Lemma NoDup_app: *)
+(*   forall [A: Type] (l l': list A), *)
+(*     NoDup (l++l') -> NoDup l /\ NoDup l'. *)
+(* Proof with (eauto using NoDup). *)
+(*   induction l; simpl; intros... *)
+(*   inverts H... *)
+(*   apply IHl in H3 as [ ]. split... *)
+(*   apply NoDup_cons... *)
+(*   intros Hf; apply H2, in_app_iff... *)
+(* Qed. *)
+
+(* Lemma rch_tr_NoDup: *)
+(*   forall σ l l' tr, *)
+(*     σ ⊨ l ⇝ l' ↑ tr -> *)
+(*     exists tr__nd, (σ ⊨ l ⇝ l' ↑ tr__nd) /\ NoDup tr__nd. *)
+(* Proof with (eauto using NoDup with rch). *)
+(*   intros. gen l l'. *)
+(*   induction tr; intros. *)
+(*   - inverts H; *)
+(*       exists ([]: list Loc); splits... *)
+(*   - lets [ ]: rch_tr_hd_rch H. *)
+(*     lets (tr__nd & ? & ?): IHtr H1. *)
+(*     destruct (in_dec (PeanoNat.Nat.eq_dec) a tr__nd). *)
+(*     + clear IHtr H1 H. *)
+(*       pose proof (proj1 (iff_and (rch_tr_in_rch σ a l' tr__nd a))) *)
+(*         as (t0 & t1 & ? & ? & ?)... *)
+(*       exists (a::t1); split. *)
+(*       * replace (a::t1) with ([]++a::t1) by steps... *)
+(*       * subst. eapply NoDup_app... *)
+(*     + exists (a::tr__nd); split... *)
+(*       replace (a::tr__nd) with ([]++a::tr__nd) by steps... *)
+(* Qed. *)
+
 
 
 
