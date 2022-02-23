@@ -56,7 +56,7 @@ Proof with (meta; eauto with typ).
     inverts H0; inverts H1; simpl in * ...
   - inverts H.
     unfold P_hot in H6; steps ...
-    exists C. eapply vt_sub ...
+    exists c. eapply vt_sub ...
   - inverts H ...
 Qed.
 Global Hint Resolve P_Hots_env: typ.
@@ -213,13 +213,13 @@ Proof with (
       lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
       IH__expr HT__e0 H0 H1 H3 H__eval0; try inverts H__r; try congruence ...
     eapply eval_implies_evalp in H__eval0.
-    lets H__pM0: pM_theorem H__eval0.
+    lets H__pM0: pM_theorem_expr H__eval0.
     lets (?C & ?ω & ?μ & H__obj & ? & ?): (proj2 H__st0) v0 ...
     rewrite H__obj in H6 |- *.
 
     (* Destruct method fetch*)
     unfold methodInfo in H__mtdinfo.
-    destruct (ct C1) as [Args1 Flds1 Mtds1] eqn:H__ct1.
+    destruct (ct C) as [Args1 Flds1 Mtds1] eqn:H__ct1.
     destruct (Mtds1 m) as [[?μ__r Ts retT ?] |] eqn:H__Mtds1; [| steps] . inverts H__mtdinfo...
 
     (* Destruct evaluation of arguments *)
@@ -232,7 +232,7 @@ Proof with (
     eapply eval_list_implies_evalp in H__eval1. eval_dom; eval_wf.
 
     (* Extract typing for method body from Ξ (well-typed) *)
-    pose proof (typable_classes C1) as HT__em.
+    pose proof (typable_classes C) as HT__em.
     rewrite H__ct1 in HT__em.
     destruct HT__em as [_ HT__em].
     specialize (HT__em m _ _ _ _ H__Mtds1).
@@ -240,7 +240,7 @@ Proof with (
     (* Destruct evaluation of method body *)
     lets (?T & ?T & ? & ? & ?): H__mn1 ψ...
     lets (?T & ?T & ? & ? & ?): H__mn1 v0...
-    assert (HT__em': (Args, (C1, μ__m)) ⊢ e__m : (C, μ__r)) by (eapply weakening with (Γ := Flds); eauto with typ).
+    assert (HT__em': (Args, (C, μ__m)) ⊢ e__m : (C0, μ__r)) by (eapply weakening with (Γ := Flds); eauto with typ).
     assert (codom args_val ∪ {v0} ⪽ σ1). { ss... eapply wf_theorem_list... }
     destruct (⟦ e__m ⟧ (σ1, args_val, v0 )( n)) as [ | | σ' v' ] eqn:H__eval2; try congruence;
     lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
@@ -255,8 +255,8 @@ Proof with (
       subst...
       destruct (local_reasoning2 Σ1 Σ2 σ1 σ2 (codom args_val ∪ { v0 }) {v2} ) as
         (Σ3 & ? & ? & ? & ? & H__v2)...
-      * apply scp_theorem with (e:=e__m); eauto with wf lia.
-      * intros l' [l H__l | l H__l]; rch_set; [| exists C1]...
+      * apply scp_theorem_expr with (e:=e__m); eauto with wf lia.
+      * intros l' [l H__l | l H__l]; rch_set; [| exists C]...
       * lets: H__v2 v2 In_singleton...
         lets (? & ? & ? & ? & ?): H12 v2...
         exists Σ3, v2, σ2; splits...
@@ -317,7 +317,7 @@ Proof with (
       intros l H__l. updates... }
     assert (H__mn5: Σ4 ≼ Σ5). {
       intros l H__l. subst.
-      lets (? & ?): getType_Some Σ4 l... exists (C1, μ).
+      lets (? & ?): getType_Some Σ4 l... exists (C0, μ0).
       destruct_eq (dom σ1 = l); subst; updates...
       exists (C, warm)... }
     assert (H__aty4': Σ1 ▷ Σ4). {
@@ -339,7 +339,8 @@ Proof with (
         destruct_eq (dom σ1 = l); subst; updates.
         -- left; exists C, (C, warm); updates...
         -- lets [ ]: H__stk4 H__l; updates...
-           inverts H11. inverts H12. left. exists C1, (C1, μ); updates...
+           inverts H11. inverts H12. left.
+           exists C0, (C0, μ0); updates...
       * exists (C, warm); subst; updates...
 
     + (* hot *)
@@ -413,14 +414,14 @@ Proof with (
     destruct (getObj σ2 v1) as [[?C ?ω] |] eqn:H__getObj.
 
     + (* Useful assignment *)
-      remember ([v1 ↦ (C1, [f ↦ v2] (ω0))] (σ2)) as σ2'. rewrite -Heqσ2' in H6.
+      remember ([v1 ↦ (C, [f ↦ v2] (ω0))] (σ2)) as σ2'. rewrite -Heqσ2' in H6.
       assert (H__st2': Σ2 ⊨ σ2'). {
         subst. rename v1 into l, v2 into v.
-        lets [?ω [H__obj2 _]]: pM_theorem H__eval2 H__obj.
+        lets [?ω [H__obj2 _]]: pM_theorem_expr H__eval2 H__obj.
         lets [v0 [H__v0 ?]]: cool_selection D0 l H__st2 H__obj2... {
           lets (?T & ?T & ? & ? & ?): H__mn2 l...
           steps...
-          apply vt_sub with (C1, μ5)...
+          apply vt_sub with (C, μ5)...
           apply s_typ_mode...
           eapply s_mode_trans...
           eapply s_mode_trans...
@@ -499,7 +500,7 @@ Proof with (
       lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
        IH__expr HT__e H0 H1 H2 H__eval; try inverts H__r; try congruence ...
     eapply eval_implies_evalp in H__eval.
-    lets H__eM: eM_theorem H__eval. lets [ω' [ ]]: H__eM H4.
+    lets H__eM: eM_theorem_expr H__eval. lets [ω' [ ]]: H__eM H4.
     lets: monotonicity_dom H__mn0.
     lets (? & ? & ? & ? & ?): H__mn0 I...
     lets (?C & ?ω & ?μ & ? & ? & ?): (proj2 H__st0) I...
@@ -511,7 +512,7 @@ Proof with (
     lets H__env0: env_typing_monotonicity H__mn0 H.
     clear IH__expr IH__list.
     lets: H__aty0 I H15.
-    assert (H__field: fieldType C (dom ω) = Some (C0, μ)). {
+    assert (H__field: fieldType C (dom ω) = Some (C1, μ0)). {
       unfold fieldType. rewrite H3.
       rewrite nth_error_app2... rewrite H__doms -minus_diag_reverse.
       simpl => //.
@@ -531,9 +532,9 @@ Proof with (
                   σ1
                   Γ Σ1
                   (init C flds I ρ σ1 n)
-                  Args (DoneFlds++(field (C0,μ) e)::flds) Mtds
+                  Args (DoneFlds++(field (C1,μ0) e)::flds) Mtds
                   (ω'++[v0])
-                  (DoneFlds ++ [field (C0, μ) e])).
+                  (DoneFlds ++ [field (C1, μ0) e])).
     subst; modus.
     destruct IH__init
       as (Σ2 & σ2 & ω2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__obj2 & H__dom2 & H__getType2 & H__scp2)...
@@ -548,7 +549,7 @@ Proof with (
       lets H__initP: H__r.
       eapply init_implies_initP in H__initP.
       lets H__scpInit: scp_theorem_init H__initP.
-      lets [ ]: scp_theorem H__eval...
+      lets [ ]: scp_theorem_expr H__eval...
       exists Σ2, σ2, ω2; splits...
       * intros l ?C Ω H__getType.
         destruct_eq (I = l); subst; updates.

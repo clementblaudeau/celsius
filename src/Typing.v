@@ -37,9 +37,15 @@ Global Hint Resolve s_mode_cool: typ.
 
 (* Subtyping *)
 
-Inductive S_Typ : Tpe -> Tpe -> Prop :=
-| s_typ_mode (C: ClN) μ1 μ2: μ1 ⊑ μ2 -> (C, μ1) <: (C, μ2)
+Variant S_Typ : Tpe -> Tpe -> Prop :=
+  s_typ_mode C μ1 μ2:
+    μ1 ⊑ μ2 ->
+    (C, μ1) <: (C, μ2)
 where "T1 <: T2" := (S_Typ T1 T2).
+Ltac S_Typ:= repeat match goal with
+                    | H: _ <: _ |- _ => inverts H
+                    end.
+Global Hint Extern 1 => S_Typ: typ.
 
 Inductive S_Typs : (list Tpe) -> (list Tpe) -> Prop :=
 | s_typs_nil: S_Typs nil nil
@@ -172,6 +178,8 @@ with T_Exprs: EnvTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
     (Γ, T) ⊩ (eh::es) : (Th::Ts)
 where  "( Γ , T )  ⊩ es : Us" := (T_Exprs Γ T es Us).
 
+Global Hint Constructors T_Expr: typ.
+
 (** ** Field typing *)
 Definition T_Field (Γ:EnvTyping) T f :=
   match f with
@@ -261,8 +269,6 @@ Proof with (eauto with typ lia).
   remember (mtd e m args) as E.
   induction H; steps;
     try solve [repeat eexists; eauto with typ].
-  destruct U.
-  repeat eexists...
 Qed.
 
 Lemma t_new_inv:
@@ -278,11 +284,10 @@ Proof with (eauto with typ lia).
   introv H.
   remember (new C args) as E.
   induction H; subst; try discriminate...
-  - destruct U as [C' μ], U' as [? μ']. inverts H0.
+  - S_Typ.
     destruct IHT_Expr as (Args & Flds & Mtds & argsTs & μ0 & ? & ? & ? & ? & ?)...
-    inverts H0.
-    exists Args, Flds, Mtds, argsTs, μ; splits...
-    destruct H5...
+    inverts H0; steps;
+    repeat eexists; eauto with typ.
   - repeat eexists; steps...
   - inverts HeqE.
     exists Args Flds Mtds argsTs hot; splits ...
@@ -301,14 +306,8 @@ Proof with (eauto with typ lia).
   remember (asgn e1 f e2 e3) as E.
   remember (C,μ) as T.
   gen C μ e1 f e2 e3.
-  induction H; steps...
-  - destruct U' as [?C ?μ]; inverts H0.
-    specialize (IHT_Expr C _ eq_refl _ _ _ _ eq_refl)
-      as (?D & ?μ1 & ?μ' & ? & ? & ? & ?); steps...
-    repeat eexists...
-    eapply t_sub...
-  - clear H2 H3 H4.
-    exists C, μ, μ0; splits...
+  induction H; steps;
+    repeat eexists; eauto using t_sub with typ.
 Qed.
 
 

@@ -69,19 +69,33 @@ Global Hint Resolve pM_domains: pM.
 
 (** ** Main Monotonicity result *)
 (** We start with two technical results on partial monotonicity for assignment (update) and fresh location *)
-Lemma pM_assignment :
-  forall σ l C ω ω',
+Lemma pM_assign:
+  forall σ l C ω f v,
     getObj σ l = Some (C, ω) ->
-    length ω <= length ω' ->
-    σ ⪯ [l ↦ (C, ω')]σ.
+    σ ⪯ [l ↦ (C, [f ↦ v]ω)]σ.
 Proof.
   autounfold with pM notations.
   intros.
   lets: getObj_dom H.
   destruct_eq (l = l0); subst;
-    updates; cross_rewrites; eauto.
+    updates; cross_rewrites; auto;
+    eexists; eauto with updates.
 Qed.
-Global Hint Resolve pM_assignment: pM.
+Global Hint Resolve pM_assign: pM.
+
+Lemma pM_assign_new:
+  forall σ l C ω v,
+    getObj σ l = Some (C, ω) ->
+    σ ⪯ [l ↦ (C, ω++[v])]σ.
+Proof.
+  autounfold with pM notations.
+  intros.
+  lets: getObj_dom H.
+  destruct_eq (l = l0); subst;
+    updates; cross_rewrites; auto;
+    eexists; split; eauto; updates; lia.
+Qed.
+Global Hint Resolve pM_assign_new: pM.
 
 Lemma pM_freshness :
   forall σ c ρ,
@@ -95,38 +109,40 @@ Global Hint Resolve pM_freshness: pM.
 
 (** Then we have the main result *)
 Theorem pM_theorem:
-  forall e σ σ' ρ ψ v,
-      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪯ σ'.
+  (forall e σ ρ ψ v σ',
+      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪯ σ') /\
+    (forall el σ ρ ψ vl σ',
+        ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ⪯ σ') /\
+    (forall C fls ψ ρ σ σ',
+        initP C fls ψ ρ σ σ' -> σ ⪯ σ').
 Proof with (eauto with pM updates lia).
-  intros.
-  induction H using evalP_ind2 with
-    (Pl := fun _ σ _ _ _ σ' _ => σ ⪯ σ')
-    (Pin := fun _ _ _ _ σ σ' _ => σ ⪯ σ');
-    unfold assign, assign_new in *;
+  apply evalP_multi_ind;
+    unfold assign, assign_new; intros;
     repeat destruct_match;
-    flatten; pM_trans ...
-  discriminate.
+    flatten; pM_trans; try discriminate...
 Qed.
-Global Hint Resolve pM_theorem: pM.
+
+Corollary pM_theorem_expr:
+  forall e σ ρ ψ v σ',
+      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪯ σ'.
+Proof.
+  apply pM_theorem.
+Qed.
+Global Hint Resolve pM_theorem_expr: pM.
 
 Corollary pM_theorem_list:
-  forall el σ σ' ρ ψ vl,
+  forall el σ ρ ψ vl σ',
       ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ⪯ σ'.
-Proof with (eauto with pM updates lia).
-  intros.
-  induction H ...
+Proof.
+  apply pM_theorem.
 Qed.
 Global Hint Resolve pM_theorem_list: pM.
 
 Corollary pM_theorem_init:
   forall C fls ψ ρ σ σ',
       initP C fls ψ ρ σ σ' -> σ ⪯ σ'.
-Proof with (eauto with pM updates lia).
-  intros.
-  induction H;
-    unfold assign, assign_new in *; ground ;
-    try discriminate...
-  eapply pM_theorem in H ...
+Proof.
+  apply pM_theorem.
 Qed.
 Global Hint Resolve pM_theorem_init: pM.
 
@@ -210,59 +226,67 @@ Global Hint Resolve eM_freshness: pM.
 
 (** Then we have the main result *)
 Theorem eM_theorem:
-  forall e σ σ' ρ ψ v,
-      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪳ σ'.
+  (forall e σ ρ ψ v σ',
+      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪳ σ') /\
+    (forall el σ ρ ψ vl σ',
+        ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ⪳ σ') /\
+    (forall C flds ψ ρ σ σ',
+        initP C flds ψ ρ σ σ' ->
+        forall ω Args Flds Mtds,
+          ct C = class Args Flds Mtds ->
+          getObj σ ψ = Some(C, ω) ->
+          dom ω + dom flds = dom Flds ->
+          σ ⪳ [ψ ↦ (C, repeat 0 (dom ω) )]σ').
+
 Proof with (updates; eauto 3 with pM updates lia).
-  intros.
-  induction H using evalP_ind2 with
-    (Pl := fun _ σ _ _ _ σ' _ => σ ⪳ σ')
-    (Pin := fun C flds ψ _  σ σ' _ =>
-              forall ω Args Flds Mtds,
-                ct C = class Args Flds Mtds ->
-                getObj σ ψ = Some(C, ω) ->
-                dom ω + dom flds = dom Flds ->
-                σ ⪳ [ψ ↦ (C, repeat 0 (dom ω) )]σ');
-    unfold assign, assign_new in *;
+  eapply evalP_multi_ind;
+    unfold assign, assign_new; intros;
     repeat destruct_match; eval_dom;
-    flatten; pM_trans ...
+    flatten; pM_trans; try discriminate ...
+
   - (* e_new *)
-    specialize (IHevalP0 [] _ _ _ H__ct (getObj_last _ _ _) ltac:(simpl;lia)).
-    lets: eM_domains IHevalP0...
+    specialize (IH__init [] _ _ _ H__ct (getObj_last _ _ _) ltac:(simpl;lia)).
     intros l D ω H__get; steps.
-    lets [ω' [H__get1 ? ]] : IHevalP H__get; eauto.
+    lets [ω' [H__get1 ? ]] : IH__args H__get; eauto.
     lets : getObj_dom H__get1.
-    specialize (IHevalP0 l D ω' ltac:(rewrite getObj_last2; eauto using Lt.lt_le_trans with lia)) as [ω'' [ ]].
+    specialize (IH__init l D ω' ltac:(rewrite getObj_last2; eauto using Lt.lt_le_trans with lia)) as [ω'' [ ]].
     exists ω''; split ...
     destruct_eq (dom σ1 = l); subst; updates...
-  - intros. simpl in H1.
+  - (* init_nil *)
+    intros. simpl in H1.
     intros l; steps.
     lets: getObj_dom I H0.
     destruct_eq (I = l); subst; updates...
     exists (repeat 0 dom ω); split...
     rewrite repeat_length. steps.
-  - intros ω' Args Flds Mtds H__ct H__getObj ?.
+  - (* init_cons *)
     intros l D ?ω H__get; steps.
-    lets [ω'' [H__get1 ? ]] : IHevalP H__getObj; eauto. cross_rewrites.
-    lets: getObj_dom I H__getObj.
-    rewrite getObj_update_same in IHevalP0... simpl in *.
-    specialize (IHevalP0 (ω''++[v]) _ _ _ H__ct eq_refl ltac:(rewrite app_length; simpl; lia)).
-    lets [ω''' [ ]]: IHevalP l H__get.
+    lets [ω'' [H__get1 ? ]] : IH__e H0; eauto. cross_rewrites.
+    lets: getObj_dom H0...
+    rewrite getObj_update_same in IH__flds...
+    specialize (IH__flds (ω''++[v]) _ _ _ H eq_refl ltac:(rewrite app_length; simpl; lia)).
+    lets [ω''' [ ]]: IH__e l H__get.
     destruct_eq (I = l); subst; cross_rewrites...
-    + exists (repeat 0 dom ω); split...
+    + exists (repeat 0 dom ω0); split...
       rewrite repeat_length...
-    + lets : IHevalP0 l.
-      rewrite getObj_update_diff in H7...
-      lets [?ω [ ]] : H7 H5...
-  - discriminate.
+    + lets : IH__flds l.
+      rewrite getObj_update_diff in H8...
+      lets [?ω [ ]] : H8 H6...
+Qed.
+
+Corollary eM_theorem_expr:
+  forall e σ ρ ψ v σ',
+      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪳ σ'.
+Proof.
+  apply eM_theorem.
 Qed.
 Global Hint Resolve eM_theorem: pM.
 
 Corollary eM_theorem_list:
-  forall el σ σ' ρ ψ vl,
+  forall el σ ρ ψ vl σ',
       ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ⪳ σ'.
-Proof with (eauto with pM updates lia).
-  intros.
-  induction H ...
+Proof.
+  apply eM_theorem.
 Qed.
 Global Hint Resolve eM_theorem_list: pM.
 

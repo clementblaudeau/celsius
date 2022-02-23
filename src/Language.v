@@ -29,7 +29,7 @@ Inductive Mode: Type :=
 | cool : nat -> Mode
 | cold.
 
-Definition Tpe : Type := ClN * Mode.
+Notation "'Tpe'" := (prod ClN Mode).
 
 Variant Field   : Type := field(type: Tpe)(expr: Expr).
 Variant Method  : Type := method(μ: Mode)(args: list Tpe)(out_type: Tpe)(body: Expr).

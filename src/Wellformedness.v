@@ -8,7 +8,7 @@ Import ListNotations.
 Open Scope nat_scope.
 
 (** ** Implicit types *)
-Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (flds: list Field).
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (flds: list Field) (el: list Expr).
 
 (** ** Definitions and notations *)
 (** A wellformed store only contains pointers to locations that are within itself *)
@@ -130,98 +130,107 @@ Global Hint Extern 1 => wf_assign_new: wf.
 
 (** Then we have the main result *)
 Theorem wf_theorem :
- forall e σ ρ ψ v σ',
+  (forall e σ ρ ψ v σ',
+      ⟦e⟧ (σ, ρ, ψ) --> (v, σ') ->
+      wf σ ->
+      (codom ρ) ∪ {ψ} ⪽ σ ->
+      (wf σ' /\ v < dom σ')) /\
+    (forall el σ ρ ψ vl σ',
+        ⟦ el ⟧ (σ, ρ, ψ) --> (vl, σ') ->
+        (codom ρ ∪ {ψ}) ⪽ σ ->
+        wf σ ->
+        wf σ' /\ (codom vl ⪽ σ')) /\
+    (forall C flds ψ ρ σ σ',
+        initP C flds ψ ρ σ σ' ->
+        forall Args Flds Mtds ω,
+          codom ρ ∪ {ψ} ⪽ σ ->
+          wf σ ->
+          ct C = class Args Flds Mtds ->
+          getObj σ ψ = Some(C, ω) ->
+          dom ω + dom flds = dom Flds ->
+          (exists ω', getObj σ' ψ = Some (C, ω') /\ dom ω' = dom Flds) /\ wf σ').
+Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
+
+  eapply evalP_multi_ind;
+    unfold assign, assign_new; simpl; intros;
+    eval_dom; ss_trans...
+
+  - (* e_var *)
+    split...
+
+  -  (* e_fld *)
+    destruct IH__e0...
+
+  - (* e_mtd *)
+    destruct IH__e0 ...
+    destruct IH__el ...
+
+  - (* e_new *)
+    destruct IH__args ...
+    lets ((ω' & ? & ?) & ?) : IH__init ([]: Env) H__ct...
+    ss...
+    eapply ss_trans with σ1...
+
+  - (* e_assgn *)
+    destruct IH__e1 ...
+    destruct IH__e2 ...
+    repeat destruct_match; subst;
+      destruct IH__e'...
+    + apply ss_trans with σ...
+    + lets [ ]: getObj_Some σ2 v1; steps...
+
+  - (* el_cons *)
+    destruct IH__e ...
+    destruct IH__el ...
+    split... rewrite codom_cons...
+
+  - (* init_cons *)
+    destruct IH__e ...
+    lets [?ω [ ] ]: eM_theorem_expr H__e H2.
+    lets: getObj_dom H8.
+    rewrite H8 in H__assign. inverts H__assign...
+    lets [?ω [ ] ]: eM_theorem_expr H__e H2...
+    rewrite getObj_update_same in IH__flds...
+    eapply IH__flds with (ω:= ω1 ++[v]);
+      ss; updates; eauto with lia.
+    + eapply ss_trans with σ...
+    + eapply wf_assign_new with (flds := flds); eauto...
+
+Qed.
+
+Corollary wf_theorem_expr :
+  forall e σ ρ ψ v σ',
     ⟦e⟧ (σ, ρ, ψ) --> (v, σ') ->
     wf σ ->
     (codom ρ) ∪ {ψ} ⪽ σ ->
     (wf σ' /\ v < dom σ').
-Proof with (updates; cross_rewrites; eauto with wf lia).
-  intros.
-  move: H0 H1.
-  induction H using evalP_ind2 with
-    (Pl := fun _ σ ρ ψ vl σ' _ => (codom ρ ∪ {ψ}) ⪽ σ -> wf σ -> (wf σ' /\ codom vl ⪽ σ'))
-    (Pin := fun C flds ψ ρ σ σ' _ =>
-              forall (H__codom : codom ρ ∪ {ψ} ⪽ σ) (H__wf: wf σ) ω Args Flds Mtds
-                (H__ct : ct C = class Args Flds Mtds) (H__obj: getObj σ ψ = Some(C, ω)),
-                dom ω + dom flds = dom Flds ->
-                 (exists ω', getObj σ' ψ = Some (C, ω') /\ dom ω' = dom Flds) /\ wf σ');
-    unfold assign, assign_new in * ; intros; eval_dom ...
-  - (* e_var *)
-    split; eauto with ss.
-  -  (* e_fld *)
-    destruct IHevalP...
-  - (* e_mtd *)
-    destruct IHevalP1 ...
-    destruct IHevalP2 ...
-  - (* e_new *)
-    destruct IHevalP ...
-    lets ((ω' & ? & ?) & ?) : IHevalP0 ([]: Env) H__ct...
-    ss...
-    eapply ss_trans with σ1...
-  - (* e_assgn *)
-    destruct IHevalP1 ...
-    destruct IHevalP2 ...
-    repeat destruct_match; subst;
-      destruct IHevalP3...
-    apply ss_trans with σ...
-    apply ss_trans with σ...
-  - (* el_cons *)
-    destruct IHevalP ...
-    destruct IHevalP0; steps ...
-    apply ss_add...
-  - (* init_nil *)
-    simpl in *.
-    split; [eexists; split |] ...
-  - (* init_cons *)
-    destruct IHevalP ...
-    lets [?ω [ ] ]: eM_theorem H H__obj.
-    rewrite H5 in H__assign... inverts H__assign...
-    simpl in H0.
-    edestruct IHevalP0; repeat ss; eauto with updates...
-    eapply ss_trans with σ...
+Proof.
+  apply wf_theorem.
 Qed.
 
 Corollary wf_theorem_list :
-  forall (el: list Expr) σ ρ ψ vl σ',
+  forall el σ ρ ψ vl σ',
     ⟦ el ⟧ (σ, ρ, ψ) --> (vl, σ') ->
     (codom ρ ∪ {ψ}) ⪽ σ ->
     wf σ ->
     wf σ' /\ (codom vl ⪽ σ').
-Proof with (eauto with wf lia).
-  intros. move: H0 H1.
-  induction H; steps;
-    eval_dom ...
-  + eapply wf_theorem in H; steps .
-    apply IHevalListP ...
-  + eapply wf_theorem in H; steps.
-    destruct IHevalListP...
-    eapply ss_add...
+Proof.
+  apply wf_theorem.
 Qed.
-Global Hint Resolve wf_theorem_list: wf.
 
 Corollary wf_theorem_init :
-  forall C flds ψ ρ σ σ' Args Flds Mtds ω,
+  forall C flds ψ ρ σ σ',
     initP C flds ψ ρ σ σ' ->
-    codom ρ ∪ {ψ} ⪽ σ ->
-    wf σ ->
-    ct C = class Args Flds Mtds ->
-    getObj σ ψ = Some(C, ω) ->
-    dom ω + dom flds = dom Flds ->
-    (exists ω', getObj σ' ψ = Some (C, ω') /\ dom ω' = dom Flds) /\ wf σ'.
-Proof with (updates; eauto with wf lia).
-  intros. move: H0 H1 H2 H3 H4. gen ω.
-  induction H; intros; eval_dom ...
-  - steps ...
-  - simpl in *.
-    lets [ ] : wf_theorem H; eauto.
-    lets [?ω [ ] ]: eM_theorem H H5.
-    unfold assign_new in *.
-    rewrite H11 in H0... inverts H0...
-    edestruct IHinitP; repeat ss; eauto with updates...
-    eapply ss_trans with σ...
+    forall Args Flds Mtds ω,
+      codom ρ ∪ {ψ} ⪽ σ ->
+      wf σ ->
+      ct C = class Args Flds Mtds ->
+      getObj σ ψ = Some(C, ω) ->
+      dom ω + dom flds = dom Flds ->
+      (exists ω', getObj σ' ψ = Some (C, ω') /\ dom ω' = dom Flds) /\ wf σ'.
+Proof.
+  apply wf_theorem.
 Qed.
-Global Hint Resolve wf_theorem_list: wf.
-
 
 (* A simple corollary on the conservation of wellformedness *)
 Corollary wf_conserved :
@@ -247,7 +256,6 @@ Proof.
 Qed.
 Global Hint Resolve correct_value: wf.
 
-
 (** A useful tactic: *)
 Ltac eval_wf :=
   repeat
@@ -264,7 +272,7 @@ Ltac eval_wf :=
         | _ =>
             let H_val := fresh "H_val" in
             let H_wf := fresh "H_wf" in
-            pose proof (wf_theorem e σ ρ ψ v σ' H H1 H2) as [H_wf H_val]
+            pose proof (wf_theorem_expr e σ ρ ψ v σ' H H1 H2) as [H_wf H_val]
         end
     | H:⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ'),
         H1:wf ?σ,
@@ -280,7 +288,6 @@ Ltac eval_wf :=
     end.
 
 (** Partially monotonic wellformed stores keep objects warm *)
-
 Lemma pM_wf_warm_monotone:
   forall σ σ' l,
     σ ⪯ σ' ->
