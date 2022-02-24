@@ -20,21 +20,18 @@ Lemma local_reasoning:
     σ ⪯ σ' ->
     σ  ⊨ L  : hot ->
     σ' ⊨ L' : hot.
-Proof.
-  intros; intros l' H__l'.
-    unfold dash_colon_, notation_reachability_mode, reachable_hot. intros l ?.
+Proof with (eauto with rch).
+  intros. intros l' H__l' l H__rch.
   assert (dom σ <= dom σ') by eauto with pM.
-  destruct (PeanoNat.Nat.lt_ge_cases l (dom σ)).
+  assert (l < dom σ \/ l >= dom σ) as [|] by lia.
   + (* l ∈ (dom σ) : the object was already in the store *)
-    eapply pM_wf_warm_monotone; eauto.
+    eapply pM_wf_warm_monotone...
     assert (σ ⊨ L ⇝ l).
-    * eapply H2 ; simpl => //.
-      exists l'; split; eauto with rch.
-    * rch_set.
-      eapply H5; eauto with rch.
+    * eapply H2...
+      eexists...
+    * rch_set. eapply H5...
   + (* l ∉ (dom σ) *)
-    pose proof (rch_dom _ _ _ H6).
-    destruct (H3 l); eauto with lia.
+    destruct (H3 l); eauto with lia rch.
 Qed.
 
 (* Then the main theorem : *)
@@ -53,7 +50,6 @@ Proof.
     eapply scp_theorem in H; eauto with pM wf lia; steps.
   + eapply H3; eauto using In_singleton.
 Qed.
-
 
 
 (** ** Local reasoning *)
@@ -87,6 +83,7 @@ Proof with (meta; eauto with typ updates lia).
   intros Σ σ l H__wf H__st; intros.
   remember ((fun l' '(C,μ) => if (classicT (σ ⊨ l ⇝ l')) then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
   remember (map (fun '(l, T) => f l T) (combine (seq 0 (dom Σ)) Σ)) as Σ'.
+
   exists Σ'.
   assert (Hyp: forall (A B C D E: Prop), ((D -> B -> A) /\ B /\ C /\ D /\ E) -> (A /\ B /\ C /\ D /\ E)) by firstorder.
   apply Hyp. clear Hyp.
