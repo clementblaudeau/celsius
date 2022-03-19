@@ -185,7 +185,7 @@ Proof with (meta; eauto with typ lia).
     intros l Hl. inversion Hl.
   - clear H L2. rename F into L2, a into l.
     unfold Add in *.
-    assert ((σ1, L1) ⋖ (σ2, L2)) by eauto with scp.
+    assert ((σ1, L1) ⋖ (σ2, L2)) by eauto using scp_union_introl.
     pose proof (ss_union_l _ _ _ H2).
     lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps.
     (* clear Σ1 H5 H6 H7 H8 H10 H1. *) clear H1.

@@ -7,7 +7,7 @@ From Celsius Require Export PartialMonotonicity Wellformedness Reachability Tact
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List.
 Import ListNotations.
 Open Scope nat_scope.
-Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet).
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
 
 (** ** Definitions and Notations *)
 (* The scoping relation, with the hypothesis that the sets of locations are "correct" (within the stores) *)
@@ -57,7 +57,7 @@ Proof.
   unfold scoping. steps; rch_set.
   exists l0; steps; eapply H => //.
 Qed.
-Global Hint Resolve scp_refl2: scp.
+(* Global Hint Resolve scp_refl2: scp. *)
 
 Lemma scp_subset :
   forall σ1 σ2 L L1 L2,
@@ -71,7 +71,7 @@ Proof with (eauto with scp lia).
   rch_set.
   exists l0; steps ...
 Qed.
-Global Hint Resolve scp_subset: scp.
+(* Global Hint Resolve scp_subset: scp. *)
 
 Lemma scp_union :
   forall σ1 σ2 L L1 L2,
@@ -100,7 +100,7 @@ Proof with (eauto with wf rch).
   apply H0...
   exists x; split... apply Union_introl...
 Qed.
-Global Hint Resolve scp_union_introl: scp.
+(* Global Hint Resolve scp_union_introl: scp. *)
 
 Lemma scp_union_intror :
   forall σ1 σ2 L L1 L2,
@@ -113,7 +113,7 @@ Proof with (eauto with wf rch).
   apply H0...
   exists x; split... apply Union_intror...
 Qed.
-Global Hint Resolve scp_union_intror: scp.
+(* Global Hint Resolve scp_union_intror: scp. *)
 
 Lemma scp_reachability:
   forall σ l1 l2,
@@ -176,7 +176,7 @@ Lemma scp_pr_regularity:
 Proof.
   unfold scoping_preservation; steps.
 Qed.
-Global Hint Resolve scp_pr_regularity: scp.
+(* Global Hint Resolve scp_pr_regularity: scp. *)
 
 Lemma scp_pr_trans_degenerate:
   forall σ1 σ2 σ3 L1 ,
@@ -289,10 +289,17 @@ Proof with (eauto with scp rch).
     + eapply H1... exists l'...
 Qed.
 
-
+Lemma scp_assign_new:
+  forall σ L C,
+    wf σ ->
+    (σ, L) ⋖ (σ ++ [(C, [])], L).
+Proof.
+  intros. intros ? ? l ? H__rch.
+  apply rch_add_empty_set in H__rch; steps.
+  lia.
+Qed.
+Global Hint Resolve scp_assign_new: scp.
 (** ** Evaluation-maintained results *)
-Global Hint Extern 1 => repeat rch_singleton: scp.
-
 
 (** ** Main Scopability theorem *)
 (** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)
@@ -308,22 +315,18 @@ Theorem scp_theorem:
          ((σ, codom ρ ∪ {ψ}) ⋖ (σ', codom vl)) /\ (σ ⇝ σ' ⋖ (codom ρ ∪ {ψ}))) /\
     (forall C flds I ρ σ σ',
         initP C flds I ρ σ σ' ->
-        forall L σ0 Args Flds Mtds ω,
+        forall Args Flds Mtds ω,
           (* Hypothesis *)
           wf σ ->
           (codom ρ ∪ {I}) ⪽ σ ->
           ct C = class Args Flds Mtds ->
           getObj σ I = Some (C, ω) ->
           dom ω + dom flds = dom Flds ->
-          ((σ0, L) ⋖ (σ, (codom ρ) ∪ {I})) ->
-          (σ0 ⇝ σ ⋖ L) ->
-          dom σ0 <= dom σ ->
           (* Conclusions *)
-          ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\
-            (σ0 ⇝ σ' ⋖ L) /\
-            (exists ω', getObj σ' I = Some (C, ω') /\ dom ω' = dom Flds)).
+          (σ ⇝ σ' ⋖ (codom ρ ∪ {I})) /\
+            ((σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}))).
 
-Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
+Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
 
   apply evalP_multi_ind;
     unfold assign, assign_new in * ; intros; eval_dom; eval_wf.
@@ -333,7 +336,7 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     exists l; split; eauto using getVal_codom with ss.
 
   - (* this *)
-    split...
+    split; eauto using scp_union_intror with scp.
 
   - (* e = e0.f *)
     unfold scoping; steps; rch_set; ss.
@@ -341,42 +344,47 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
     + eapply scp_trans with σ1 {v1}; eauto with wf.
       unfold scoping; steps.
     + eapply C1 ; steps ...
+      eauto with rch.
 
   - (* e = e0.m(l0) *)
     destruct IH__e0, IH__el; eauto with wf.
     destruct IH__e2; eauto with ss lia.
     assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ1, (codom ρ) ∪ {ψ})) as A4 by eauto with scp wf pM.
-    assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, (codom vl2) ∪ {v1}) ) as A6 by
-        (eapply scp_union; eauto with scp wf pM lia).
+    assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, (codom vl2) ∪ {v1}) ) as A6. {
+      eapply scp_union.
+      - eauto with scp lia.
+      - apply H7...
+    }
     split.
     + eapply scp_trans with σ2 ( codom vl2 ∪ {v1}) ...
     + eapply scp_pr_trans with σ2 ( codom vl2 ∪ {v1}) ...
 
   - (* e = new C(l0) *)
     destruct IH__args; eauto with wf.
-    specialize IH__init with (codom ρ ∪ {ψ}) σ Args Flds Mtds [].
+    specialize IH__init with Args Flds Mtds [].
     assert (dom σ1 <= dom (σ1 ++ [(C, [])])); updates; try lia.
-    destruct IH__init as [ ? [ ]]; eauto with wf lia.
+    destruct IH__init as (? & ?); eauto with wf lia; [| split].
     + ss... eapply ss_trans with σ1...
-    + intros ? ; steps.
-      move : H9 => [l0 [H__l0 H__rch]].
-      inversion H__l0; steps.
-      * eapply H3 ...
-        eapply rch_add_empty in H__rch ...
-        exists l0; steps.
-        eapply H_vals in H6 ...
-      * inSingleton.
-        eapply rch_add_empty in H__rch; steps; try lia.
-        eapply rch_dom2 in H6. lia.
-    + eapply scp_pr_trans; eauto.
+    + eapply H6; ss; updates; eauto with lia.
+      * apply scp_union...
+        eapply scp_trans with σ1 (codom vl__args)...
+        intros ? ? l ? H__rch. rch_set.
+        apply rch_add_empty in H__rch; flatten; try lia; eauto.
+        apply rch_dom2 in H__rch1. lia.
+      * intros ? ? l ? H__rch.
+        rch_set. ss. updates.
+        apply rch_add_empty in H__rch; flatten; try lia; eauto.
+        apply rch_dom2 in H__rch1; lia.
+    + eapply scp_pr_trans; eauto with scp.
       unfold scoping_preservation; steps; eauto.
-      unfold scoping; steps.
-      move: H15 => [l0 [Hl0 H__rch]].
-      eapply rch_add_empty in H__rch; steps; try lia.
-      apply H11 ... exists l0 ...
-    + flatten; split => //.
-      eapply scp_union_intror ; eauto with wf scp. ss...
-      eapply ss_trans with σ1...
+      apply H6; ss ... apply ss_trans with σ1...
+      intros ? ? l ? H__rch. rch_set.
+      inverts H__ln...
+      * apply rch_add_empty in H__rch; steps. lia.
+        apply H12...
+        exists l0...
+      * apply rch_add_empty in H__rch; steps; try lia.
+        apply rch_dom2 in H17...
 
   - (* e = e0.f = e1; e2 *)
     destruct (getObj σ2 v1) as [[C ω] |] eqn: H__obj.
@@ -384,9 +392,9 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
       destruct IH__e2; eauto with wf lia.
       destruct IH__e'; eauto with wf lia.
       eapply scp_assign with (f := x) (σ1 := σ) (l' := v2) (L1 := (codom ρ ∪ {ψ})) in H__obj as [ ];
-          try reflexivity; eauto 3 with wf lia scp; [split |].
+        try reflexivity; eauto 3 with wf lia scp; [split |].
       * eapply scp_trans with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))]σ2) (L2 := codom ρ ∪ {ψ});
-             try eapply H8; eauto 3 with wf lia scp updates.
+          try eapply H8; eauto 3 with wf lia scp updates.
       * eapply scp_pr_trans_degenerate with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))] (σ2)) ; eauto with scp lia...
       * eapply_any ...
     + destruct IH__e1; eauto.
@@ -418,17 +426,17 @@ Proof with (rch_set; updates; timeout 10 eauto with scp wf rch lia).
   - (* init_cons *)
     destruct IH__e; eauto.
     lets [?ω [ ]]: eM_theorem_expr H__e H2; cross_rewrites.
-    rewrite H11 in H__assign. inverts H__assign.
-    specialize (IH__flds L σ0 Args Flds Mtds (ω0++[v])).
+    rewrite H8 in H__assign. inverts H__assign.
+    specialize (IH__flds Args Flds Mtds (ω0++[v])).
     simpl in *.
-    destruct IH__flds as [ ? [ ]]; updates; eauto with updates wf lia.
-    + eapply scp_add_env; eauto with lia wf; updates.
-      * apply_any.
-      * eapply scp_trans ...
-      * eapply scp_trans ...
-    + eapply scp_pr_trans; eauto.
-      eapply scp_pr_trans; eauto.
-      unfold scoping_preservation; intros ...
+    destruct IH__flds as (? & ?); updates; eauto with updates wf lia; split.
+    + unfold scoping_preservation; steps. apply H10...
+      * eapply scp_add_env; eauto with lia wf; updates;
+        eapply scp_trans with σ (codom ρ ∪ {I})...
+      * eapply scp_add_env; eauto with lia wf; updates.
+        eapply scp_trans with σ (codom ρ ∪ {I})...
+        apply H7...
+    + apply H10 ...
 Qed.
 
 Corollary scp_theorem_expr:
@@ -442,21 +450,17 @@ Qed.
 
 Corollary scp_theorem_init:
   forall C flds I ρ σ σ',
-    initP C flds I ρ σ σ' ->
-    forall L σ0 Args Flds Mtds ω,
-      (* Hypothesis *)
-      wf σ ->
-      (codom ρ ∪ {I}) ⪽ σ ->
-      ct C = class Args Flds Mtds ->
-      getObj σ I = Some (C, ω) ->
-      dom ω + dom flds = dom Flds ->
-      ((σ0, L) ⋖ (σ, (codom ρ) ∪ {I})) ->
-      (σ0 ⇝ σ ⋖ L) ->
-      dom σ0 <= dom σ ->
-      (* Conclusions *)
-      ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\
-        (σ0 ⇝ σ' ⋖ L) /\
-        (exists ω', getObj σ' I = Some (C, ω') /\ dom ω' = dom Flds).
+        initP C flds I ρ σ σ' ->
+        forall Args Flds Mtds ω,
+          (* Hypothesis *)
+          wf σ ->
+          (codom ρ ∪ {I}) ⪽ σ ->
+          ct C = class Args Flds Mtds ->
+          getObj σ I = Some (C, ω) ->
+          dom ω + dom flds = dom Flds ->
+          (* Conclusions *)
+          (σ ⇝ σ' ⋖ (codom ρ ∪ {I})) /\
+            ((σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I})).
 Proof.
   apply scp_theorem.
 Qed.

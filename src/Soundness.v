@@ -115,14 +115,8 @@ Definition init_soundness n C flds I ρ σ Γ Σ r :=
         getObj σ' I = Some (C, ω') /\
         dom ω' = dom Flds /\
         getType Σ' I = Some (C, cool (dom Flds)) /\
-        ( forall L σ0,
-            (* Hypothesis *)
-            ((σ0, L) ⋖ (σ, (codom ρ) ∪ {I})) ->
-            (σ0 ⇝ σ ⋖ L) ->
-            dom σ0 <= dom σ ->
-            (* Conclusions *)
-            ((σ0, L) ⋖ (σ', (codom ρ) ∪ {I})) /\
-              (σ0 ⇝ σ' ⋖ L)).
+        ((σ ⇝ σ' ⋖ (codom ρ ∪ {I})) /\
+            ((σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}))).
 
 Lemma soundness_fld:
   forall n,

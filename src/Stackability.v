@@ -1,6 +1,12 @@
 (* Celsius project *)
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the notion of stackability between stores. When we evaluate expressions, it might have the effect of creating new objects. If we are in the middle of the creation of a new object, the newly added objects might point to the current [this], which might be not fully initialized. So those newly created objects might not be hot. However, they have to be fully initialized, and thus, warm. Stackability states exactly this: two stores [σ] and [σ'] are stackable if the new objects in [σ'] are warm. To prove this, we use the evaluator results of Eval.v, whith a custom proof the initialization case *)
+(** This file defines the notion of stackability between stores. When we evaluate expressions, it
+might have the effect of creating new objects. If we are in the middle of the creation of a new
+object, the newly added objects might point to the current [this], which might be not fully
+initialized. So those newly created objects might not be hot. However, they have to be fully
+initialized, and thus, warm. Stackability states exactly this: two stores [σ] and [σ'] are stackable
+if the new objects in [σ'] are warm. To prove this, we use the evaluator results of Eval.v, whith a
+custom proof the initialization case *)
 
 From Celsius Require Export PartialMonotonicity Reachability Wellformedness.
 Require Import ssreflect ssrbool Psatz List.
@@ -34,17 +40,14 @@ Lemma stk_trans: forall σ1 σ2 σ3,
     σ2 ⪯ σ3 ->
     σ1 ≪ σ3.
 Proof.
-  steps. unfold stackability_, notation_stackability_store, stackability in *.
-  steps.
+  intros. intros l H__l.
   specialize (H l);
     specialize (H0 l);
-    specialize (H1 l);
-    steps.
-  left. unfold reachable_warm in *.
-  steps.
-  specialize (H1 C ω H3) as [ω' [ ]].
-  exists C ω'.
-  repeat eexists; eauto with lia.
+    specialize (H1 l).
+  intuition auto.
+  destruct H as (C & ω & Args & Flds & Mtds & ? & ? & ?).
+  lets [ω' [ ]]: H1 H.
+  left; repeat eexists; eauto with lia.
 Qed.
 Global Hint Resolve stk_trans: stk.
 
@@ -70,7 +73,11 @@ Local Hint Resolve stk_assign_new: stk.
 
 
 (** ** Main stackability theorem *)
-(** Here we show the main result. We proceed by induction, enriching the goal with partial monotonicity and compatibility.Stackability is not maintained throughout the initialization of a new object, as its fields are being initialized. For the proof, we use a custom predicate [Pin] : the stores grows and the number of initialized fields grows too. Doing this, when we reach the end of initialization, we get a store with all initialized fields for the new object  *)
+(** Here we show the main result. We proceed by induction, enriching the goal with partial
+monotonicity and compatibility.Stackability is not maintained throughout the initialization of a new
+object, as its fields are being initialized. For the proof, we use a custom predicate [Pin] : the
+stores grows and the number of initialized fields grows too. Doing this, when we reach the end of
+initialization, we get a store with all initialized fields for the new object *)
 
 Theorem stk_theorem :
   (forall e σ ρ ψ v σ',
