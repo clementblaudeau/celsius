@@ -154,6 +154,26 @@ Proof.
 Qed.
 Global Hint Resolve rch_dom2: rch.
 
+Lemma rch_union_introl :
+  forall σ L1 L2 l,
+    σ ⊨ L1 ⇝ l ->
+    σ ⊨ L1 ∪ L2 ⇝ l.
+Proof.
+  intros. destruct H as (l0 & ? & ?).
+  exists l0; split; eauto using Union_introl.
+Qed.
+
+Lemma rch_union_intror :
+  forall σ L1 L2 l,
+    σ ⊨ L2 ⇝ l ->
+    σ ⊨ L1 ∪ L2 ⇝ l.
+Proof.
+  intros. destruct H as (l0 & ? & ?).
+  exists l0; split; eauto using Union_intror.
+Qed.
+
+Global Hint Resolve rch_union_introl rch_union_intror: rch.
+
 (** We define a custom induction predicate. If a transitive property is true along heap paths, then it is true between any two reachable locations. *)
 (* Lemma reachability_rev_ind: *)
 (*   forall (P: Loc -> Loc -> Prop) σ, *)

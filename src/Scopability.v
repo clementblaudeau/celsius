@@ -23,20 +23,7 @@ Notation "( σ1 ,  { l } )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 {l} L2) (at l
 Notation "( σ1 , L1 )  ⋖  ( σ2 ,  { l } )" := (scoping σ1 σ2 L1 {l}) (at level 0).
 Notation "( σ1 ,  { l1 } )  ⋖  ( σ2 ,  { l2 } )" := (scoping σ1 σ2 {l1} {l2}) (at level 0).
 
-(* The scoping preservation, with technical choices of hypothesis: *)
-Definition scoping_preservation σ1 σ2 L :=
-  (L ⪽ σ1) /\
-  forall σ0 (L0 L1: Ensemble Loc),
-    (dom σ0) <= (dom σ1) ->
-    (dom σ0) <= (dom σ2) ->
-    L0 ⪽ σ0 ->
-    L1 ⪽ σ1 ->
-    (σ0, L0) ⋖ (σ1, L) ->
-    (σ0, L0) ⋖ (σ1, L1) ->
-    (σ0, L0) ⋖ (σ2, L1).
-Notation "σ1 ⇝ σ2 ⋖ L" := (scoping_preservation σ1 σ2 L) (at level 99).
 Local Hint Unfold scoping : scp.
-Local Hint Unfold scoping_preservation : scp.
 Local Hint Unfold reachability_set: scp.
 Local Hint Resolve Union_introl: scp.
 Local Hint Resolve Union_intror: scp.
@@ -97,8 +84,6 @@ Lemma scp_union_introl :
 Proof with (eauto with wf rch).
   unfold scoping; intros.
   inversion H4; steps...
-  apply H0...
-  exists x; split... apply Union_introl...
 Qed.
 (* Global Hint Resolve scp_union_introl: scp. *)
 
@@ -110,8 +95,6 @@ Lemma scp_union_intror :
 Proof with (eauto with wf rch).
   unfold scoping; intros.
   inversion H4; steps...
-  apply H0...
-  exists x; split... apply Union_intror...
 Qed.
 (* Global Hint Resolve scp_union_intror: scp. *)
 
@@ -135,59 +118,6 @@ Proof with (eauto with scp lia).
   autounfold with notations scp. steps...
 Qed.
 Global Hint Resolve scp_trans: scp.
-
-Lemma scp_pr_trans:
-  forall σ1 σ2 σ3 L1 L2,
-    σ1 ⇝ σ2 ⋖ L1 ->
-    σ2 ⇝ σ3 ⋖ L2 ->
-    (σ1, L1) ⋖ (σ2, L2) ->
-    dom σ1 <= dom σ2 ->
-    σ1 ⇝ σ3 ⋖ L1.
-Proof with (eauto with wf lia).
-  unfold scoping_preservation ; light.
-  split; [eapply_any |]; steps.
-  eapply_any ...
-  eapply scp_trans with σ1 L1 ...
-Qed.
-Global Hint Resolve scp_pr_trans: scp.
-
-Lemma scp_pr_regularity_degenerate:
-  forall σ1 σ2 L,
-    σ1 ⇝ σ2 ⋖ L ->
-    (dom σ1) <= (dom σ2) ->
-    (σ1, L) ⋖ (σ2, L).
-Proof.
-  intros.
-  destruct H.
-  eapply H1; eauto with lia ss scp.
-Qed.
-Global Hint Resolve scp_pr_regularity_degenerate: scp.
-
-Lemma scp_pr_regularity:
-  forall σ0 σ1 σ2 L L1,
-    σ1 ⇝ σ2 ⋖ L ->
-    (dom σ0) <= (dom σ2) ->
-    (dom σ0) <= (dom σ1) ->
-    L ⪽ σ0 ->
-    L1 ⪽ σ1 ->
-    (σ0, L) ⋖ (σ1, L) ->
-    (σ0, L) ⋖ (σ1, L1) ->
-    (σ0, L) ⋖ (σ2, L1).
-Proof.
-  unfold scoping_preservation; steps.
-Qed.
-(* Global Hint Resolve scp_pr_regularity: scp. *)
-
-Lemma scp_pr_trans_degenerate:
-  forall σ1 σ2 σ3 L1 ,
-    σ1 ⇝ σ2 ⋖ L1 ->
-    dom σ1 <= dom σ2 ->
-    σ2 ⇝ σ3 ⋖ L1 ->
-    σ1 ⇝ σ3 ⋖ L1.
-Proof.
-  steps; eauto with scp.
-Qed.
-Global Hint Resolve scp_pr_trans_degenerate: scp.
 
 Lemma scp_add:
   forall σ σ' ρ' l0 l a,
@@ -255,38 +185,15 @@ Qed.
 
 (** We prove some specific results on scopability in the context of assignment. The key reasonning technique is to do a case analysis on the presence of the modified entry in the reachability path. *)
 Lemma scp_assign:
-  forall σ1 σ2 σ2' L1 l l' f C ω,
-    σ1 ⇝ σ2 ⋖ L1 ->
-    (σ1, L1) ⋖ (σ2, {l}) ->
-    (σ1, L1) ⋖ (σ2, {l'}) ->
-    getObj σ2 l = Some (C, ω) ->
-    σ2' = [l ↦ (C, [f ↦ l']ω)]σ2 ->
-    (σ1 ⇝ σ2' ⋖ L1) /\
-      ((σ1, L1) ⋖ (σ2', {l})).
+  forall σ L l v f C ω,
+    getObj σ l = Some (C, ω) ->
+    (σ, L ∪ {v}) ⋖ ([l ↦ (C, [f ↦ v] (ω))]σ, L ∪ {v}).
+
 Proof with (eauto with scp rch).
-  unfold scoping_preservation; intros; flatten.
-  repeat split => //.
-
-  - (* σ1 ⇝ σ2' ⋖ L1 *)
-    move => σ0 L0 L H_dom1 H_dom2' H_subL H_subL0 A1 A2.
-    updates.
-    unfold scoping; simpl.
-    intros.
-    assert ((σ0, L0) ⋖ (σ2, L)) as B1 by eauto.
-    assert ((σ0, L0) ⋖ (σ2, {l'})) as C1 by eauto using scp_trans.
-    destruct H7 as [l1 [H__l1 H__rch]].
-    eapply ss_update in H5.
-    lets [? | [H__rch1 H__rch2 ]]: rch_asgn H2 H__rch => //.
-    + eapply B1... exists l1...
-    + eapply C1... exists l'...
-
-  - (* (σ1, L1) ⋖ (σ2', {l}) *)
-    unfold scoping; simpl. intros.
-    destruct H7 as [l1 [H__l1 H__rch]].
-    ss; updates. inSingleton.
-    lets [? | [H__rch1 H__rch2 ]]: rch_asgn H2 H__rch => //.
-    + eapply H0... exists l...
-    + eapply H1... exists l'...
+  unfold scoping; intros.
+  destruct H3 as [l1 [H__l1 H__rch]].
+  lets [? | [H__rch1 H__rch2 ]]: rch_asgn H__rch; eauto;
+    eexists...
 Qed.
 
 Lemma scp_assign_new:
@@ -304,27 +211,29 @@ Global Hint Resolve scp_assign_new: scp.
 (** ** Main Scopability theorem *)
 (** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)
 Theorem scp_theorem:
+
   (forall e σ ρ ψ v σ',
       ⟦e⟧p (σ, ρ, ψ) --> (v, σ') ->
       (codom ρ) ∪ {ψ} ⪽ σ -> wf σ ->
-      ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ', {v})) /\ (σ ⇝ σ' ⋖ (codom ρ) ∪ {ψ})) /\
+      forall L , L ⪽ σ -> (codom ρ ∪ {ψ}) ⊆ L -> (σ, L) ⋖ (σ', L ∪ {v})) /\
+
     (forall el σ ρ ψ vl σ',
          ⟦el⟧ (σ, ρ, ψ) --> (vl, σ') ->
          (codom ρ ∪ {ψ}) ⪽ σ ->
          wf σ ->
-         ((σ, codom ρ ∪ {ψ}) ⋖ (σ', codom vl)) /\ (σ ⇝ σ' ⋖ (codom ρ ∪ {ψ}))) /\
-    (forall C flds I ρ σ σ',
-        initP C flds I ρ σ σ' ->
+         (forall L, L ⪽ σ -> (codom ρ ∪ {ψ}) ⊆ L -> (σ, L) ⋖ (σ', L ∪ codom vl))) /\
+
+    (forall C flds ψ ρ σ σ',
+        initP C flds ψ ρ σ σ' ->
         forall Args Flds Mtds ω,
           (* Hypothesis *)
           wf σ ->
-          (codom ρ ∪ {I}) ⪽ σ ->
+          (codom ρ ∪ {ψ}) ⪽ σ ->
           ct C = class Args Flds Mtds ->
-          getObj σ I = Some (C, ω) ->
+          getObj σ ψ = Some (C, ω) ->
           dom ω + dom flds = dom Flds ->
           (* Conclusions *)
-          (σ ⇝ σ' ⋖ (codom ρ ∪ {I})) /\
-            ((σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}))).
+          (forall L, L ⪽ σ -> (codom ρ ∪ {ψ}) ⊆ L -> (σ, L) ⋖ (σ', L))).
 
 Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
 
@@ -332,120 +241,111 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     unfold assign, assign_new in * ; intros; eval_dom; eval_wf.
 
   - (* e = x *)
+    apply scp_union...
     unfold scoping; steps ... ss.
     exists l; split; eauto using getVal_codom with ss.
 
-  - (* this *)
-    split; eauto using scp_union_intror with scp.
+  - (* e = this *)
+    apply scp_union...
+    unfold scoping; steps...
+    exists ψ; split...
 
-  - (* e = e0.f *)
-    unfold scoping; steps; rch_set; ss.
-    assert ((σ,  (codom ρ) ∪ ({ψ})) ⋖ (σ1, {v1})) as C1.
-    + eapply scp_trans with σ1 {v1}; eauto with wf.
-      unfold scoping; steps.
-    + eapply C1 ; steps ...
-      eauto with rch.
+  - (* e = e.f *)
+    intuition auto...
+    lets: H5 L H2...
+    unfold scoping; steps...
+    apply H4...
+    inverts H__ln...
+    + exists l0...
+    + exists v1; split... apply rch_trans with v...
 
   - (* e = e0.m(l0) *)
-    destruct IH__e0, IH__el; eauto with wf.
-    destruct IH__e2; eauto with ss lia.
-    assert ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ1, (codom ρ) ∪ {ψ})) as A4 by eauto with scp wf pM.
-    assert ((σ, codom ρ ∪ {ψ}) ⋖ (σ2, (codom vl2) ∪ {v1}) ) as A6. {
-      eapply scp_union.
-      - eauto with scp lia.
-      - apply H7...
-    }
-    split.
-    + eapply scp_trans with σ2 ( codom vl2 ∪ {v1}) ...
-    + eapply scp_pr_trans with σ2 ( codom vl2 ∪ {v1}) ...
+    assert ((codom vl2 ∪ {v1}) ⪽ σ2); ss...
+    assert (((L ∪ {v1}) ∪ codom vl2) ⪽ σ2); ss... apply ss_trans with σ...
+    intuition auto.
+    unfold scoping; steps.
+    apply H9...
+    apply H10... intros ?...
+    apply H11... intros ? [ ]...
+    exists l0; split... inverts H__ln; eauto 6 using Union.
 
   - (* e = new C(l0) *)
-    destruct IH__args; eauto with wf.
-    specialize IH__init with Args Flds Mtds [].
-    assert (dom σ1 <= dom (σ1 ++ [(C, [])])); updates; try lia.
-    destruct IH__init as (? & ?); eauto with wf lia; [| split].
-    + ss... eapply ss_trans with σ1...
-    + eapply H6; ss; updates; eauto with lia.
-      * apply scp_union...
-        eapply scp_trans with σ1 (codom vl__args)...
-        intros ? ? l ? H__rch. rch_set.
-        apply rch_add_empty in H__rch; flatten; try lia; eauto.
-        apply rch_dom2 in H__rch1. lia.
-      * intros ? ? l ? H__rch.
-        rch_set. ss. updates.
-        apply rch_add_empty in H__rch; flatten; try lia; eauto.
-        apply rch_dom2 in H__rch1; lia.
-    + eapply scp_pr_trans; eauto with scp.
-      unfold scoping_preservation; steps; eauto.
-      apply H6; ss ... apply ss_trans with σ1...
-      intros ? ? l ? H__rch. rch_set.
-      inverts H__ln...
-      * apply rch_add_empty in H__rch; steps. lia.
-        apply H12...
-        exists l0...
-      * apply rch_add_empty in H__rch; steps; try lia.
-        apply rch_dom2 in H17...
+    assert ((L ∪ {dom σ1}) ⪽ σ1 ++ [(C, [])]). { ss... apply ss_trans with σ1... }
+    eapply scp_trans with σ1 (L ∪ codom vl__args)...
+    eapply scp_trans with (σ1++[(C,[])]) (L ∪ codom vl__args ∪ {dom σ1})...
+    + ss; updates; try lia; apply ss_trans with σ1...
+    + intros ? ? l ? ?.
+      apply rch_add_empty_set in H9 as [|]...
+      lets: rch_dom2 H9.
+      inverts H__ln; rch_set... exists l0...
+    + intros ? ? l ? ?.
+      eapply IH__init...
+      * ss. apply ss_trans with σ1...
+      * intros ? [ ]...
+      * ss. apply ss_trans with σ1...
+      * exists l0; split... inverts H__ln...
 
   - (* e = e0.f = e1; e2 *)
     destruct (getObj σ2 v1) as [[C ω] |] eqn: H__obj.
-    + destruct IH__e1; eauto.
-      destruct IH__e2; eauto with wf lia.
-      destruct IH__e'; eauto with wf lia.
-      eapply scp_assign with (f := x) (σ1 := σ) (l' := v2) (L1 := (codom ρ ∪ {ψ})) in H__obj as [ ];
-        try reflexivity; eauto 3 with wf lia scp; [split |].
-      * eapply scp_trans with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))]σ2) (L2 := codom ρ ∪ {ψ});
-          try eapply H8; eauto 3 with wf lia scp updates.
-      * eapply scp_pr_trans_degenerate with (σ2 := [v1 ↦ (C, [x ↦ v2] (ω))] (σ2)) ; eauto with scp lia...
-      * eapply_any ...
-    + destruct IH__e1; eauto.
-      destruct IH__e2; eauto with wf lia.
-      destruct IH__e'; eauto with wf lia.
-      split.
-      * eapply scp_trans with (σ2 := σ2) (L2 := codom ρ ∪ {ψ}) ...
-      * eapply scp_pr_trans ...
+    + apply scp_trans with σ1 (L∪{v1})...
+      assert (((L ∪ {v1}) ∪ {v2}) ⪽ σ2). { ss... apply ss_trans with σ... }
+      apply scp_trans with σ2 ((L∪{v1})∪{v2})... { apply IH__e2... intros ? ... }
+      assert ((((L ∪ {v1}) ∪ {v2}) ∪ {v3}) ⪽ σ3). { ss... apply ss_trans with σ... }
+      apply scp_trans with σ3 (((L∪{v1})∪{v2})∪{v3})...
+      * eapply scp_trans with ([v1 ↦ (C, [x ↦ v2] (ω))] (σ2)) ((L ∪ {v1}) ∪ {v2})...
+        -- ss...  apply ss_trans with σ...
+        -- apply scp_assign...
+        -- apply IH__e'... ss... apply ss_trans with σ... intros ? ?; eauto using Union.
+      * apply scp_refl2... intros ? [ ]; eauto using Union.
+    + apply scp_trans with σ1 (L∪{v1})...
+      assert (((L ∪ {v1}) ∪ {v2}) ⪽ σ2). { ss... apply ss_trans with σ... }
+      apply scp_trans with σ2 ((L∪{v1})∪{v2})... { apply IH__e2... intros ? ... }
+      assert ((((L ∪ {v1}) ∪ {v2}) ∪ {v3}) ⪽ σ3). { ss... apply ss_trans with σ... }
+      apply scp_trans with σ3 (((L∪{v1})∪{v2})∪{v3})... {
+        apply IH__e'... intros ? ?. eauto using Union.  }
+      apply scp_refl2... intros ? [ ]; eauto using Union.
 
-  - (* el_nil *)
-    split.
-    + intros x; steps.
-      inversion H3; steps.
-    + eapply scp_pr_trans_degenerate ...
+  - (* el = nil *)
+    apply scp_refl2. intros ? [ ] ... inverts H3.
 
-  - (* el_cons *)
-    destruct IH__e; eauto.
-    destruct IH__el; eauto with wf lia.
-    split.
-    + rewrite codom_cons.
-      eapply scp_union.
-      * apply_any; eauto with lia wf scp.
-      * eapply scp_trans with (σ2 := σ1) (L2 := codom ρ ∪ {ψ}) ...
-    + eapply scp_pr_trans_degenerate ...
+  - (* el = e::el *)
+    rewrite codom_cons.
+    eapply scp_trans with σ1 (L ∪ {v1})...
+    (* Union associativity would simplify things *)
+    unfold scoping; intros.
+    apply IH__el... intros ? ...
+    exists l0; split...
+    inverts H__ln... inverts H9...
 
   - (* init_nil *)
-    steps ...
+    done...
 
   - (* init_cons *)
-    destruct IH__e; eauto.
     lets [?ω [ ]]: eM_theorem_expr H__e H2; cross_rewrites.
     rewrite H8 in H__assign. inverts H__assign.
-    specialize (IH__flds Args Flds Mtds (ω0++[v])).
-    simpl in *.
-    destruct IH__flds as (? & ?); updates; eauto with updates wf lia; split.
-    + unfold scoping_preservation; steps. apply H10...
-      * eapply scp_add_env; eauto with lia wf; updates;
-        eapply scp_trans with σ (codom ρ ∪ {I})...
-      * eapply scp_add_env; eauto with lia wf; updates.
-        eapply scp_trans with σ (codom ρ ∪ {I})...
-        apply H7...
-    + apply H10 ...
+    apply scp_trans with σ1 (L ∪ {v})...
+    apply scp_trans with σ3 (L ∪ {v})... {
+      ss... apply ss_trans with σ1...
+    }
+    apply scp_trans with ([I ↦ (C, ω0 ++ [v])] σ1) (L ∪ {v})...
+    + eapply scp_add_env...
+    + eapply IH__flds... simpl in *; updates...
+      intros ? ...
 Qed.
 
 Corollary scp_theorem_expr:
   forall e σ ρ ψ v σ',
     ⟦e⟧p (σ, ρ, ψ) --> (v, σ') ->
     (codom ρ) ∪ {ψ} ⪽ σ -> wf σ ->
-    ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ', {v})) /\ (σ ⇝ σ' ⋖ (codom ρ) ∪ {ψ}).
+    ((σ, (codom ρ) ∪ {ψ}) ⋖ (σ', {v})).
 Proof.
-  apply scp_theorem.
+  intros.
+  lets (? & _ & _): scp_theorem.
+  lets: H2 H (codom ρ ∪ {ψ}) H0; eauto.
+  eval_dom; eval_wf.
+  apply scp_trans with σ' ((codom ρ ∪ {ψ}) ∪ {v}); eauto 3 with scp.
+  + apply H3; intros ?; eauto.
+  + apply scp_refl2. intros ? []; eauto using Union.
 Qed.
 
 Corollary scp_theorem_init:
@@ -459,8 +359,10 @@ Corollary scp_theorem_init:
           getObj σ I = Some (C, ω) ->
           dom ω + dom flds = dom Flds ->
           (* Conclusions *)
-          (σ ⇝ σ' ⋖ (codom ρ ∪ {I})) /\
-            ((σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I})).
+          (σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}).
 Proof.
-  apply scp_theorem.
+  intros.
+  lets (_ & _ & ?): scp_theorem.
+  lets: H5 H (codom ρ ∪ {I}) H1; eauto 3.
+  apply H6. intros ? => //.
 Qed.

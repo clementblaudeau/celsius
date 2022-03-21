@@ -114,9 +114,7 @@ Definition init_soundness n C flds I ρ σ Γ Σ r :=
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ ([I↦(C,cool (dom Flds))]Σ ▷ Σ') /\ (Σ' ⊨ σ') /\ wf σ' /\
         getObj σ' I = Some (C, ω') /\
         dom ω' = dom Flds /\
-        getType Σ' I = Some (C, cool (dom Flds)) /\
-        ((σ ⇝ σ' ⋖ (codom ρ ∪ {I})) /\
-            ((σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}))).
+        getType Σ' I = Some (C, cool (dom Flds)).
 
 Lemma soundness_fld:
   forall n,
@@ -318,11 +316,12 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct (init C Flds dom σ1 args_val (σ1 ++ [(C, [])]) n) as [ | | σ3] eqn:Heq;
     rewrite Heq in H5 |- *; try congruence;
     specialize (IH__init C Flds (dom σ1) args_val σ2 argsTs Σ2);
-    lets (Σ4 & σ4 & ω4 & H__r & H__mn4 & H__stk4 & H__aty4 & H__st4 & H__wf4 & H__obj4 & H__dom4 & H__getType4 & H__scp4):
+    lets (Σ4 & σ4 & ω4 & H__r & H__mn4 & H__stk4 & H__aty4 & H__st4 & H__wf4 & H__obj4 & H__dom4 & H__getType4):
     IH__init ([]: list Field) H__env2 H__st2 H__ct; subst; simpl...
   all: try solve [intros; discriminate].
   all: try solve [rewrite (proj1 H__st1) getType_last; simpl; reflexivity].
   inverts H__r.
+  apply init_implies_initP in Heq.
 
   (* Promotion *)
   remember ([dom σ1 ↦ (C, warm)] (Σ4)) as Σ5.
@@ -359,21 +358,20 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     * exists (C, warm); subst; updates...
 
   + (* hot *)
-    eapply init_implies_initP in Heq. eval_dom. updates...
+    eval_dom. updates...
     destruct (local_reasoning2 Σ1 Σ5 σ1 σ4 (codom args_val) {dom σ1} ) as
       (Σ6 & ? & ? & ? & ? & H__vnew)...
     * eapply wf_theorem_list...
-    * lets (? & ? & ? & ? & ?): scp_theorem_init Heq (codom args_val ∪ {dom σ1}) (σ1++[(C,[])]);
-        eauto with scp... unfold scoping_preservation; steps.
-      intros ? ? l H__l H__rch. ss.
-      assert ((σ1 ++ [(C, [])]) ⊨ codom args_val ∪ {dom σ1} ⇝ l). {
-        apply H12; updates... eapply ss_trans with (σ1++[(C,[])]); updates...
-        rch_set. exists (dom σ1); split; eauto with ss. }
-      eapply rch_add_empty_set in H17 as [|]...
-      inversion H17 as (l' & ? & H__rch').
-      lets: rch_dom2 H__rch'.
-      inverts H18; rch_set...
-      exists l'; splits; eauto with ss.
+    * lets: scp_theorem_init Heq; eauto with scp...
+      apply scp_trans with σ4 (codom args_val ∪ {dom σ1}); ss... {
+        eapply ss_trans with (σ1++[(C,[])]); updates...
+      }
+      ++ apply scp_trans with (σ1 ++ [(C, [])]) (codom args_val ∪ {dom σ1}); updates...
+         intros ? ? l ? H__rch.
+         apply rch_add_empty_set in H__rch as [ [x [ [ ] H__rch]] |]; rch_set...
+         eexists...
+         apply rch_dom2 in H__rch...
+      ++ apply scp_refl2; intros ? [ ]. apply Union_intror, In_singleton.
     * intros l H__l.
       lets [|] : H__stk4 l;  updates...
       ++ left.
@@ -552,7 +550,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
                 (DoneFlds ++ [field (C1, μ0) e])).
   subst; modus.
   destruct IH__init
-    as (Σ2 & σ2 & ω2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__obj2 & H__dom2 & H__getType2 & H__scp2)...
+    as (Σ2 & σ2 & ω2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__obj2 & H__dom2 & H__getType2)...
   + rewrite getObj_update_same...
   + updates...
   + rewrite app_assoc_reverse. simpl => //.
@@ -564,7 +562,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     lets H__initP: H__r.
     eapply init_implies_initP in H__initP.
     lets H__scpInit: scp_theorem_init H__initP.
-    lets [ ]: scp_theorem_expr H__eval...
+    lets: scp_theorem_expr H__eval H1...
     exists Σ2, σ2, ω2; splits...
     * eauto with typ.
     * eauto with typ.
@@ -573,19 +571,10 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       -- rewrite getType_update_same in H__getType... steps.
       -- eapply H__aty0 in H__getType.
          eapply H__aty2. updates...
-    * splits... {
-        rewrite H__getType2. f_equal; eauto. rewrite H5 => //.
-      }
-      intros.
-      eapply H__scp2...
-      -- eapply scp_add_env; eauto with lia wf; updates.
-         ++ apply H23.
-         ++ eapply scp_trans; eauto with scp.
-         ++ eapply scp_trans; eauto with scp.
-      -- eapply scp_pr_trans; eauto.
-         eapply scp_pr_trans; eauto.
-         unfold scoping_preservation; intros; eauto with scp.
+    * splits...
+      rewrite H__getType2. f_equal; eauto. rewrite H5 => //.
 Qed.
+
 
 
 Theorem soundness:

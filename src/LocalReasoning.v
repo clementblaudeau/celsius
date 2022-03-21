@@ -47,13 +47,11 @@ Proof.
   assert (σ' ⊨ (Singleton Loc v) : hot).
   + eapply local_reasoning;
       eauto using stk_theorem with pM stk wf lia.
-    eapply scp_theorem in H; eauto with pM wf lia; steps.
+    eapply scp_theorem_expr; eauto with pM wf lia; steps.
   + eapply H3; eauto using In_singleton.
 Qed.
 
-
 (** ** Local reasoning *)
-
 Axiom classicT : forall (P : Prop), {P} + {~ P}.
 
 Lemma synchronization: forall Σ σ l,
