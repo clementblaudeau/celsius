@@ -313,4 +313,4 @@ Ltac cross_rewrites :=
   repeat match goal with
          | H: ?A = ?B, H': ?A = ?C |- _ => rewrite H in H'; inverts H'
          end.
-Hint Extern 1 => cross_rewrites: core.
+Global Hint Extern 1 => cross_rewrites: core.

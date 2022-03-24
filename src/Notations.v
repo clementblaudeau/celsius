@@ -38,7 +38,7 @@ Reserved Notation "Σ1 ≼ Σ2" (at level 60). (* Monotonicity *)
 (** *** Store properties *)
 Reserved Notation "σ ⪨ σ'" (at level 60). (* Compatibility *)
 Reserved Notation "s ⪯ s'" (at level 60). (* Partial monotonicity *)
-Reserved Notation "s ⪳ s'" (at level 60). (* Exact monotonicity *)
+Reserved Notation "s ⊵ s'" (at level 60). (* Strong authority *)
 
 (** *** Typing *)
 Reserved Notation "m1 ⊑ m2" (at level 40).

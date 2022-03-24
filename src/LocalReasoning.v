@@ -20,21 +20,18 @@ Lemma local_reasoning:
     σ ⪯ σ' ->
     σ  ⊨ L  : hot ->
     σ' ⊨ L' : hot.
-Proof.
-  intros; intros l' H__l'.
-    unfold dash_colon_, notation_reachability_mode, reachable_hot. intros l ?.
+Proof with (eauto with rch).
+  intros. intros l' H__l' l H__rch.
   assert (dom σ <= dom σ') by eauto with pM.
-  destruct (PeanoNat.Nat.lt_ge_cases l (dom σ)).
+  assert (l < dom σ \/ l >= dom σ) as [|] by lia.
   + (* l ∈ (dom σ) : the object was already in the store *)
-    eapply pM_wf_warm_monotone; eauto.
+    eapply pM_wf_warm_monotone...
     assert (σ ⊨ L ⇝ l).
-    * eapply H2 ; simpl => //.
-      exists l'; split; eauto with rch.
-    * rch_set.
-      eapply H5; eauto with rch.
+    * eapply H2...
+      eexists...
+    * rch_set. eapply H5...
   + (* l ∉ (dom σ) *)
-    pose proof (rch_dom _ _ _ H6).
-    destruct (H3 l); eauto with lia.
+    destruct (H3 l); eauto with lia rch.
 Qed.
 
 (* Then the main theorem : *)
@@ -50,14 +47,11 @@ Proof.
   assert (σ' ⊨ (Singleton Loc v) : hot).
   + eapply local_reasoning;
       eauto using stk_theorem with pM stk wf lia.
-    eapply scp_theorem in H; eauto with pM wf lia; steps.
+    eapply scp_theorem_expr; eauto with pM wf lia; steps.
   + eapply H3; eauto using In_singleton.
 Qed.
 
-
-
 (** ** Local reasoning *)
-
 Axiom classicT : forall (P : Prop), {P} + {~ P}.
 
 Lemma synchronization: forall Σ σ l,
@@ -70,7 +64,7 @@ Lemma synchronization: forall Σ σ l,
         Σ ▷ Σ' /\
         Σ ≪ Σ' /\
         (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ' ⊨ l' : hot).
-Proof with (meta; eauto with typ updates lia).
+Proof with (meta; eauto 3 with typ updates lia).
 
   Ltac getType_combine :=
     lazymatch goal with
@@ -87,6 +81,7 @@ Proof with (meta; eauto with typ updates lia).
   intros Σ σ l H__wf H__st; intros.
   remember ((fun l' '(C,μ) => if (classicT (σ ⊨ l ⇝ l')) then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
   remember (map (fun '(l, T) => f l T) (combine (seq 0 (dom Σ)) Σ)) as Σ'.
+
   exists Σ'.
   assert (Hyp: forall (A B C D E: Prop), ((D -> B -> A) /\ B /\ C /\ D /\ E) -> (A /\ B /\ C /\ D /\ E)) by firstorder.
   apply Hyp. clear Hyp.
@@ -129,12 +124,13 @@ Proof with (meta; eauto with typ updates lia).
         destruct (classicT (σ ⊨ l ⇝ v)); steps.
         assert (C1 = C); subst; eauto...
         inverts H2; meta...
-        all: try lets [?v [ ] ]: H15 H5 ...
-        all: try lets: H14 H5 ...
-        all: try lets: H12 H5 ...
+        -- lets [?v [ ] ]: H15 H5 ...
+        -- lets [?v [ ] ]: H15 H5 ...
+        -- lets: H14 H5 ...
+        -- invert H3.
     + exists C, ω, μ; repeat split => // ...
-      getType_combine; steps.
-      destruct (classicT (σ ⊨ l ⇝ l')); steps.
+  getType_combine; steps.
+  destruct (classicT (σ ⊨ l ⇝ l')); steps.
 
   - intros l' H__l'.
     lets [?T ?]: getType_Some H__l'...
@@ -161,25 +157,21 @@ Proof with (meta; eauto with typ updates lia).
     destruct (classicT (σ ⊨ l ⇝ l')); steps.
 Qed.
 
-
 Lemma local_reasoning2: forall Σ1 Σ2 σ1 σ2 L1 L2,
-    L1 ⪽ σ1 ->
-    L2 ⪽ σ2 ->
+    L1 ⪽ σ1 -> L2 ⪽ σ2 ->
     (σ1, L1) ⋖ (σ2, L2) ->
     (Σ1 ≪ Σ2) ->
     (Σ1 ▷ Σ2) ->
     (Σ1 ≼ Σ2) ->
-    (Σ1 ⊨ σ1) ->
-    (Σ2 ⊨ σ2) ->
+    (Σ1 ⊨ σ1) -> (Σ2 ⊨ σ2) ->
     (Σ1 ⊨ L1 : hot) ->
-    wf σ1 ->
-    wf σ2 ->
+    wf σ1 -> wf σ2 ->
     exists Σ', (Σ2 ≪ Σ') /\
             (Σ2 ≼ Σ') /\
             (Σ2 ▷ Σ') /\
             (Σ' ⊨ σ2) /\
             (Σ' ⊨ L2 : hot).
-Proof with (meta; eauto with typ lia).
+Proof with (meta; eauto 3 with typ lia).
   intros Σ1 Σ2 σ1 σ2 L1 L2 H1 H2.
   pose proof (storeSubset_finite _ _ H2).
   gen Σ1 Σ2 σ1 σ2 L1.
@@ -188,7 +180,7 @@ Proof with (meta; eauto with typ lia).
     intros l Hl. inversion Hl.
   - clear H L2. rename F into L2, a into l.
     unfold Add in *.
-    assert ((σ1, L1) ⋖ (σ2, L2)) by eauto with scp.
+    assert ((σ1, L1) ⋖ (σ2, L2)) by eauto using scp_union_introl.
     pose proof (ss_union_l _ _ _ H2).
     lets [Σ3 [ ]]: H1 Σ2 H10; eauto; steps.
     (* clear Σ1 H5 H6 H7 H8 H10 H1. *) clear H1.

@@ -17,9 +17,9 @@ Definition monotonicity Σ1 Σ2 :=
 Notation "Σ1 ≼ Σ2" := (monotonicity Σ1 Σ2) (at level 60).
 
 (** ** Authority *)
-Definition authority Σ1 Σ2 :=
+Definition authority_st Σ1 Σ2 :=
   forall l C Ω, getType Σ1 l = Some (C, cool Ω) -> getType Σ2 l = Some (C, cool Ω).
-Notation "Σ1 ▷ Σ2" := (authority Σ1 Σ2) (at level 60).
+Notation "Σ1 ▷ Σ2" := (authority_st Σ1 Σ2) (at level 60).
 
 (** ** Value typing (with variants) *)
 
@@ -64,6 +64,7 @@ Global Hint Unfold notation_stackability_StoreTyping : notations.
 
 (** ** Object typing **)
 Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
+
 | ot_hot : forall Σ C ω Args Flds Mtds,
     ct C = class Args Flds Mtds ->
     (forall f D μ,
@@ -72,6 +73,7 @@ Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
         exists v,
           getVal ω f = Some v /\ (Σ ⊨ v : (D, hot))) ->
     object_typing Σ (C,ω) (C, hot)
+
 | ot_warm : forall Σ C ω Args Flds Mtds,
     ct C = class Args Flds Mtds ->
     (forall f D μ,
@@ -80,6 +82,7 @@ Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
         exists v,
           getVal ω f = Some v /\ (Σ ⊨ v : (D, μ))) ->
     object_typing Σ (C,ω) (C, warm)
+
 | ot_cool : forall Σ C ω n,
     (forall f v D μ,
         getVal ω f = Some v ->
@@ -87,11 +90,8 @@ Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
         Σ ⊨ v : (D, μ)) ->
     dom ω = n ->
     object_typing Σ (C,ω) (C, cool n)
+
 | ot_cold : forall Σ C ω,
-    (forall f v D μ,
-        getVal ω f = Some v ->
-        fieldType C f = Some (D, μ) ->
-        Σ ⊨ v : (D, μ)) ->
     object_typing Σ (C,ω) (C, cold).
 
 Global Instance notation_object_typing : notation_dash_colon StoreTyping Obj Tpe :=
@@ -201,14 +201,6 @@ Proof with meta; eauto with lia updates .
 Qed.
 Global Hint Resolve monotonicity_dom: typ.
 
-(* Ltac monotonicity_dom := *)
-(*   repeat match goal with *)
-(*          | H : ?Σ ≼ ?Σ', *)
-(*              H': in_dom ?Σ ?l |- _ => *)
-(*              let Hf := fresh "H__dom" in *)
-(*              add_hypothesis Hf (monotonicity_dom Σ Σ' H l H') *)
-(*          end. *)
-
 Lemma value_typing_dom : forall Σ l T,
     Σ ⊨ l : T -> l < dom Σ.
 Proof with meta; eauto.
@@ -237,27 +229,27 @@ Proof.
 Qed.
 Global Hint Resolve env_typing_monotonicity: typ.
 
-
 Lemma object_typing_monotonicity: forall Σ1 Σ2 (o: Obj) T,
     Σ1 ≼ Σ2 -> Σ1 ⊨ o : T -> Σ2 ⊨ o : T.
 Proof with (meta; eauto with lia typ).
   intros ...
-  autounfold with notations in H0.
   inversion H0; steps.
-  - eapply ot_hot ...
+
+  - eapply ot_hot; [eassumption |].
     intros.
-    specialize (H7 f D μ H1 H2); steps ...
-    exists v ... split => //.
+    specialize (H7 f D μ H1 H2); steps.
+    exists v; split => //.
     exists (D, hot)...
-    lets: H H6. steps ...
-  - eapply ot_warm ...
+    lets ([ ] & [ ] & ? & ? & ?): H H6...
+
+  - eapply ot_warm; [eassumption |].
     intros.
-    specialize (H7 f D μ H1 H2); steps ...
+    specialize (H7 f D μ H1 H2); steps.
     exists v; steps ...
-    lets: H H6. steps ...
-    exists (D, μ1) ...
+    lets ([ ] & [ ] & ? & ? & ?): H H6.
+    eexists...
+
   - apply ot_cool ...
-  - apply ot_cold ...
 Qed.
 Global Hint Resolve object_typing_monotonicity: typ.
 
@@ -274,7 +266,7 @@ Lemma mn_trans: forall Σ1 Σ2 Σ3,
 Proof with (meta; eauto with lia typ).
   intros.
   intros l; steps.
-  specialize (H l H1); steps...
+  specialize (H l H1); steps.
   specialize (H0 l) as [ ]; steps...
   eexists; eexists...
 Qed.
@@ -297,7 +289,9 @@ Lemma mn_hot_set: forall Σ1 Σ2 (L: LocSet),
     (Σ1 ⊨ L : hot) ->
     (Σ2 ⊨ L : hot).
 Proof.
-  intros; meta. intros l. specialize (H0  l); eauto with typ.
+  intros; meta.
+  intros l.
+  specialize (H0  l); eauto with typ.
 Qed.
 
 Lemma env_regularity: forall Γ Σ ρ x U T,
@@ -312,7 +306,7 @@ Proof.
     exists l; steps.
     inverts Ht.
     eapply vt_sub; eauto with typ.
-  - steps.
+  - inverts Heqe.
     gen U x.
     autounfold with notations in H. simpl in *.
     induction H; intros; destruct x; steps; eauto.
@@ -352,7 +346,7 @@ Lemma hot_transitivity : forall Σ σ l l',
     (Σ ⊨ σ) ->
     (σ ⊨ l ⇝ l') ->
     (Σ ⊨ l' : hot).
-Proof with (storeTyping_update; meta; eauto with lia typ).
+Proof with (storeTyping_update; meta; eauto 2 with lia typ).
   intros.
   gen Σ.
   induction H2; steps...
@@ -368,24 +362,24 @@ Qed.
 
 
 (** ** Authority results *)
-Lemma aty_refl: forall Σ, Σ ▷ Σ.
+Lemma aty_st_refl: forall Σ, Σ ▷ Σ.
 Proof with (meta; eauto with typ lia).
   intros Σ l H.
   destruct (getType Σ l) eqn:E; eauto.
 Qed.
-Global Hint Resolve aty_refl : typ.
+Global Hint Resolve aty_st_refl : typ.
 
-Lemma aty_trans: forall Σ1 Σ2 Σ3,
+Lemma aty_st_trans: forall Σ1 Σ2 Σ3,
     Σ1 ▷ Σ2 ->
     Σ2 ▷ Σ3 ->
     Σ1 ▷ Σ3.
 Proof with steps.
   intros. intros l ...
 Qed.
-Global Hint Resolve aty_trans : typ.
+Global Hint Resolve aty_st_trans : typ.
+
 
 (** ** Stackability results *)
-
 Lemma stk_st_refl: forall Σ, Σ ≪ Σ.
 Proof.
   intros Σ l H. right => //.
@@ -407,10 +401,9 @@ Proof.
   left.
   specialize (H1 l) as [ ]; steps.
   rewrite H3 in H; steps.
-  exists x, T2; steps; eauto with typ.
+  repeat eexists; eauto with typ.
 Qed.
 Global Hint Resolve stk_st_trans : typ.
-
 
 
 (** ** Selection results *)
@@ -422,7 +415,7 @@ Lemma hot_selection : forall Σ σ l C ω,
     (forall f D μ, fieldType C f = Some (D, μ) ->
               exists v, getVal ω f = Some v /\
                    Σ ⊨ v : (D, hot)).
-Proof with (meta; eauto with typ lia).
+Proof with (meta; eauto 3 with typ lia).
   intros ...
   lets [ ]: (proj2 H0) l ...
   steps ...
@@ -438,7 +431,7 @@ Lemma warm_selection : forall Σ σ l C ω f T,
     getObj σ l = Some (C, ω) ->
     fieldType C f = Some T ->
     exists v, getVal ω f = Some v /\ Σ ⊨ v : T.
-Proof with (meta; eauto with typ lia).
+Proof with (meta; eauto 3 with typ lia).
   intros ...
   lets [ ]: (proj2 H) l ... steps ...
   inverts H6.
@@ -457,7 +450,7 @@ Lemma cool_selection : forall Σ σ C l Ω ω f T,
     fieldType C f = Some T ->
     f < Ω ->
     exists v, getVal ω f = Some v /\ Σ ⊨ v : T.
-Proof with (meta; eauto with typ lia).
+Proof with (meta; eauto 4 with typ lia).
   intros ...
   lets [ ]: (proj2 H) l ... steps ...
   inverts H9 ...
@@ -485,12 +478,11 @@ Lemma field_initialization: forall C I σ ω T Σ v,
       assign_new I v σ = Some σ' ->
       Σ' = [I ↦ (C, cool (S (dom ω)))]Σ ->
       (Σ' ⊨ σ') /\ Σ ≼ Σ' /\ Σ ≪ Σ'.
-Proof with (updates; meta; eauto with typ lia).
+Proof with (updates; meta; eauto 2 with typ lia).
   intros. subst.
-  assert (H__fo: forall A B C : Prop , (B -> A) -> B -> C -> A /\ B /\ C) by firstorder.
   unfold assign_new in *.
+  assert (H__fo: forall A B C : Prop , (B -> A) -> B -> C -> A /\ B /\ C) by firstorder.
   apply H__fo; clear H__fo; steps.
-
   - (* ⊨ *)
     split...
     intros l H__l.
@@ -505,19 +497,19 @@ Proof with (updates; meta; eauto with typ lia).
            eapply s_typ_mode...
            eapply s_mode_trans with (cool (dom ω)) ...
            eapply s_mode_cool...
-        -- exists (D, μ0); try rewrite getType_update_diff...
+        -- exists (D, μ); try rewrite getType_update_diff...
       * inverts H10.
         lets: H15 H11...
-    + exists C1, ω0, μ1; splits...
+    + repeat eexists...
 
   - (* ≼ *)
     intros l H__l.
     destruct_eq (I = l); subst...
     + exists (C, cool (dom ω)), (C, cool (S dom ω)); splits ...
-      eapply s_typ_mode...
-      eapply s_mode_trans with (cool (dom ω)) ...
+      eapply s_typ_mode.
       eapply s_mode_cool...
-    +lets [?T ?]: getType_Some Σ l...
+    + lets [?T ?]: getType_Some Σ l...
+      eauto with typ lia.
 
   - (* ≪ *)
     intros l H__l. right...
@@ -535,7 +527,7 @@ Lemma promotion: forall Σ1 Σ2 C I σ2 Args Flds Mtds,
       Σ1 ▷ Σ3 /\
       Σ1 ≼ Σ3 /\
         Σ3 ⊨ σ2.
-Proof with (updates; meta; eauto with typ lia).
+Proof with (updates; meta; eauto 3 with typ lia).
   intros. subst.
   apply proj2 with (Σ2 ≼ [I ↦ (C, warm)] (Σ2)).
   assert (H__fo: forall A B C D: Prop, B -> (A -> C) -> (A -> C -> D) -> A -> A /\ B /\ C /\ D) by firstorder.
@@ -551,7 +543,9 @@ Proof with (updates; meta; eauto with typ lia).
     lets ([C1 μ1] & ?): getType_Some Σ2 l...
     lets (?T & ?T & ? &? &?): H0 H__l...
     exists (C0, μ).
-    destruct_eq (I = l); subst...
+    destruct_eq (I = l); subst.
+    + exists (C, warm); split...
+    + exists (C0, μ1); split...
 
   - (* ⊨ *)
     split...
@@ -560,18 +554,20 @@ Proof with (updates; meta; eauto with typ lia).
     lets (C0 & ω & ?): getObj_Some H__l...
     lets (?C & ?ω & ?μ & ? & ? & ?) : (proj2 H4) l...
     destruct_eq (I = l); subst...
-    + exists C, ω, warm; splits...
-      eapply ot_warm; eauto.
+    + exists C, ω, warm; splits; auto.
+      eapply ot_warm; [eassumption |].
       intros f D μ' ? ?.
       inverts H12.
       lets (v & ?): getVal_Some ω f...
+      eexists; split...
     + exists C0, ω, μ; splits...
 
   - (* ≼ *)
     intros l H__l.
     lets ([C0 μ] & ?): getType_Some H__l.
     exists (C0, μ).
-    destruct_eq (I = l); subst...
+    destruct_eq (I = l); subst;
+      eexists; split...
 Qed.
 
 (** Env typing lemmas *)
@@ -615,7 +611,7 @@ Lemma storeTyping_assgn:
     μ ⊑ μ0 ->
     wf σ ->
     Σ ⊨ ([l ↦ (C, [f ↦ v]ω)]σ).
-Proof with (updates; meta; eauto with typ updates).
+Proof with (updates; meta; eauto 3 with typ updates).
   intros.
   split...
   intros l' H__l'.
@@ -625,13 +621,15 @@ Proof with (updates; meta; eauto with typ updates).
     destruct (ct C) as [Args Flds Mtds] eqn:H__ct.
     assert (f < dom Flds)...
     inverts H11.
-    + eapply ot_hot... intros...
+    + eapply ot_hot; [eassumption|].
+      intros.
       lets [?v [ ]]: H17 f...
       lets [?v [ ]]: H17 f0...
       destruct_eq (f = f0); subst...
       exists v; split...
       eexists...
-    + eapply ot_warm... intros.
+    + eapply ot_warm; [eassumption |].
+      intros.
       lets [?v [ ]]: H17 f...
       lets [?v [ ]]: H17 f0...
       destruct_eq (f = f0); subst...
@@ -642,9 +640,6 @@ Proof with (updates; meta; eauto with typ updates).
       lets: H16 μ__f H1 H2...
       destruct_eq (f = f0); subst...
       exists (D0, μ)...
-    + apply ot_cold. intros.
-      lets: H14 H1 H2...
-      destruct_eq (f = f0); subst...
-      exists (D0, μ)...
+    + apply ot_cold.
   - exists C', ω', μ'; splits...
 Qed.

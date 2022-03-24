@@ -2,8 +2,10 @@
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** Store typing *)
 
-From Celsius Require Export MetaTheory Reachability LibTactics.
+From Celsius Require Export MetaTheory Reachability LibTactics Stackability.
 Require Import Coq.ssr.ssreflect Coq.ssr.ssrbool Coq.Lists.List Coq.micromega.Psatz Ensembles.
+
+
 
 Lemma ot_hot_dom: forall Σ C ω Args Flds Mtds,
     ct C = class Args Flds Mtds ->
@@ -11,16 +13,17 @@ Lemma ot_hot_dom: forall Σ C ω Args Flds Mtds,
     dom Flds <= dom ω.
 Proof with (meta; eauto with lia).
   intros.
-  inverts H0.
-  destruct (dom Flds) eqn: H__Flds...
+  inverts H0. cross_rewrites.
+  destruct (dom Flds0) eqn: H__Flds...
   lets [ ]: fieldType_exists n H; steps...
   specialize (H5 n x μ) as [ ]; steps...
+  lets: getVal_dom H2...
 Qed.
 Local Hint Resolve ot_hot_dom: typ.
 
 Lemma ot_warm_dom: forall Σ C ω Args Flds Mtds,
     ct C = class Args Flds Mtds ->
-    Σ ⊨ (C, ω) : (C, hot) ->
+    Σ ⊨ (C, ω) : (C, warm) ->
     dom Flds <= dom ω.
 Proof with (meta; eauto with lia).
   intros.
@@ -28,8 +31,29 @@ Proof with (meta; eauto with lia).
   destruct (dom Flds) eqn: H__Flds...
   lets [ ]: fieldType_exists n H; steps...
   specialize (H5 n x μ) as [ ]; steps...
+  lets: getVal_dom H2...
 Qed.
 Local Hint Resolve ot_warm_dom: typ.
+
+
+Lemma stackability_over_approximation:
+  forall σ σ' Σ Σ',
+    Σ ⊨ σ ->
+    Σ' ⊨ σ' ->
+    Σ ≪ Σ' ->
+    σ ≪ σ'.
+Proof with (meta; eauto 3 with stk typ).
+  intros.
+  intros l H__l.
+  specialize (H1 l) as [|]...
+  left.
+  destruct (ct C) eqn:?.
+  lets [?C [?ω [?μ (? & ? & ?)]]]: (proj2 H0) l...
+  exists C ω args fields methods; splits...
+  inverts H4...
+Qed.
+
+
 
 
 Lemma object_over_approximation:
@@ -38,10 +62,29 @@ Lemma object_over_approximation:
     (Σ ⊨ σ) ->
     (Σ ⊨ l : μ) ->
     (σ ⊨ l : μ).
-Proof with (meta; eauto with typ rch updates lia).
-  intros ...
+Proof with (meta; eauto 3 with typ rch updates lia).
+  intros...
   lets [?C [?ω [?μ ?]]]: (proj2 H0) l; steps...
   destruct (ct C) as [Args Flds Mtds] eqn:H__ct ...
+  destruct μ as [ | | Ω |]...
+  - (* hot *)
+    intros l' H__rch.
+    lets: hot_transitivity H__rch... { exists C, (C, hot) ... }
+    lets [?C [?ω [?μ (? & ? & ?)]]]: (proj2 H0) l'...
+    destruct (ct C0) eqn:?.
+    eapply ot_hot_dom in H9...
+    repeat eexists...
+  - exists C, ω, Args, Flds, Mtds; splits...
+    inverts H5...
+  - exists C, ω, Args, Flds, Mtds; splits...
+
+
+
+    eapply ot_warm_dom...
+
+
+
+
   destruct μ0 as [ | | Ω | ], μ as [ | | Ω0 |];
     try solve [invert H5];
     try apply_anywhere s_mode_cool;
