@@ -17,9 +17,9 @@ Definition monotonicity Σ1 Σ2 :=
 Notation "Σ1 ≼ Σ2" := (monotonicity Σ1 Σ2) (at level 60).
 
 (** ** Authority *)
-Definition authority Σ1 Σ2 :=
+Definition authority_st Σ1 Σ2 :=
   forall l C Ω, getType Σ1 l = Some (C, cool Ω) -> getType Σ2 l = Some (C, cool Ω).
-Notation "Σ1 ▷ Σ2" := (authority Σ1 Σ2) (at level 60).
+Notation "Σ1 ▷ Σ2" := (authority_st Σ1 Σ2) (at level 60).
 
 (** ** Value typing (with variants) *)
 
@@ -92,10 +92,6 @@ Inductive object_typing : StoreTyping -> Obj -> Tpe -> Prop :=
     object_typing Σ (C,ω) (C, cool n)
 
 | ot_cold : forall Σ C ω,
-    (forall f v D μ,
-        getVal ω f = Some v ->
-        fieldType C f = Some (D, μ) ->
-        Σ ⊨ v : (D, μ)) ->
     object_typing Σ (C,ω) (C, cold).
 
 Global Instance notation_object_typing : notation_dash_colon StoreTyping Obj Tpe :=
@@ -254,8 +250,6 @@ Proof with (meta; eauto with lia typ).
     eexists...
 
   - apply ot_cool ...
-
-  - apply ot_cold ...
 Qed.
 Global Hint Resolve object_typing_monotonicity: typ.
 
@@ -368,21 +362,21 @@ Qed.
 
 
 (** ** Authority results *)
-Lemma aty_refl: forall Σ, Σ ▷ Σ.
+Lemma aty_st_refl: forall Σ, Σ ▷ Σ.
 Proof with (meta; eauto with typ lia).
   intros Σ l H.
   destruct (getType Σ l) eqn:E; eauto.
 Qed.
-Global Hint Resolve aty_refl : typ.
+Global Hint Resolve aty_st_refl : typ.
 
-Lemma aty_trans: forall Σ1 Σ2 Σ3,
+Lemma aty_st_trans: forall Σ1 Σ2 Σ3,
     Σ1 ▷ Σ2 ->
     Σ2 ▷ Σ3 ->
     Σ1 ▷ Σ3.
 Proof with steps.
   intros. intros l ...
 Qed.
-Global Hint Resolve aty_trans : typ.
+Global Hint Resolve aty_st_trans : typ.
 
 
 (** ** Stackability results *)
@@ -646,9 +640,6 @@ Proof with (updates; meta; eauto 3 with typ updates).
       lets: H16 μ__f H1 H2...
       destruct_eq (f = f0); subst...
       exists (D0, μ)...
-    + apply ot_cold. intros.
-      lets: H14 H1 H2...
-      destruct_eq (f = f0); subst...
-      exists (D0, μ)...
+    + apply ot_cold.
   - exists C', ω', μ'; splits...
 Qed.

@@ -8,12 +8,12 @@ initialized, and thus, warm. Stackability states exactly this: two stores [σ] a
 if the new objects in [σ'] are warm. To prove this, we use the evaluator results of Eval.v, whith a
 custom proof the initialization case *)
 
-From Celsius Require Export PartialMonotonicity Reachability Wellformedness.
+From Celsius Require Export Wellformedness.
 Require Import ssreflect ssrbool Psatz List.
 Import ListNotations.
 Open Scope nat_scope.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
-Global Hint Resolve eM_warm_monotone: stk.
+Global Hint Resolve aty_warm_monotone: stk.
 
 
 (** ** Definitions and notations *)
@@ -93,22 +93,30 @@ Proof with (updates; eauto 4 with stk pM lia ).
 
   apply evalP_multi_ind;
     unfold assign, assign_new; simpl; intros;
-    eval_dom; ss_trans;
-    try solve [intuition (eauto 3 with stk pM lia)].
+    eval_dom; ss_trans...
 
-  - eapply stk_trans...
-  - rewrite getObj_last in IH__init.
-    move /(_ [] eq_refl): IH__init. steps ...
-    eapply stk_trans with σ1; try eapply pM_trans with (σ1 ++ [(C, [])])...
+  - (* e = m.(el) *)
+    eapply stk_trans...
+
+  - (* e = new C(args) *)
+    rewrite getObj_last in IH__init.
+    specialize (IH__init _ eq_refl); steps.
+    lets: pM_theorem_list H__args.
+    lets: pM_theorem_init H__init.
+    eapply stk_trans with σ1...
     move => l Hl.
-    move /(_ l Hl): H1 => H1. steps ...
+    move /(_ l Hl): H1 => [?|H1]...
     destruct_eq (l = dom σ1); steps; [left |] ...
     repeat eexists ...
-  - steps ; pM_trans ...
+
+  - (* flds = nil *)
+    steps ; pM_trans ...
     + eapply stk_trans with ([v1 ↦ (c, [x ↦ v2] (e))] (σ2)) ...
       eapply stk_trans with σ2 ...
     + eapply stk_trans with σ2 ...
-  - lets [?ω [ ]]: eM_theorem_expr H__e H.
+
+  - (* fld = e::flds *)
+    lets [?ω [ ]]: aty_theorem_expr H__e H.
     rewrite H2 in H__assign; inverts H__assign.
     rewrite getObj_update_same in IH__flds; eauto with updates ...
     move /(_ _ eq_refl): IH__flds; intros; flatten; updates.

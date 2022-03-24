@@ -209,7 +209,8 @@ Global Hint Resolve scp_assign_new: scp.
 (** ** Evaluation-maintained results *)
 
 (** ** Main Scopability theorem *)
-(** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use the results shown for initialization, lists and assignment *)
+(** We show the main theorem. As for wellformedness theorem, we have to make a custom proof. We use
+the results shown for initialization, lists and assignment *)
 Theorem scp_theorem:
 
   (forall e σ ρ ψ v σ',
@@ -269,7 +270,7 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     apply H11... intros ? [ ]...
     exists l0; split... inverts H__ln; eauto 6 using Union.
 
-  - (* e = new C(l0) *)
+   - (* e = new C(l0) *)
     assert ((L ∪ {dom σ1}) ⪽ σ1 ++ [(C, [])]). { ss... apply ss_trans with σ1... }
     eapply scp_trans with σ1 (L ∪ codom vl__args)...
     eapply scp_trans with (σ1++[(C,[])]) (L ∪ codom vl__args ∪ {dom σ1})...
@@ -321,7 +322,7 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     done...
 
   - (* init_cons *)
-    lets [?ω [ ]]: eM_theorem_expr H__e H2; cross_rewrites.
+    lets [?ω [ ]]: aty_theorem_expr H__e H2; cross_rewrites.
     rewrite H8 in H__assign. inverts H__assign.
     apply scp_trans with σ1 (L ∪ {v})...
     apply scp_trans with σ3 (L ∪ {v})... {

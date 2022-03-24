@@ -350,6 +350,7 @@ Ltac inSingleton :=
   | H: {?x} ?y |- _ => induction H
   end.
 
+
 (** * Store Subset *)
 
 (** A set of locations is contained in a store: [L ⪽ σ] *)

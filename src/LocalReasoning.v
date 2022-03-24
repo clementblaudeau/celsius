@@ -64,7 +64,7 @@ Lemma synchronization: forall Σ σ l,
         Σ ▷ Σ' /\
         Σ ≪ Σ' /\
         (forall (l': Loc), σ ⊨ l ⇝ l' -> Σ' ⊨ l' : hot).
-Proof with (meta; eauto with typ updates lia).
+Proof with (meta; eauto 3 with typ updates lia).
 
   Ltac getType_combine :=
     lazymatch goal with
@@ -124,12 +124,13 @@ Proof with (meta; eauto with typ updates lia).
         destruct (classicT (σ ⊨ l ⇝ v)); steps.
         assert (C1 = C); subst; eauto...
         inverts H2; meta...
-        all: try lets [?v [ ] ]: H15 H5 ...
-        all: try lets: H14 H5 ...
-        all: try lets: H12 H5 ...
+        -- lets [?v [ ] ]: H15 H5 ...
+        -- lets [?v [ ] ]: H15 H5 ...
+        -- lets: H14 H5 ...
+        -- invert H3.
     + exists C, ω, μ; repeat split => // ...
-      getType_combine; steps.
-      destruct (classicT (σ ⊨ l ⇝ l')); steps.
+  getType_combine; steps.
+  destruct (classicT (σ ⊨ l ⇝ l')); steps.
 
   - intros l' H__l'.
     lets [?T ?]: getType_Some H__l'...
@@ -156,25 +157,21 @@ Proof with (meta; eauto with typ updates lia).
     destruct (classicT (σ ⊨ l ⇝ l')); steps.
 Qed.
 
-
 Lemma local_reasoning2: forall Σ1 Σ2 σ1 σ2 L1 L2,
-    L1 ⪽ σ1 ->
-    L2 ⪽ σ2 ->
+    L1 ⪽ σ1 -> L2 ⪽ σ2 ->
     (σ1, L1) ⋖ (σ2, L2) ->
     (Σ1 ≪ Σ2) ->
     (Σ1 ▷ Σ2) ->
     (Σ1 ≼ Σ2) ->
-    (Σ1 ⊨ σ1) ->
-    (Σ2 ⊨ σ2) ->
+    (Σ1 ⊨ σ1) -> (Σ2 ⊨ σ2) ->
     (Σ1 ⊨ L1 : hot) ->
-    wf σ1 ->
-    wf σ2 ->
+    wf σ1 -> wf σ2 ->
     exists Σ', (Σ2 ≪ Σ') /\
             (Σ2 ≼ Σ') /\
             (Σ2 ▷ Σ') /\
             (Σ' ⊨ σ2) /\
             (Σ' ⊨ L2 : hot).
-Proof with (meta; eauto with typ lia).
+Proof with (meta; eauto 3 with typ lia).
   intros Σ1 Σ2 σ1 σ2 L1 L2 H1 H2.
   pose proof (storeSubset_finite _ _ H2).
   gen Σ1 Σ2 σ1 σ2 L1.

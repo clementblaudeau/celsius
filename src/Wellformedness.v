@@ -2,7 +2,7 @@
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
 (** This file defines the notion of wellformedness for scopes. The set of reachable locations must all be valid locations of the store - that is, locations that are inside of the store. The main result is to show that if we start from a wellformed store that contains the local environment ρ and the [this] pointer, then we end up with a wellformed store that contains the location of the result *)
 
-From Celsius Require Export Reachability Semantics PartialMonotonicity.
+From Celsius Require Export Reachability Semantics Authority PartialMonotonicity.
 Require Import ssreflect ssrbool Psatz List Sets.Ensembles Coq.Program.Tactics Coq.Sets.Finite_sets_facts.
 Import ListNotations.
 Open Scope nat_scope.
@@ -186,10 +186,10 @@ Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
 
   - (* init_cons *)
     destruct IH__e ...
-    lets [?ω [ ] ]: eM_theorem_expr H__e H2.
+    lets [?ω [ ] ]: aty_theorem_expr H__e H2.
     lets: getObj_dom H8.
     rewrite H8 in H__assign. inverts H__assign...
-    lets [?ω [ ] ]: eM_theorem_expr H__e H2...
+    lets [?ω [ ] ]: aty_theorem_expr H__e H2...
     rewrite getObj_update_same in IH__flds...
     eapply IH__flds with (ω:= ω1 ++[v]);
       ss; updates; eauto with lia.
