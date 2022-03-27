@@ -361,6 +361,17 @@ Proof with (storeTyping_update; meta; eauto 2 with lia typ).
 Qed.
 
 
+Lemma hot_transitivity_set : forall Σ σ L l,
+    wf σ ->
+    (Σ ⊨ L : hot) ->
+    (Σ ⊨ σ) ->
+    (σ ⊨ L ⇝ l) ->
+    (Σ ⊨ l : hot).
+Proof with (storeTyping_update; meta; eauto 2 with lia typ).
+  intros. rch_set.
+  eapply hot_transitivity...
+Qed.
+
 (** ** Authority results *)
 Lemma aty_st_refl: forall Σ, Σ ▷ Σ.
 Proof with (meta; eauto with typ lia).
@@ -518,6 +529,7 @@ Qed.
 Lemma promotion: forall Σ1 Σ2 C I σ2 Args Flds Mtds,
     Σ1 ▷ Σ2 ->
     Σ1 ≼ Σ2 ->
+    Σ1 ≪ [I ↦ (C, warm)] Σ2 ->
     ct C = class Args Flds Mtds ->
     I >= dom Σ1 ->
     getType Σ2 I = Some (C, cool (dom Flds)) ->
@@ -525,12 +537,13 @@ Lemma promotion: forall Σ1 Σ2 C I σ2 Args Flds Mtds,
     forall Σ3,
       Σ3 = [I ↦ (C, warm)]Σ2 ->
       Σ1 ▷ Σ3 /\
-      Σ1 ≼ Σ3 /\
+        Σ1 ≼ Σ3 /\
+        Σ1 ≪ Σ3 /\
         Σ3 ⊨ σ2.
 Proof with (updates; meta; eauto 3 with typ lia).
   intros. subst.
   apply proj2 with (Σ2 ≼ [I ↦ (C, warm)] (Σ2)).
-  assert (H__fo: forall A B C D: Prop, B -> (A -> C) -> (A -> C -> D) -> A -> A /\ B /\ C /\ D) by firstorder.
+  assert (H__fo: forall A B C D E: Prop, B -> (A -> C) -> (A -> C -> E) -> D -> A -> A /\ B /\ C /\ D /\ E) by firstorder.
   apply H__fo; clear H__fo; intros.
 
   - (* ▷ *)
@@ -552,15 +565,19 @@ Proof with (updates; meta; eauto 3 with typ lia).
     intros l H__l.
     lets: monotonicity_dom H6...
     lets (C0 & ω & ?): getObj_Some H__l...
-    lets (?C & ?ω & ?μ & ? & ? & ?) : (proj2 H4) l...
+    lets (?C & ?ω & ?μ & ? & ? & ?) : (proj2 H5) l...
     destruct_eq (I = l); subst...
     + exists C, ω, warm; splits; auto.
       eapply ot_warm; [eassumption |].
       intros f D μ' ? ?.
-      inverts H12.
+      inverts H13.
       lets (v & ?): getVal_Some ω f...
       eexists; split...
     + exists C0, ω, μ; splits...
+
+  - (* ≪ *)
+    intros l H__l...
+    destruct (H1 l)...
 
   - (* ≼ *)
     intros l H__l.

@@ -118,12 +118,6 @@ Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
       (fieldType D f = Some (C, μ)) ->
       (Γ, T) ⊢ (fld e f) : (C, hot)
 
-| t_selwarm:
-    forall Γ T e f U D,
-      (Γ, T) ⊢ e : (D, warm) ->
-      (fieldType D f = Some U) ->
-      (Γ, T) ⊢ (fld e f) : U
-
 | t_selcool:
     forall Γ T e f U D Ω,
       (Γ, T) ⊢ e : (D, cool Ω) ->
@@ -179,6 +173,15 @@ with T_Exprs: EnvTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
 where  "( Γ , T )  ⊩ es : Us" := (T_Exprs Γ T es Us).
 
 Global Hint Constructors T_Expr: typ.
+
+Lemma t_selwarm:
+    forall Γ T e f U D,
+      (Γ, T) ⊢ e : (D, warm) ->
+      (fieldType D f = Some U) ->
+      (Γ, T) ⊢ (fld e f) : U.
+Proof.
+  eauto with typ.
+Qed.
 
 (** ** Field typing *)
 Definition T_Field (Γ:EnvTyping) T f :=
@@ -240,7 +243,7 @@ Lemma t_fld_inv:
     exists D μ__e μ__f,
       ((Γ, T__this) ⊢ e : (D, μ__e)) /\
         fieldType D f = Some (C, μ__f) /\
-        ((μ__e = hot) \/ (μ__e = warm /\ μ__f ⊑ μ) \/ (exists Ω, μ__e = cool Ω /\ f < Ω /\ μ__f ⊑ μ)).
+        ((μ__e = hot) \/ (exists Ω, μ__e = cool Ω /\ f < Ω /\ μ__f ⊑ μ)).
 Proof with (eauto with typ lia).
   introv H.
   remember (fld e f) as E.
@@ -251,7 +254,7 @@ Proof with (eauto with typ lia).
   all: try specialize (IHT_Expr C μ0 eq_refl _ _ eq_refl)
     as (?D & ?μ__e & ?C & ?μ__f & ? & ? & [|[|]]); steps...
   all: repeat eexists...
-  all: right; right; eexists...
+  all: right; eexists...
 Qed.
 
 Lemma t_mtd_inv: forall Γ T__this e m args T,
@@ -331,10 +334,6 @@ Section typing_ind.
       P Γ T e (D, hot) H__D ->
       P Γ T (fld e f) (C, hot) (t_selhot Γ T e f C D μ H__D H__field).
 
-  Variable P_selwarm: forall Γ T e f U D H__D H__field,
-      P Γ T e (D, warm) H__D ->
-      P Γ T (fld e f) U (t_selwarm Γ T e f U D H__D H__field).
-
   Variable P_selcool: forall Γ T e f U D Ω H__D H__f H__field,
       P Γ T e (D, cool Ω) H__D ->
       P Γ T (fld e f) U (t_selcool Γ T e f U D Ω H__D H__f H__field).
@@ -380,9 +379,6 @@ Section typing_ind.
     | t_selhot Γ T e f C D μ H__D H__field =>
         P_selhot Γ T e f C D μ H__D H__field
                  (typing_ind Γ T e (D, hot) H__D)
-    | t_selwarm Γ T e f U D H__D H__field =>
-        P_selwarm Γ T e f U D H__D H__field
-                  (typing_ind Γ T e (D, warm) H__D)
     | t_selcool Γ T e f U D Ω H__D H__f H__field =>
         P_selcool Γ T e f U D Ω H__D H__f H__field
                   (typing_ind Γ T e (D, cool Ω) H__D)
