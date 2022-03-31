@@ -6,7 +6,7 @@ From Celsius Require Export LocalReasoning Eval.
 Require Import ssreflect ssrbool Psatz Sets.Ensembles List Coq.Sets.Finite_sets_facts Coq.Program.Tactics.
 Import ListNotations Arith.
 Open Scope nat_scope.
-
+Implicit Type (ρ: Env).
 
 Local Hint Constructors evalP: typ.
 Local Hint Constructors T_Expr: typ.
@@ -48,7 +48,7 @@ Qed.
 Lemma P_Hots_env:
   forall Args l args_val Σ1,
     P_hots Args ->
-    (Args, Σ1) ⊨ args_val ->
+    Σ1 ⊨ args_val : Args ->
     l ∈ codom args_val ->
     Σ1 ⊨ l : hot.
 Proof with (meta; eauto with typ).
@@ -64,7 +64,7 @@ Global Hint Resolve P_Hots_env: typ.
 
 Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
     ((Γ, U) ⊢ e : T) ->
-    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ ρ : Γ ->
     Σ ⊨ σ ->
     (Σ ⊨ ψ : U) ->
     wf σ ->
@@ -80,7 +80,7 @@ Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
 
 Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
     ((Γ, U) ⊩ el : Tl) ->
-    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ ρ : Γ ->
     Σ ⊨ σ ->
     (Σ ⊨ ψ : U) ->
     wf σ ->
@@ -90,11 +90,11 @@ Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
     exists Σ' vl σ',
       r = Success_l vl σ' /\
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
-        (Tl, Σ') ⊨ vl.
+        Σ' ⊨ vl : Tl.
 
 Definition init_soundness n C flds I ρ σ Γ Σ r :=
   forall Args Flds Mtds ω DoneFlds,
-    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ ρ : Γ ->
     Σ ⊨ σ ->
 
     wf σ ->
@@ -542,8 +542,6 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       rewrite H__getType2. f_equal; eauto. rewrite H5 => //.
 Qed.
 
-
-
 Theorem soundness:
   forall n,
     (forall e ρ σ ψ r Γ Σ U T,
@@ -624,7 +622,7 @@ Qed.
 Corollary Soundness :
   forall n e ρ σ ψ r Γ Σ U T,
     ((Γ, U) ⊢ e : T) ->
-    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ ρ : Γ ->
     Σ ⊨ σ ->
     (Σ ⊨ ψ : U) ->
     wf σ ->

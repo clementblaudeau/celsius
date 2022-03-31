@@ -112,14 +112,14 @@ Global Hint Unfold notation_store_typing: notations.
 Global Hint Unfold notation_store_typing store_typing: typ.
 
 (** ** Environment typing *)
-Inductive env_typing : EnvTyping -> StoreTyping -> Env -> Prop :=
-| et_nil : forall Σ, env_typing nil Σ nil
-| et_cons : forall Γ Σ ρ l T,
-    env_typing Γ Σ ρ ->
+Inductive env_typing : StoreTyping -> Env -> EnvTyping -> Prop :=
+| et_nil : forall Σ, env_typing Σ nil nil
+| et_cons : forall Σ ρ Γ l T,
+    env_typing Σ ρ Γ ->
     (Σ ⊨ l : T) ->
-    env_typing (T :: Γ) Σ (l :: ρ).
-Global Instance notation_env_typing: notation_dash (EnvTyping * StoreTyping) Env :=
-  { dash_ := fun a b => env_typing (fst a) (snd a) b }.
+    env_typing  Σ (l :: ρ) (T :: Γ).
+Global Instance notation_env_typing: notation_dash_colon StoreTyping Env EnvTyping :=
+  { dash_colon_ := env_typing }.
 Global Hint Unfold notation_env_typing: notations.
 
 
@@ -218,7 +218,7 @@ Qed.
 Global Hint Resolve value_typing_monotonicity: typ.
 
 Lemma env_typing_monotonicity: forall Σ1 Σ2 Γ ρ,
-    Σ1 ≼ Σ2 -> (Γ, Σ1) ⊨ ρ -> (Γ, Σ2) ⊨ ρ.
+    Σ1 ≼ Σ2 -> Σ1 ⊨ ρ : Γ -> Σ2 ⊨ ρ : Γ.
 Proof.
   intros.
   autounfold with notations in H0. simpl in H0.
@@ -295,7 +295,7 @@ Proof.
 Qed.
 
 Lemma env_regularity: forall Γ Σ ρ x U T,
-    (Γ, Σ) ⊨ ρ ->
+    Σ ⊨ ρ : Γ ->
     ((Γ, U) ⊢ (var x) : T) ->
     exists l, getVal ρ x = Some l /\ Σ ⊨ l : T.
 Proof.
@@ -590,18 +590,16 @@ Qed.
 (** Env typing lemmas *)
 
 Lemma env_typing_subs: forall Γ1 Γ2 Σ vl,
-    (Γ1, Σ) ⊨ vl ->
+    Σ ⊨ vl : Γ2 ->
     S_Typs Γ1 Γ2 ->
-    (Γ2, Σ) ⊨ vl.
+    Σ ⊨ vl : Γ2.
 Proof.
   induction Γ1; intros.
   - inverts H0; eauto with typ.
   - inverts H0; meta.
     inverts H; simpl in *.
-    eapply IHΓ1 in H4; eauto.
+    eapply IHΓ1 in H6; eauto.
     eapply et_cons; simpl in *; eauto with typ.
-    meta.
-    exists (C, μ1); eauto with typ.
 Qed.
 Global Hint Resolve env_typing_subs: typ.
 
