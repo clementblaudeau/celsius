@@ -619,23 +619,23 @@ Proof with (
     eapply soundness_init_cons...
 Qed.
 
-Corollary Soundness :
-  forall n e ρ σ ψ r Γ Σ U T,
-    ((Γ, U) ⊢ e : T) ->
-    Σ ⊨ ρ : Γ ->
-    Σ ⊨ σ ->
-    (Σ ⊨ ψ : U) ->
-    wf σ ->
-    (codom ρ ∪ {ψ} ⪽ σ) ->
+Theorem Soundness :
+  forall n e ρ σ ψ r Γ Σ Tthis T,
     ⟦e⟧(σ, ρ, ψ)(n) = r ->
     r <> Timeout ->
+    Σ ⊨ σ ->
+    (Σ ⊨ ρ : Γ) ->
+    (Σ ⊨ ψ : Tthis) ->
+    ((Γ, Tthis) ⊢ e : T) ->
+    wf σ ->
+    (codom ρ ∪ {ψ} ⪽ σ) ->
     exists Σ' v σ',
       r = Success v σ' /\
-        Σ ≼ Σ' /\
-        Σ ≪ Σ' /\
-        Σ ▷ Σ' /\
         (Σ' ⊨ σ') /\
-        Σ' ⊨ v : T.
+        (Σ' ⊨ v : T) /\
+        Σ ≼ Σ' /\
+        Σ ▷ Σ' /\
+        Σ ≪ Σ'.
 Proof with (eauto with typ).
   intros.
   lets [(Σ'& v& σ'& ?) _]: soundness n... steps.
