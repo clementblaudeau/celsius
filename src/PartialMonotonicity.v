@@ -79,16 +79,19 @@ Qed.
 Global Hint Resolve pM_assign: pM.
 
 Lemma pM_assign_new:
-  forall σ l C ω v,
-    getObj σ l = Some (C, ω) ->
-    σ ⪯ [l ↦ (C, ω++[v])]σ.
+  forall σ σ' l x v,
+    assign_new l x v σ = Some σ' ->
+    σ ⪯ σ'.
 Proof.
-  autounfold with pM notations.
+  autounfold with pM notations. unfold assign_new.
   intros.
-  lets: getObj_dom H.
-  destruct_eq (l = l0); subst;
+  lets: getObj_dom H0.
+  destruct (getObj σ l) as [[C' ω'] |] eqn:?.
+  + destruct (Nat.eqb x (dom ω')); inverts H;
+    destruct_eq (l = l0); subst;
     updates; cross_rewrites; auto;
-    eexists; split; eauto; updates; lia.
+      eexists; split; eauto; updates; try lia.
+  + inverts H.
 Qed.
 Global Hint Resolve pM_assign_new: pM.
 
@@ -108,11 +111,11 @@ Theorem pM_theorem:
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪯ σ') /\
     (forall el σ ρ ψ vl σ',
         ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ⪯ σ') /\
-    (forall C fls ψ ρ σ σ',
-        initP C fls ψ ρ σ σ' -> σ ⪯ σ').
+    (forall C ψ x ρ σ σ',
+        initP C ψ x ρ σ σ' -> σ ⪯ σ').
 Proof with (eauto with pM updates lia).
   apply evalP_multi_ind;
-    unfold assign, assign_new; intros;
+    unfold assign; intros;
     repeat destruct_match;
     flatten; pM_trans; try discriminate...
 Qed.
@@ -134,8 +137,8 @@ Qed.
 Global Hint Resolve pM_theorem_list: pM.
 
 Corollary pM_theorem_init:
-  forall C fls ψ ρ σ σ',
-      initP C fls ψ ρ σ σ' -> σ ⪯ σ'.
+  forall C ψ x ρ σ σ',
+      initP C ψ x ρ σ σ' -> σ ⪯ σ'.
 Proof.
   apply pM_theorem.
 Qed.

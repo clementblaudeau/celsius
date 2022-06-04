@@ -7,7 +7,6 @@ src/Notations.v
 src/Semantics.v
 src/Eval.v
 src/Reachability.v
-src/Authority.v
 src/PartialMonotonicity.v
 src/Stackability.v
 src/Wellformedness.v

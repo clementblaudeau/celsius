@@ -2,7 +2,7 @@
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
 (** This file defines the notion of wellformedness for scopes. The set of reachable locations must all be valid locations of the store - that is, locations that are inside of the store. The main result is to show that if we start from a wellformed store that contains the local environment ρ and the [this] pointer, then we end up with a wellformed store that contains the location of the result *)
 
-From Celsius Require Export Reachability Semantics Authority PartialMonotonicity.
+From Celsius Require Export Semantics PartialMonotonicity Reachability.
 Require Import ssreflect ssrbool Psatz List Sets.Ensembles Coq.Program.Tactics Coq.Sets.Finite_sets_facts.
 Import ListNotations.
 Open Scope nat_scope.
@@ -101,32 +101,24 @@ Qed.
 Global Hint Resolve wf_assign: wf.
 
 Lemma wf_assign_new:
-  forall σ C I v ω (flds: list Field) Args Flds Mtds,
+  forall C σ σ' I x v ω Args Flds Mtds,
     ct C = class Args Flds Mtds ->
-    dom ω + S (dom flds) = dom Flds ->
     wf σ ->
-    getObj σ I = Some (C, ω) ->
     v < dom σ ->
-    wf [I ↦ (C, ω ++ [v])] (σ).
+    x < length Flds ->
+    getObj σ I = Some (C, ω) ->
+    assign_new I x v σ = Some σ' ->
+    wf σ'.
 Proof with (updates; cross_rewrites; eauto with wf lia).
-  intros.
+  unfold assign_new; intros.
+  steps.
+  rewrite_anywhere PeanoNat.Nat.eqb_eq... steps.
   unfold wf; intros; updates.
   destruct_eq (I = l); subst; split; intros; cross_rewrites; updates...
-  eapply getVal_add in H5; steps...
-  eapply H1...
+  eapply getVal_add in H4; steps...
+  eapply H0...
 Qed.
 
-Ltac wf_assign_new :=
-  match goal with
-  | H: ct ?C = class ?Args ?Flds ?Mtds,
-      H1: dom ?ω' = dom ?ω |- wf [?I ↦ (?C, ?ω ++ [?v])] (?σ) =>
-      eapply wf_assign_new with (Args := Args) (Flds := Flds) (Mtds := Mtds);
-      try rewrite -H1;
-      eauto with wf
-  | H: ct ?C = class ?Args ?Flds ?Mtds |- wf [?I ↦ (?C, ?ω ++ [?v])] (?σ) =>
-      eapply wf_assign_new with (Args := Args) (Flds := Flds) (Mtds := Mtds); eauto with wf
-  end.
-Global Hint Extern 1 => wf_assign_new: wf.
 
 (** Then we have the main result *)
 Theorem wf_theorem :
@@ -140,19 +132,18 @@ Theorem wf_theorem :
         (codom ρ ∪ {ψ}) ⪽ σ ->
         wf σ ->
         wf σ' /\ (codom vl ⪽ σ')) /\
-    (forall C flds ψ ρ σ σ',
-        initP C flds ψ ρ σ σ' ->
-        forall Args Flds Mtds ω,
+    (forall C ψ x ρ σ σ',
+        initP C ψ x ρ σ σ' ->
+        forall ω,
+          getObj σ ψ = Some (C, ω) ->
+          let '(class _ Flds _ ) := ct C in
+          x <= length Flds ->
           codom ρ ∪ {ψ} ⪽ σ ->
-          wf σ ->
-          ct C = class Args Flds Mtds ->
-          getObj σ ψ = Some(C, ω) ->
-          dom ω + dom flds = dom Flds ->
-          (exists ω', getObj σ' ψ = Some (C, ω') /\ dom ω' = dom Flds) /\ wf σ').
+          wf σ -> wf σ').
 Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
 
   eapply evalP_multi_ind;
-    unfold assign, assign_new; simpl; intros;
+    unfold assign; simpl; intros;
     eval_dom; ss_trans...
 
   - (* e_var *)
@@ -167,9 +158,11 @@ Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
 
   - (* e_new *)
     destruct IH__args ...
-    lets ((ω' & ? & ?) & ?) : IH__init ([]: Env) H__ct...
-    ss...
-    eapply ss_trans with σ1...
+    split... rewrite H__ct in IH__init.
+    destruct Flds; [steps; inverts H__init|]...
+    + inverts H6.
+    + eapply IH__init; ss;
+      try eapply ss_trans with σ1; simpl...
 
   - (* e_assgn *)
     destruct IH__e1 ...
@@ -184,18 +177,24 @@ Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
     destruct IH__el ...
     split... rewrite codom_cons...
 
-  - (* init_cons *)
-    destruct IH__e ...
-    lets [?ω [ ] ]: aty_theorem_expr H__e H2.
-    lets: getObj_dom H8.
-    rewrite H8 in H__assign. inverts H__assign...
-    lets [?ω [ ] ]: aty_theorem_expr H__e H2...
-    rewrite getObj_update_same in IH__flds...
-    eapply IH__flds with (ω:= ω1 ++[v]);
-      ss; updates; eauto with lia.
-    + eapply ss_trans with σ...
-    + eapply wf_assign_new with (flds := flds); eauto...
+  - (* init_nil *)
+    steps.
 
+  - (* init_cons *)
+    rewrite H__ct.
+    intros.
+    destruct IH__e ...
+    lets: pM_theorem_expr H__e.
+    lets: pM_assign_new H__assign.
+    lets (?C & ?ω & ?): getObj_Some σ I...
+    lets (?ω & ? & ?): H7 I...
+    lets (?ω & ? & ?): H8 I...
+    lets: init_field H__init...
+    lets: wf_assign_new C0 H__assign...
+    rewrite H__ct in IH__init.
+    eapply IH__init; eauto;
+      try eapply ss_trans with σ...
+    eauto with pM lia.
 Qed.
 
 Corollary wf_theorem_expr :
@@ -219,17 +218,20 @@ Proof.
 Qed.
 
 Corollary wf_theorem_init :
-  forall C flds ψ ρ σ σ',
-    initP C flds ψ ρ σ σ' ->
-    forall Args Flds Mtds ω,
+  forall C ψ x ρ σ σ',
+    initP C ψ x ρ σ σ' ->
+    forall ω,
+      getObj σ ψ = Some (C, ω) ->
+      let '(class _ Flds _ ) := ct C in
+      x <= length Flds ->
       codom ρ ∪ {ψ} ⪽ σ ->
-      wf σ ->
-      ct C = class Args Flds Mtds ->
-      getObj σ ψ = Some(C, ω) ->
-      dom ω + dom flds = dom Flds ->
-      (exists ω', getObj σ' ψ = Some (C, ω') /\ dom ω' = dom Flds) /\ wf σ'.
+      wf σ -> wf σ'.
 Proof.
-  apply wf_theorem.
+  intros.
+  lets (_ & _ & ?): wf_theorem.
+  specialize (H1 C).
+  ct_lookup C.
+  eapply H1; eauto.
 Qed.
 
 (* A simple corollary on the conservation of wellformedness *)

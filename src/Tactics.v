@@ -314,3 +314,11 @@ Ltac cross_rewrites :=
          | H: ?A = ?B, H': ?A = ?C |- _ => rewrite H in H'; inverts H'
          end.
 Global Hint Extern 1 => cross_rewrites: core.
+
+Ltac destruct_if_eqb:=
+  match goal with
+  | H : context [if Nat.eqb ?a ?b then _ else _ ] |- _ =>
+      let Heq := fresh "Heq" in
+      destruct (Nat.eqb a b) eqn:Heq;
+      [apply PeanoNat.Nat.eqb_eq in Heq ; rewrites Heq in * ; clear Heq | apply PeanoNat.Nat.eqb_neq in Heq ]
+  end.

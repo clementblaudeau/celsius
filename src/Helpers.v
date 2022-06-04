@@ -1,5 +1,5 @@
 From Celsius Require Import Language Notations Tactics LibTactics.
-Import List ListNotations Psatz Ensembles.
+Import List ListNotations Psatz Ensembles Nat.
 Require Import ssreflect ssrbool Coq.Sets.Finite_sets_facts Coq.Program.Tactics.
 Open Scope list_scope.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
@@ -151,36 +151,49 @@ Qed.
 
 (** * Assignments *)
 
-(** Update store with new value in local env : adds a new field to an existing object *)
-Definition assign_new (obj: Value) (v: Value) σ : option Store :=
-  match (getObj σ obj) with
-  | Some (C, fields) => Some ([ obj ↦ (C, fields++[v])] σ)
-  | None => None (* ? *)
-  end.
+(** Update store with new value in local env : adds a (new) field of index x to an existing object *)
+Definition assign_new l x v σ : option Store :=
+  match (getObj σ l) with
+  | Some (C, ω) => if (x =? length ω) then
+                    Some [l ↦ (C, ω++[v])]σ
+                  else
+                    Some σ
+  | None => None (* Error : adding a field to non-existing object *)
+end.
+
+Lemma assign_new_dom:
+  forall σ l x v σ',
+    assign_new l x v σ = Some σ' ->
+    dom σ = dom σ'.
+Proof.
+  unfold assign_new; steps; try rewrite update_length; done.
+Qed.
 
 (** Update store with update in local env : update an already-existing field of an existing object*)
-Definition assign (obj: Value) (f: Var) (v: Value) σ : Store :=
-  match (getObj σ obj) with
-  | Some (C, fields) => ([ obj ↦ (C, [f ↦ v]fields)] σ)
+Definition assign l x v σ : Store :=
+  match (getObj σ l) with
+  | Some (C, ω) => [ l ↦ (C, [x ↦ v]ω)] σ
   | None => σ (* ? *)
   end.
+
+(** Class info *)
 
 Definition fieldType C f :=
   match ct C with
   | class _ flds _  =>
-    match nth_error flds f with
-    | Some (field (T, μ) _) => Some (T, μ)
-    | _ => None
-    end
+      match nth_error flds f with
+      | Some (field (T, μ) _) => Some (T, μ)
+      | _ => None
+      end
   end.
 
 Definition methodInfo C m :=
   match ct C with
   | class _ _ methods =>
-    match methods m with
-    | None => None
-    | Some (method μ Ts retT e) => Some (μ, Ts, retT, e)
-    end
+      match methods m with
+      | None => None
+      | Some (method μ Ts retT e) => Some (μ, Ts, retT, e)
+      end
   end.
 
 
@@ -237,7 +250,7 @@ Proof.
     eapply nth_error_Some.
     rewrite H; steps.
   }
-    rewrite app_length in H1 ;
+  rewrite app_length in H1 ;
     simpl in H1;
     fold (dom σ) in H1;
     rewrite_anywhere PeanoNat.Nat.add_1_r.
@@ -270,6 +283,9 @@ Qed.
 
 
 (** * Tactic *)
+Ltac ct_lookup C :=
+  destruct (ct C) as [?Args ?Flds ?Mtds] eqn:?H__ct.
+
 Ltac updates :=
   repeat
     match goal with
@@ -278,6 +294,11 @@ Ltac updates :=
     | H: context [ dom (_ ++ _) ] |- _ => rewrite app_length in H; simpl in H
     |  |- context [ dom ([_ ↦ _] _) ] => rewrite update_length
     | H: context [ dom ([_ ↦ _] _) ] |- _ => rewrite update_length in H
+
+    (* assign_new *)
+    | H: assign_new ?C ?v ?σ = Some ?σ' |- _ =>
+        let H1 := fresh "H__dom" in
+        add_hypothesis H1 (assign_new_dom σ C v σ' H)
 
     (* update_same *)
     | H: context [ getObj ([?l ↦ ?O]?σ) ?l = Some ?O'] |- _ =>
@@ -573,3 +594,18 @@ Proof.
   eapply nth_error_Some; eauto.
 Qed.
 Global Hint Resolve fieldType_some: typ.
+
+
+(** * List lemmas *)
+Lemma app_inv_tail_length:
+  forall (A: Type) (l l' l1 l2: list A),
+    l++l1 = l'++l2 ->
+    length l = length l' ->
+    l1 = l2.
+Proof.
+  induction l; steps.
+  - symmetry in H0.
+    apply length_zero_iff_nil in H0.
+    steps.
+  - destruct l'; steps; eauto.
+Qed.

@@ -197,13 +197,16 @@ Proof with (eauto with scp rch).
 Qed.
 
 Lemma scp_assign_new:
-  forall σ L C,
+  forall σ σ' x v L C,
     wf σ ->
-    (σ, L) ⋖ (σ ++ [(C, [])], L).
-Proof.
-  intros. intros ? ? l ? H__rch.
-  apply rch_add_empty_set in H__rch; steps.
-  lia.
+    assign_new C x v σ = Some σ' ->
+    (σ, L ∪ {v}) ⋖ (σ', L ∪ {v}).
+Proof with (eauto with scp rch).
+  unfold scoping, assign_new; intros. steps.
+  rewrite_anywhere PeanoNat.Nat.eqb_eq. subst.
+  destruct H4 as [l1 [H__l1 H__rch]].
+  lets [? | [H__rch1 H__rch2 ]]: rch_asgn_new H__rch; eauto;
+    eexists...
 Qed.
 Global Hint Resolve scp_assign_new: scp.
 (** ** Evaluation-maintained results *)
@@ -224,22 +227,17 @@ Theorem scp_theorem:
          wf σ ->
          (forall L, L ⪽ σ -> (codom ρ ∪ {ψ}) ⊆ L -> (σ, L) ⋖ (σ', L ∪ codom vl))) /\
 
-    (forall C flds ψ ρ σ σ',
-        initP C flds ψ ρ σ σ' ->
-        forall Args Flds Mtds ω,
-          (* Hypothesis *)
-          wf σ ->
-          (codom ρ ∪ {ψ}) ⪽ σ ->
-          ct C = class Args Flds Mtds ->
-          getObj σ ψ = Some (C, ω) ->
-          dom ω + dom flds = dom Flds ->
-          (* Conclusions *)
-          (forall L, L ⪽ σ -> (codom ρ ∪ {ψ}) ⊆ L -> (σ, L) ⋖ (σ', L))).
+    (forall C ψ x ρ σ σ',
+        initP C ψ x ρ σ σ' ->
+        wf σ ->
+        (codom ρ ∪ {ψ}) ⪽ σ ->
+        forall ω, getObj σ ψ = Some (C, ω) ->
+             (forall L, L ⪽ σ -> (codom ρ ∪ {ψ}) ⊆ L -> (σ, L) ⋖ (σ', L))).
 
 Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
 
   apply evalP_multi_ind;
-    unfold assign, assign_new in * ; intros; eval_dom; eval_wf.
+    unfold assign in * ; intros; eval_dom; eval_wf.
 
   - (* e = x *)
     apply scp_union...
@@ -270,7 +268,7 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     apply H11... intros ? [ ]...
     exists l0; split... inverts H__ln; eauto 6 using Union.
 
-   - (* e = new C(l0) *)
+  - (* e = new C(l0) *)
     assert ((L ∪ {dom σ1}) ⪽ σ1 ++ [(C, [])]). { ss... apply ss_trans with σ1... }
     eapply scp_trans with σ1 (L ∪ codom vl__args)...
     eapply scp_trans with (σ1++[(C,[])]) (L ∪ codom vl__args ∪ {dom σ1})...
@@ -281,7 +279,7 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
       inverts H__ln; rch_set... exists l0...
     + intros ? ? l ? ?.
       eapply IH__init...
-      * ss. apply ss_trans with σ1...
+      * ss... apply ss_trans with σ1...
       * intros ? [ ]...
       * ss. apply ss_trans with σ1...
       * exists l0; split... inverts H__ln...
@@ -322,16 +320,22 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     done...
 
   - (* init_cons *)
-    lets [?ω [ ]]: aty_theorem_expr H__e H2; cross_rewrites.
-    rewrite H8 in H__assign. inverts H__assign.
+    lets: scp_assign_new L H__assign ...
+    lets: assign_new_dom H__assign.
     apply scp_trans with σ1 (L ∪ {v})...
     apply scp_trans with σ3 (L ∪ {v})... {
       ss... apply ss_trans with σ1...
     }
-    apply scp_trans with ([I ↦ (C, ω0 ++ [v])] σ1) (L ∪ {v})...
-    + eapply scp_add_env...
-    + eapply IH__flds... simpl in *; updates...
-      intros ? ...
+    apply scp_trans with σ2 (L ∪ {v})...
+    + eapply ss_trans with σ1 ...
+    + lets: init_field H__init...
+      lets H__pM: pM_theorem_expr H__e.
+      lets H__pM1: pM_assign_new H__assign.
+      lets (?ω & H__obj1 & ?): H__pM I H1.
+      lets (?ω & H__obj2 & ?): H__pM1 I H__obj1.
+      eapply IH__init; try eapply ss_trans with σ1 ...
+      * eapply wf_assign_new...
+      * intros ? ...
 Qed.
 
 Corollary scp_theorem_expr:
@@ -350,20 +354,15 @@ Proof.
 Qed.
 
 Corollary scp_theorem_init:
-  forall C flds I ρ σ σ',
-        initP C flds I ρ σ σ' ->
-        forall Args Flds Mtds ω,
-          (* Hypothesis *)
-          wf σ ->
-          (codom ρ ∪ {I}) ⪽ σ ->
-          ct C = class Args Flds Mtds ->
-          getObj σ I = Some (C, ω) ->
-          dom ω + dom flds = dom Flds ->
-          (* Conclusions *)
-          (σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}).
+  forall C I x ρ σ σ',
+    initP C I x ρ σ σ' ->
+    wf σ ->
+    (codom ρ ∪ {I}) ⪽ σ ->
+    forall ω, getObj σ I = Some (C, ω) ->
+         (σ, codom ρ ∪ {I}) ⋖ (σ', codom ρ ∪ {I}).
 Proof.
   intros.
   lets (_ & _ & ?): scp_theorem.
-  lets: H5 H (codom ρ ∪ {I}) H1; eauto 3.
-  apply H6. intros ? => //.
+  eapply H3; eauto.
+  intros ? => //.
 Qed.

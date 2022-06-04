@@ -44,7 +44,7 @@ Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
     ⟦_ args _⟧p (σ, ρ, ψ) --> (vl__args, σ1) ->
     ct C = class Args Flds Mtds ->
     let I := (length σ1) in
-    initP C Flds I vl__args (σ1 ++ [(C, [])]) σ3 ->
+    initP C I 0 vl__args (σ1 ++ [(C, [])]) σ3 ->
     ⟦ new C args ⟧p (σ, ρ, ψ) --> (I, σ3)
 
 (** assignment *)
@@ -65,14 +65,20 @@ with evalListP : list Expr -> Store -> Env -> Value -> list Value -> Store -> Pr
     ⟦_ (e::el) _⟧p (σ, ρ, ψ) --> (l1::vl, σ2)
 where "'⟦_' el '_⟧p' '(' σ ',' ρ ',' v ')' '-->' '(' vl ',' σ0 ')' "  := (evalListP el σ ρ v vl σ0)
 
-with initP : ClN -> list Field -> Var -> Env -> Store -> Store -> Prop :=
-| init_nil : forall C I ρ σ,
-    initP C [] I ρ σ σ
-| init_cons : forall C I ρ σ v T e flds σ1 σ2 σ3,
+(* initialize between x and (length Flds)*)
+with initP : ClN -> Var -> nat -> Env -> Store -> Store -> Prop :=
+| init_nil : forall C I ρ σ Args Flds Mtds,
+    ct C = class Args Flds Mtds ->
+    initP C I (dom Flds) ρ σ σ
+| init_cons : forall C I x ρ σ v T e Args Flds Mtds σ1 σ2 σ3,
+    ct C = class Args Flds Mtds ->
+    nth_error Flds x = Some (field T e) ->
+
     ⟦ e ⟧p (σ, ρ, I) --> (v, σ1) ->
-    assign_new I v σ1 = Some σ2 ->
-    initP C flds I ρ σ2 σ3 ->
-    initP C (field T e :: flds) I ρ σ σ3.
+    assign_new I x v σ1 = Some σ2 ->
+    initP C I (S x) ρ σ2 σ3 ->
+
+    initP C I x ρ σ σ3.
 
 
 Global Instance notation_big_step_list_expr : notation_big_step (list Expr) (list Value) :=
@@ -84,7 +90,7 @@ Global Instance notation_big_step_expr : notation_big_step Expr Value :=
 Section evalP_ind.
   Variable P : forall e σ ρ ψ v σ', (evalP e σ ρ ψ v σ') -> Prop.
   Variable Pl : forall el σ ρ ψ vl σ', (evalListP el σ ρ ψ vl σ') -> Prop.
-  Variable Pin : forall C flds ψ ρ σ σ', (initP C flds ψ ρ σ σ') -> Prop.
+  Variable Pin : forall C ψ x ρ σ σ', (initP C ψ x ρ σ σ') -> Prop.
 
   Variable P_var : forall σ x ρ ψ l Hget,
       P (var x) σ ρ ψ l σ (e_var σ x ρ ψ l Hget).
@@ -104,7 +110,7 @@ Section evalP_ind.
 
   Variable P_new : forall σ ρ ψ C args vl__args σ1 σ3 Args Flds Mtds H__args H__ct H__init
     (IH__args: Pl args σ ρ ψ vl__args σ1 H__args)
-    (IH__init: Pin C Flds (length σ1) vl__args (σ1 ++ [(C, [])]) σ3 H__init),
+    (IH__init: Pin C (length σ1) 0 vl__args (σ1 ++ [(C, [])]) σ3 H__init),
     P (new C args) σ ρ ψ (length σ1) σ3 (e_new σ ρ ψ C Args Flds Mtds args vl__args σ1 σ3 H__args H__ct H__init).
 
   Variable P_asgn :  forall σ ρ ψ e1 x e2 e' σ1 v1 σ2 v2 σ3 v3 H__e1 H__e2 H__e'
@@ -120,12 +126,13 @@ Section evalP_ind.
       (IH__el: Pl el σ1 ρ ψ vl σ2 H__el),
       Pl (e::el) σ ρ ψ (v1::vl) σ2 (el_cons σ ρ ψ e el v1 σ1 vl σ2 H__e H__el).
 
-  Variable Pin_nil: forall C I ρ σ, Pin C [] I ρ σ σ (init_nil C I ρ σ).
+  Variable Pin_nil: forall C I ρ σ Args Flds Mtds H__ct,
+      Pin C I (length Flds) ρ σ σ (init_nil C I ρ σ Args Flds Mtds H__ct).
 
-  Variable Pin_cons : forall C I ρ σ v T e flds σ1 σ2 σ3 H__e H__assign H__flds
+  Variable Pin_cons : forall C I x ρ σ v T e Args Flds Mtds σ1 σ2 σ3 H__ct H__fld H__e H__assign H__init
       (IH__e: P e σ ρ I v σ1 H__e)
-      (IH__flds: Pin C flds I ρ σ2 σ3 H__flds),
-      Pin C (field T e :: flds) I ρ σ σ3 (init_cons C I ρ σ v T e flds σ1 σ2 σ3 H__e H__assign H__flds).
+      (IH__init: Pin C I (S x) ρ σ2 σ3 H__init),
+      Pin C I x ρ σ σ3 (init_cons C I x ρ σ v T e Args Flds Mtds σ1 σ2 σ3 H__ct H__fld H__e H__assign H__init).
 
   Fixpoint evalP_ind2 e σ ρ ψ v σ' (eval : evalP e σ ρ ψ v σ') : P e σ ρ ψ v σ' eval :=
     match eval with
@@ -141,7 +148,7 @@ Section evalP_ind.
     | e_new σ ρ ψ C Args Flds Mtds args vl__args σ1 σ3 H__args H__ct H__init =>
         P_new σ ρ ψ C args vl__args σ1 σ3 Args Flds Mtds H__args H__ct H__init
               (evalListP_ind2 args σ ρ ψ vl__args σ1 H__args)
-              (initP_ind2 C Flds (length σ1) vl__args (σ1 ++ [(C, [])]) σ3 H__init)
+              (initP_ind2 C (length σ1) 0 vl__args (σ1 ++ [(C, [])]) σ3 H__init)
     | e_asgn σ ρ ψ e1 x e2 e' σ1 v1 σ2 v2 σ3 v3 H__e1 H__e2 H__e' =>
         P_asgn σ ρ ψ e1 x e2 e' σ1 v1 σ2 v2 σ3 v3 H__e1 H__e2 H__e'
                (evalP_ind2 e1 σ ρ ψ v1 σ1 H__e1)
@@ -158,19 +165,19 @@ Section evalP_ind.
                      (evalListP_ind2 el σ1 ρ ψ vl σ2 H__el)
          end
 
-  with initP_ind2 C flds ψ (ρ:Env) (σ σ':Store) H__init: Pin C flds ψ ρ σ σ' H__init :=
+  with initP_ind2 C ψ x (ρ:Env) (σ σ':Store) H__init: Pin C ψ x ρ σ σ' H__init :=
          match H__init with
-         | init_nil C ψ ρ σ => Pin_nil C ψ ρ σ
-         | init_cons C ψ ρ σ v T e flds σ1 σ2 σ3 H__e H__assign H__flds =>
-             Pin_cons C ψ ρ σ v T e flds σ1 σ2 σ3 H__e H__assign H__flds
+         | init_nil C ψ ρ σ Args Flds Mtds H__ct => Pin_nil C ψ ρ σ Args Flds Mtds H__ct
+         | init_cons C ψ x ρ σ v T e Args Flds Mtds σ1 σ2 σ3 H__ct H__fld H__e H__assign H__init  =>
+             Pin_cons C ψ x ρ σ v T e Args Flds Mtds σ1 σ2 σ3 H__ct H__fld H__e H__assign H__init
                       (evalP_ind2 e σ ρ ψ v σ1 H__e)
-                      (initP_ind2 C flds ψ ρ σ2 σ3 H__flds)
+                      (initP_ind2 C ψ (S x) ρ σ2 σ3 H__init)
          end.
 
   Lemma evalP_multi_ind:
     (forall e σ ρ ψ v σ' H__eval, P e σ ρ ψ v σ' H__eval) /\
       (forall el σ ρ ψ vl σ' H__evalList, Pl el σ ρ ψ vl σ' H__evalList) /\
-      (forall C flds ψ ρ σ σ' H__init, Pin C flds ψ ρ σ σ' H__init).
+      (forall C ψ x ρ σ σ' H__init, Pin C ψ x ρ σ σ' H__init).
   Proof.
     splits; intros.
     + apply evalP_ind2.
@@ -188,8 +195,8 @@ Theorem dom_theorem:
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> dom σ <= dom σ') /\
     ( forall el σ ρ ψ vl σ',
         ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> dom σ <= dom σ') /\
-    ( forall C fls ψ ρ σ σ',
-        initP C fls ψ ρ σ σ' -> dom σ <= dom σ').
+    ( forall C ψ x ρ σ σ',
+        initP C ψ x ρ σ σ' -> dom σ <= dom σ').
 Proof.
   eapply evalP_multi_ind;
     unfold assign, assign_new;
@@ -211,11 +218,23 @@ Proof.
 Qed.
 
 Corollary initP_dom:
-  forall C fls ψ ρ σ σ',
-      initP C fls ψ ρ σ σ' -> dom σ <= dom σ'.
+  forall C ψ x ρ σ σ',
+      initP C ψ x ρ σ σ' -> dom σ <= dom σ'.
 Proof.
   apply dom_theorem.
 Qed.
+
+Lemma init_field:
+  forall C ψ x ρ σ σ' Args Flds Mtds,
+    ct C = class Args Flds Mtds ->
+    initP C ψ x ρ σ σ' ->
+    x <= length Flds.
+Proof.
+  intros. move: Args Flds Mtds H.
+  induction H0; intros; cross_rewrites => //.
+  apply IHinitP in H. lia.
+Qed.
+
 
 Ltac eval_dom :=
   repeat match goal with
@@ -225,7 +244,7 @@ Ltac eval_dom :=
          | H: ⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ') |- _ =>
              let fresh := fresh "H_dom" in
              add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
-         | H: initP ?C ?fls ?ψ ?ρ ?σ ?σ' |- _ =>
+         | H: initP ?C ?ψ ?x ?ρ ?σ ?σ' |- _ =>
              let fresh := fresh "H_dom" in
-             add_hypothesis fresh (initP_dom C fls ψ ρ σ σ' H)
+             add_hypothesis fresh (initP_dom C ψ x ρ σ σ' H)
          end.

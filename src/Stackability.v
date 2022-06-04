@@ -13,7 +13,6 @@ Require Import ssreflect ssrbool Psatz List.
 Import ListNotations.
 Open Scope nat_scope.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
-Global Hint Resolve aty_warm_monotone: stk.
 
 
 (** ** Definitions and notations *)
@@ -61,15 +60,16 @@ Proof.
 Qed.
 Local Hint Resolve stk_assign: stk.
 
-Lemma stk_assign_new : forall σ l C ω v,
-    getObj σ l = Some (C, ω) ->
-    σ ≪ [l ↦ (C, ω++[v])]σ.
+Lemma stk_assign_new:
+  forall σ σ' l x v,
+    assign_new l x v σ = Some σ' ->
+    σ ≪ σ'.
 Proof.
+  unfold assign_new.
   autounfold with stk notations; steps.
   updates; eauto.
 Qed.
 Local Hint Resolve stk_assign_new: stk.
-
 
 
 (** ** Main stackability theorem *)
@@ -84,44 +84,58 @@ Theorem stk_theorem :
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ≪ σ') /\
     (forall el σ ρ ψ vl σ',
         ⟦el⟧ (σ, ρ, ψ) --> (vl, σ') -> σ ≪ σ') /\
-    (forall C flds I ρ σ σ',
-        initP C flds I ρ σ σ' ->
-        (forall ω, getObj σ I = Some (C, ω) ->
-             σ ≪ σ' /\ (exists ω', getObj σ' I = Some (C, ω') /\ (length flds + length ω = length ω')))).
+    (forall C I x ρ σ σ',
+        initP C I x ρ σ σ' ->
+          forall ω Args Flds Mtds,
+            getObj σ I = Some (C, ω) ->
+            dom ω >= x ->
+            ct C = class Args Flds Mtds ->
+            σ ≪ σ' /\
+            exists ω', getObj σ' I = Some (C, ω') /\
+                    dom ω' >= dom Flds).
 
-Proof with (updates; eauto 4 with stk pM lia ).
+Proof with (updates; cross_rewrites; eauto 4 with stk pM lia ).
 
   apply evalP_multi_ind;
-    unfold assign, assign_new; simpl; intros;
+    unfold assign; simpl; intros;
     eval_dom; ss_trans...
 
   - (* e = m.(el) *)
     eapply stk_trans...
 
   - (* e = new C(args) *)
-    rewrite getObj_last in IH__init.
-    specialize (IH__init _ eq_refl); steps.
     lets: pM_theorem_list H__args.
     lets: pM_theorem_init H__init.
     eapply stk_trans with σ1...
+    rewrite getObj_last in IH__init; edestruct IH__init as [H3 [ω' [ ]]]...
     move => l Hl.
-    move /(_ l Hl): H1 => [?|H1]...
+    specialize (H3 l Hl)...
     destruct_eq (l = dom σ1); steps; [left |] ...
     repeat eexists ...
 
-  - (* flds = nil *)
-    steps ; pM_trans ...
-    + eapply stk_trans with ([v1 ↦ (c, [x ↦ v2] (e))] (σ2)) ...
-      eapply stk_trans with σ2 ...
-    + eapply stk_trans with σ2 ...
+  - (* e = e1.x <- e2; e' *)
+    lets: pM_theorem_expr H__e1.
+    lets: pM_theorem_expr H__e2.
+    lets: pM_theorem_expr H__e'.
+    destruct (getObj σ2 v1) as [[?C ω]|] eqn:?; updates;
+      eapply stk_trans...
+    eapply stk_trans with ([v1 ↦ (C, [x ↦ v2] (ω))] (σ2)) ...
 
   - (* fld = e::flds *)
-    lets [?ω [ ]]: aty_theorem_expr H__e H.
-    rewrite H2 in H__assign; inverts H__assign.
-    rewrite getObj_update_same in IH__flds; eauto with updates ...
-    move /(_ _ eq_refl): IH__flds; intros; flatten; updates.
-    split...
-    eapply stk_trans with ([I ↦ (C, ω0 ++ [v])] (σ1)) ...
+    lets H__pM: pM_theorem_expr H__e.
+    lets H__pM2: pM_theorem_init H__init.
+    lets [?ω [ ]]: H__pM H...
+    lets: stk_assign_new H__assign.
+    lets: pM_assign_new H__assign.
+    unfold assign_new in H__assign. rewrite H1 in H__assign.
+    destruct (Nat.eqb x (dom ω0)) eqn:Heq; inverts H__assign.
+    + rewrite getObj_update_same in IH__init; eauto with updates ...
+      apply PeanoNat.Nat.eqb_eq in Heq; subst.
+      specialize (IH__init (ω0++[v]) Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]...
+      split; [| exists ω1; split]...
+    + apply PeanoNat.Nat.eqb_neq in Heq; subst.
+      specialize (IH__init ω0 Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]...
+      split...
 Qed.
 
 Corollary stk_theorem_expr :
