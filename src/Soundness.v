@@ -628,3 +628,25 @@ Proof with (eauto with typ).
   lets [(Σ'& v& σ'& ?) _]: soundness n... steps.
   exists Σ', v, σ'; splits...
 Qed.
+
+Corollary Program_soundness :
+  T_Prog ->
+  forall n, eval_prog n <> Error.
+Proof with (meta; eauto 2 with typ).
+  unfold eval_prog, T_Prog.
+  lets H__ct: EntryClass_ct. rewrite H__ct.
+  destruct EntryClass.
+  steps...
+  lets: Soundness [(Entry, hot)] H0 H; eauto with typ; steps.
+  + split; steps.
+    assert (l = 0) by lia; steps.
+    exists Entry, ([]: Env), hot; steps.
+    eapply ot_hot...
+    simpl; intros; lia.
+  + eapply vt_sub; steps.
+  + lets (? & ? & ?): H1; steps...
+    intros l C ω ?H.
+    lets: getObj_dom H2; simpl in *.
+    assert (l=0) by lia; steps.
+    lets: getVal_dom H6; simpl in *; try lia...
+Qed.

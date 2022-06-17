@@ -148,6 +148,18 @@ with init (C: ClN) (flds: list Field) (I : Loc) x ρ σ n : result_i :=
                end
        end.
 
+
+Definition eval_prog n :=
+  match ct Entry with
+  | class nil nil Mtds =>
+      match Mtds main  with
+      | Some (method hot nil T e) => ⟦e⟧([(Entry, [])], [], 0)(n)
+      | _ => Error
+      end
+  | _ => Error
+  end.
+
+
 (** Associated ltac tactics : *)
 Ltac destruct_eval He v σ' :=
   match goal with
