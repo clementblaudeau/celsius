@@ -44,9 +44,9 @@ Proof.
     specialize (H0 l);
     specialize (H1 l).
   intuition auto.
-  destruct H as (C & ω & Args & Flds & Mtds & ? & ? & ?).
-  lets [ω' [ ]]: H1 H.
-  left; repeat eexists; eauto with lia.
+  inverts H.
+  lets [ω' [ ]]: H1 H2.
+  left; repeat eexists; eauto with rch lia.
 Qed.
 Global Hint Resolve stk_trans: stk.
 
@@ -94,7 +94,7 @@ Theorem stk_theorem :
             exists ω', getObj σ' I = Some (C, ω') /\
                     dom ω' >= dom Flds).
 
-Proof with (updates; cross_rewrites; eauto 4 with stk pM lia ).
+Proof with (updates; cross_rewrites; eauto 4 with rch stk pM lia ).
 
   apply evalP_multi_ind;
     unfold assign; simpl; intros;
@@ -111,7 +111,6 @@ Proof with (updates; cross_rewrites; eauto 4 with stk pM lia ).
     move => l Hl.
     specialize (H3 l Hl)...
     destruct_eq (l = dom σ1); steps; [left |] ...
-    repeat eexists ...
 
   - (* e = e1.x <- e2; e' *)
     lets: pM_theorem_expr H__e1.

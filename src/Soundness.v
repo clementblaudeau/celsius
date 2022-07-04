@@ -9,7 +9,8 @@ Open Scope nat_scope.
 Implicit Type (ρ: Env).
 
 Local Hint Constructors evalP: typ.
-Local Hint Constructors T_Expr: typ.
+Local Hint Constructors expr_typing: typ.
+Local Hint Constructors expr_list_typing: typ.
 
 Parameter typable_classes: T_Classes.
 
@@ -30,7 +31,7 @@ Theorem weakening: forall Γ Γ' U e T,
     (forall x T__x, typeLookup Γ x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x) ->
     ((Γ, U) ⊢ e : T) ->
     ((Γ', U) ⊢ e : T).
-Proof with (meta; eauto using T_Exprs with typ lia).
+Proof with (meta; eauto using expr_typing with typ lia).
   intros. gen Γ'.
   induction H0 using typing_ind with
     (Pl := fun Γ0 T0 el Ul _ =>
@@ -65,7 +66,7 @@ Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
     (Σ ⊨ ψ : U) ->
     wf σ ->
     (codom ρ ∪ {ψ} ⪽ σ) ->
-    ⟦e⟧(σ, ρ, ψ)(n) = r ->
+    ⟦e⟧(σ, ρ, ψ, n) = r ->
     r <> Timeout ->
     exists Σ' v σ',
       r = Success v σ' /\
@@ -81,7 +82,7 @@ Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
     (Σ ⊨ ψ : U) ->
     wf σ ->
     (codom ρ ∪ {ψ} ⪽ σ) ->
-    ⟦_ el _⟧(σ, ρ, ψ)(n) = r ->
+    ⟦_ el _⟧(σ, ρ, ψ, n) = r ->
     r <> Timeout_l ->
     exists Σ' vl σ',
       r = Success_l vl σ' /\
@@ -118,7 +119,7 @@ Lemma soundness_fld:
     (forall C flds I x ρ σ Γ Σ r,
         init_soundness n C flds I x ρ σ Γ Σ r) ->
     (forall e f ρ σ ψ r Γ Σ U T,
-        expr_soundness (S n) (fld e f) ρ σ ψ r Γ Σ U T).
+        expr_soundness (S n) (e_fld e f) ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
@@ -174,7 +175,7 @@ Lemma soundness_mtd:
       (forall C flds I x ρ σ Γ Σ r,
           init_soundness n C flds I x ρ σ Γ Σ r) ->
     (forall e m args ρ σ ψ r Γ Σ U T,
-        expr_soundness (S n) (mtd e m args) ρ σ ψ r Γ Σ U T).
+        expr_soundness (S n) (e_mtd e m args) ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto 4 with typ]
@@ -222,7 +223,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   lets (?T & ?T & ? & ? & ?): H__mn1 v0...
   assert (HT__em': (Args, (C, μ__m)) ⊢ e__m : (C0, μ__r)) by (eapply weakening with (Γ := Flds); eauto with typ).
   assert (codom args_val ∪ {v0} ⪽ σ1). { ss... eapply wf_theorem_list... }
-  destruct (⟦ e__m ⟧ (σ1, args_val, v0 )( n)) as [ | | σ' v' ] eqn:H__eval2; try congruence;
+  destruct (⟦ e__m ⟧ (σ1, args_val, v0 ,  n)) as [ | | σ' v' ] eqn:H__eval2; try congruence;
     lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
     IH__expr HT__em' H__v1 H__st1 H__wf1 H__eval2; try inverts H__r; try congruence ...
   eapply eval_implies_evalp in H__eval2. subst.
@@ -254,7 +255,7 @@ Lemma soundness_new:
       (forall C flds I x ρ σ Γ Σ r,
           init_soundness n C flds I x ρ σ Γ Σ r) ->
     (forall C args ρ σ ψ r Γ Σ U T,
-        expr_soundness (S n) (new C args) ρ σ ψ r Γ Σ U T).
+        expr_soundness (S n) (e_new C args) ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
@@ -368,7 +369,7 @@ Lemma soundness_asgn:
       (forall C flds I x ρ σ Γ Σ r,
           init_soundness n C flds I x ρ σ Γ Σ r) ->
     (forall e1 f e2 e' ρ σ ψ r Γ Σ U T,
-        expr_soundness (S n) (asgn e1 f e2 e') ρ σ ψ r Γ Σ U T).
+        expr_soundness (S n) (e_asgn e1 f e2 e') ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
@@ -422,7 +423,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     }
     assert (H__wf2': wf σ2') by (subst; eapply wf_assign; eauto).
     assert (H__codom' : (codom ρ ∪ {ψ}) ⪽ σ2'). by (subst; ss).
-    destruct (⟦ e' ⟧ (σ2', ρ, ψ )( n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
+    destruct (⟦ e' ⟧ (σ2', ρ, ψ ,  n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
       lets (Σ3 & v3 & σ3 & H__r & H__mn3 & H__stk3 & H__aty3 & H__st3 & H__wf3 & H__v3) :
       IH__expr HT__e3 H__st2' H__eval3; try inverts H__r; try congruence ...
     (* eapply eval_implies_evalp in H__eval3. eval_dom; eval_wf.*)
@@ -431,7 +432,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     all: eauto with typ.
 
   + (* Useless assignment *)
-    destruct (⟦ e' ⟧ (σ2, ρ, ψ )( n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
+    destruct (⟦ e' ⟧ (σ2, ρ, ψ ,  n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
       lets (Σ3 & v3 & σ3 & H__r & H__mn3 & H__stk3 & H__aty3 & H__st3 & H__wf3 & H__v3) :
       IH__expr HT__e3 H__st2 H__wf2 H__eval3; try inverts H__r; try congruence ...
     eapply eval_implies_evalp in H__eval3. eval_dom; eval_wf.
@@ -586,7 +587,7 @@ Proof with (
     (* Destruct evaluation of tail *)
     lets (?T & ?T & ? & ? & ?): H__mn0 ψ...
     lets H__env0: env_typing_monotonicity H__mn0 H0.
-    destruct (⟦_ el _⟧ (σ0, ρ, ψ )( n)) as [ | | σ' vl' ] eqn:H__eval1; try congruence;
+    destruct (⟦_ el _⟧ (σ0, ρ, ψ, n)) as [ | | σ' vl' ] eqn:H__eval1; try congruence;
     lets (Σ1 & vl & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1):
       IH__list H12 H__env0 H__st0 H__wf0 H__eval1; try inverts H__r; try congruence ...
 
@@ -608,7 +609,7 @@ Qed.
 
 Theorem Soundness :
   forall n e ρ σ ψ r Γ Σ Tthis T,
-    ⟦e⟧(σ, ρ, ψ)(n) = r ->
+    ⟦e⟧(σ, ρ, ψ, n) = r ->
     r <> Timeout ->
     Σ ⊨ σ ->
     (Σ ⊨ ρ : Γ) ->

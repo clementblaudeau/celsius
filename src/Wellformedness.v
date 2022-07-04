@@ -297,11 +297,9 @@ Lemma pM_wf_warm_monotone:
     σ  ⊨ l : warm ->
     σ' ⊨ l : warm.
 Proof.
-  intros. cbn in *.
-  unfold reachable_warm in *.
-  steps.
-  lets [?ω' [ ] ] : H H2.
-  lets [ ? _ ]: H0 H3.
-  lets : H6 H1.
-  repeat eexists; eauto with lia.
+  intros.
+  inverts H1.
+  lets (?ω & ? & ?): H l H2.
+  lets [? _]: H0 l H1.
+  eapply sm_warm; eauto with rch lia.
 Qed.

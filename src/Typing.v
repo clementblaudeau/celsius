@@ -96,7 +96,7 @@ Qed.
 
 
 (** e can have the type U with env Γ and `this` of type T *)
-Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
+Inductive expr_typing : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
 | t_sub:
     forall Γ T e U U',
       (Γ, T) ⊢ e : U' ->
@@ -106,30 +106,30 @@ Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
 | t_var:
     forall Γ T x U,
       typeLookup Γ x = Some U ->
-      (Γ, T) ⊢ (var x) : U
+      (Γ, T) ⊢ (e_var x) : U
 
 | t_this:
     forall Γ T,
-      (Γ, T) ⊢ this : T
+      (Γ, T) ⊢ e_this : T
 
 | t_selhot:
     forall Γ T e f C D μ,
       (Γ, T) ⊢ e : (D, hot) ->
       (fieldType D f = Some (C, μ)) ->
-      (Γ, T) ⊢ (fld e f) : (C, hot)
+      (Γ, T) ⊢ (e_fld e f) : (C, hot)
 
 | t_selcool:
     forall Γ T e f U D Ω,
       (Γ, T) ⊢ e : (D, cool Ω) ->
       f < Ω ->
       (fieldType D f = Some U) ->
-      (Γ, T) ⊢ (fld e f) : U
+      (Γ, T) ⊢ (e_fld e f) : U
 
 | t_new:
     forall Γ T C args Args Flds Mtds,
       ct C = class Args Flds Mtds ->
       (Γ, T) ⊩ args : Args ->
-      (Γ, T) ⊢ (new C args) : (C, warm)
+      (Γ, T) ⊢ (e_new C args) : (C, warm)
 
 | t_new_hot:
     forall Γ T C args argsTs Args Flds Mtds,
@@ -137,14 +137,14 @@ Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
       (Γ, T) ⊩ args : argsTs ->
       P_hots argsTs ->
       S_Typs argsTs Args ->
-      (Γ, T) ⊢ (new C args) : (C, hot)
+      (Γ, T) ⊢ (e_new C args) : (C, hot)
 
 | t_block:
     forall Γ T U e1 f e2 e3 C μ,
-      (Γ, T) ⊢ (fld e1 f) : (C, μ) ->
+      (Γ, T) ⊢ (e_fld e1 f) : (C, μ) ->
       (Γ, T) ⊢ e2 : (C, hot) ->
       (Γ, T) ⊢ e3 : U ->
-      (Γ, T) ⊢ (asgn e1 f e2 e3) : U
+      (Γ, T) ⊢ (e_asgn e1 f e2 e3) : U
 
 | t_call:
     forall Γ T e m args argsT U e__m μ0 μ__m C,
@@ -152,7 +152,7 @@ Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
       μ0 ⊑ μ__m ->
       methodInfo C m = Some (μ__m, argsT, U, e__m) ->
       (Γ, T) ⊩ args : argsT ->
-      (Γ, T) ⊢ (mtd e m args) : U
+      (Γ, T) ⊢ (e_mtd e m args) : U
 
 | t_call_hot:
     forall Γ T e m args argTs paramTs D body μ0 μ_r C,
@@ -161,24 +161,24 @@ Inductive T_Expr : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
       (Γ, T) ⊩ args : argTs ->
       P_hots argTs ->
       S_Typs argTs paramTs ->
-      (Γ, T) ⊢ (mtd e m args) : (D, hot)
-where  "( Γ , T )  ⊢ e : U" := (T_Expr Γ T e U)
+      (Γ, T) ⊢ (e_mtd e m args) : (D, hot)
+where  "( Γ , T )  ⊢ e : U" := (expr_typing Γ T e U)
 
-with T_Exprs: EnvTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
-| t_exprs_nil: forall Γ T, T_Exprs Γ T [] []
+with expr_list_typing: EnvTyping -> Tpe -> (list Expr) -> (list Tpe) -> Prop :=
+| t_exprs_nil: forall Γ T, expr_list_typing Γ T [] []
 | t_exprs_cons: forall Γ T Ts es Th eh,
     (Γ, T) ⊩ es : Ts ->
     (Γ, T) ⊢ eh : Th ->
     (Γ, T) ⊩ (eh::es) : (Th::Ts)
-where  "( Γ , T )  ⊩ es : Us" := (T_Exprs Γ T es Us).
+where  "( Γ , T )  ⊩ es : Us" := (expr_list_typing Γ T es Us).
 
-Global Hint Constructors T_Expr: typ.
+Global Hint Constructors expr_typing: typ.
 
 Lemma t_selwarm:
     forall Γ T e f U D,
       (Γ, T) ⊢ e : (D, warm) ->
       (fieldType D f = Some U) ->
-      (Γ, T) ⊢ (fld e f) : U.
+      (Γ, T) ⊢ (e_fld e f) : U.
 Proof.
   eauto with typ.
 Qed.
@@ -231,22 +231,22 @@ Definition T_Prog :=
 
 Lemma t_this_inv:
   forall Γ U T,
-    (Γ, U) ⊢ this : T -> U <: T.
+    (Γ, U) ⊢ e_this : T -> U <: T.
 Proof.
-  intros. remember this as e.
+  intros. remember e_this as e.
   induction H; steps; eauto with typ.
 Qed.
 
 Lemma t_fld_inv:
   forall Γ T__this e f C μ,
-    ((Γ, T__this) ⊢ (fld e f) : (C, μ)) ->
+    ((Γ, T__this) ⊢ (e_fld e f) : (C, μ)) ->
     exists D μ__e μ__f,
       ((Γ, T__this) ⊢ e : (D, μ__e)) /\
         fieldType D f = Some (C, μ__f) /\
         ((μ__e = hot) \/ (exists Ω, μ__e = cool Ω /\ f < Ω /\ μ__f ⊑ μ)).
 Proof with (eauto with typ lia).
   introv H.
-  remember (fld e f) as E.
+  remember (e_fld e f) as E.
   remember (C,μ) as T.
   gen C μ e f.
   induction H; steps...
@@ -258,7 +258,7 @@ Proof with (eauto with typ lia).
 Qed.
 
 Lemma t_mtd_inv: forall Γ T__this e m args T,
-    ((Γ, T__this) ⊢ (mtd e m args) : T) ->
+    ((Γ, T__this) ⊢ (e_mtd e m args) : T) ->
     exists C D e__m argTs paramTs μ__m μ0 μ__r,
       ((Γ, T__this) ⊢ e : (C, μ0)) /\
         methodInfo C m = Some (μ__m, paramTs, (D, μ__r),  e__m) /\
@@ -269,14 +269,14 @@ Lemma t_mtd_inv: forall Γ T__this e m args T,
         ((D, μ__r) <: T \/ P_hots argTs /\ μ0 = hot).
 Proof with (eauto with typ lia).
   introv H.
-  remember (mtd e m args) as E.
+  remember (e_mtd e m args) as E.
   induction H; steps;
     try solve [repeat eexists; eauto with typ].
 Qed.
 
 Lemma t_new_inv:
   forall Γ T__this C args T,
-    ((Γ, T__this) ⊢ (new C args) : T) ->
+    ((Γ, T__this) ⊢ (e_new C args) : T) ->
     exists Args Flds Mtds argsTs μ,
       T = (C, μ) /\
         ct C = class Args Flds Mtds /\
@@ -285,10 +285,10 @@ Lemma t_new_inv:
         (warm ⊑ μ \/ (P_hots argsTs)).
 Proof with (eauto with typ lia).
   introv H.
-  remember (new C args) as E.
+  remember (e_new C args) as E.
   induction H; subst; try discriminate...
   - S_Typ.
-    destruct IHT_Expr as (Args & Flds & Mtds & argsTs & μ0 & ? & ? & ? & ? & ?)...
+    destruct IHexpr_typing as (Args & Flds & Mtds & argsTs & μ0 & ? & ? & ? & ? & ?)...
     inverts H0; steps;
     repeat eexists; eauto with typ.
   - repeat eexists; steps...
@@ -298,15 +298,15 @@ Qed.
 
 Lemma t_asgn_inv:
   forall Γ T__this e1 f e2 e3 C μ,
-    ((Γ, T__this) ⊢ (asgn e1 f e2 e3) : (C, μ)) ->
+    ((Γ, T__this) ⊢ (e_asgn e1 f e2 e3) : (C, μ)) ->
     exists D μ1 μ',
-      ((Γ, T__this) ⊢ (fld e1 f) : (D, μ1)) /\
+      ((Γ, T__this) ⊢ (e_fld e1 f) : (D, μ1)) /\
         ((Γ, T__this) ⊢ e2 : (D, hot)) /\
         (μ' ⊑ μ) /\
         ((Γ, T__this) ⊢ e3 : (C, μ')).
 Proof with (eauto with typ lia).
   introv H.
-  remember (asgn e1 f e2 e3) as E.
+  remember (e_asgn e1 f e2 e3) as E.
   remember (C,μ) as T.
   gen C μ e1 f e2 e3.
   induction H; steps;
@@ -325,43 +325,43 @@ Section typing_ind.
       P Γ T e U (t_sub Γ T e U U' H__U' H__sub).
 
   Variable P_var: forall Γ T x U H__lkp,
-      P Γ T (var x) U (t_var Γ T x U H__lkp).
+      P Γ T (e_var x) U (t_var Γ T x U H__lkp).
 
   Variable P_this: forall Γ T,
-      P Γ T this T (t_this Γ T).
+      P Γ T e_this T (t_this Γ T).
 
   Variable P_selhot: forall Γ T e f C D μ H__D H__field,
       P Γ T e (D, hot) H__D ->
-      P Γ T (fld e f) (C, hot) (t_selhot Γ T e f C D μ H__D H__field).
+      P Γ T (e_fld e f) (C, hot) (t_selhot Γ T e f C D μ H__D H__field).
 
   Variable P_selcool: forall Γ T e f U D Ω H__D H__f H__field,
       P Γ T e (D, cool Ω) H__D ->
-      P Γ T (fld e f) U (t_selcool Γ T e f U D Ω H__D H__f H__field).
+      P Γ T (e_fld e f) U (t_selcool Γ T e f U D Ω H__D H__f H__field).
 
   Variable P_new: forall Γ T C args Args Flds Mtds H__ct H__args,
       Pl Γ T args Args H__args ->
-      P Γ T (new C args) (C, warm) (t_new Γ T C args Args Flds Mtds H__ct H__args).
+      P Γ T (e_new C args) (C, warm) (t_new Γ T C args Args Flds Mtds H__ct H__args).
 
   Variable P_new_hot: forall Γ T C args argsTs Args Flds Mtds H__ct H__args H__hots H__subs,
       Pl Γ T args argsTs H__args ->
-      P Γ T (new C args) (C, hot) (t_new_hot Γ T C args argsTs Args Flds Mtds H__ct H__args H__hots H__subs).
+      P Γ T (e_new C args) (C, hot) (t_new_hot Γ T C args argsTs Args Flds Mtds H__ct H__args H__hots H__subs).
 
   Variable P_block: forall Γ T U e1 f e2 e3 C μ H__fld H__e2 H__e3,
-      P Γ T (fld e1 f) (C, μ) H__fld ->
+      P Γ T (e_fld e1 f) (C, μ) H__fld ->
       P Γ T e2 (C, hot) H__e2 ->
       P Γ T e3 U H__e3 ->
-      P Γ T (asgn e1 f e2 e3) U (t_block Γ T U e1 f e2 e3 C μ H__fld H__e2 H__e3).
+      P Γ T (e_asgn e1 f e2 e3) U (t_block Γ T U e1 f e2 e3 C μ H__fld H__e2 H__e3).
 
   Variable P_call: forall Γ T e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args,
       P Γ T e (C, μ0) H__e ->
       Pl Γ T args argsT H__args ->
       (* P argsT (C, μ__m) e__m U (typable_method m C μ__m argsT U e__m H__mtd) ->*)
-      P Γ T (mtd e m args) U (t_call Γ T e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args).
+      P Γ T (e_mtd e m args) U (t_call Γ T e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args).
 
   Variable P_call_hot: forall Γ T e m args argTs paramTs D body μ0 μ_r C H__e H__mtd H__args H__hots H__subs,
       P Γ T e (C, hot) H__e ->
       Pl Γ T args argTs H__args ->
-      P Γ T (mtd e m args) (D, hot) (t_call_hot Γ T e m args argTs paramTs D body μ0 μ_r C H__e H__mtd H__args H__hots H__subs).
+      P Γ T (e_mtd e m args) (D, hot) (t_call_hot Γ T e m args argTs paramTs D body μ0 μ_r C H__e H__mtd H__args H__hots H__subs).
 
   Variable Pl_nil: forall Γ T,
       Pl Γ T [] [] (t_exprs_nil Γ T).
@@ -390,7 +390,7 @@ Section typing_ind.
                   (typing_list_ind Γ T args argsTs H__args)
     | t_block Γ T U e1 f e2 e3 C μ H__fld H__e2 H__e3 =>
         P_block Γ T U e1 f e2 e3 C μ H__fld H__e2 H__e3
-                (typing_ind Γ T (fld e1 f) (C, μ) H__fld)
+                (typing_ind Γ T (e_fld e1 f) (C, μ) H__fld)
                 (typing_ind Γ T e2 (C, hot) H__e2)
                 (typing_ind Γ T e3 U H__e3)
     | t_call Γ T e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args =>

@@ -18,9 +18,13 @@ Class notation_stackability (A: Type) :=
   stackability_ : A -> A -> Prop.
 Notation "s ≪ s'" := (stackability_ s s') (at level 60).
 
+Class notation_authority (A: Type) :=
+  authority_ : A -> A -> Prop.
+Notation "s ▷ s'" := (authority_ s s') (at level 60).
+
 Class notation_big_step (A B : Type) :=
   big_step_ : A -> Store -> Env -> Value -> B -> Store -> Prop.
-Notation "'⟦' x '⟧' '(' σ ',' ρ ',' ψ ')'  '-->'  '(' y ',' σ' ')'" := (big_step_ x σ ρ ψ y σ') (at level 80).
+Notation "'⟦' x '⟧' '(' σ ',' ρ ',' ψ ')'  '-->'  '(' y ',' σ' ')'" := (big_step_ x σ ρ ψ y σ') (at level 80, ψ at level 98).
 
 Global Hint Unfold dash_: notations.
 Global Hint Unfold dash_arrow_: notations.
@@ -32,13 +36,11 @@ Global Hint Unfold big_step_: notations.
 (** ** Non-overloaded notations *)
 
 (** *** Store typing properties *)
-Reserved Notation "Σ1 ▷ Σ2" (at level 60). (* Authority *)
 Reserved Notation "Σ1 ≼ Σ2" (at level 60). (* Monotonicity *)
 
 (** *** Store properties *)
 Reserved Notation "σ ⪨ σ'" (at level 60). (* Compatibility *)
 Reserved Notation "s ⪯ s'" (at level 60). (* Partial monotonicity *)
-Reserved Notation "s ⊵ s'" (at level 60). (* Strong authority *)
 
 (** *** Typing *)
 Reserved Notation "m1 ⊑ m2" (at level 40).
@@ -72,3 +74,7 @@ Notation "{ l } ∪ L" := (Union Loc (Singleton Loc l) L) (at level 80).
 (** *** Store subsets *)
 Reserved Notation "L ⪽ σ" (at level 80).
 Reserved Notation "{ l } ⪽ σ" (at level 80).
+
+(** *** Definitional interpreter *)
+Reserved Notation "⟦ e ⟧ ( σ , ρ , ψ , n )"   (at level 80, ψ at level 98, n at level 98).
+Reserved Notation "⟦_ e _⟧ ( σ , ρ , ψ , n )" (at level 80).

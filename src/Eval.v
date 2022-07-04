@@ -1,6 +1,7 @@
 (* Celsius project *)
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the big-step evaluator of the language (with fuel). It is then shown equivalent to the predicate version *)
+(** This file defines the big-step evaluator of the language (with fuel). It is then shown
+equivalent to the predicate version *)
 
 From Celsius Require Export Semantics Tactics.
 Require Import ssreflect ssrbool.
@@ -31,25 +32,23 @@ Inductive result_i : Type :=
 (** ** Big step evaluator (with fuel) *)
 (** We define the [eval] function along with its notations *)
 
-Reserved Notation "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"   (at level 80).
-Reserved Notation "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" (at level 80).
 Fixpoint eval e σ ρ v k :=
   match k with
   | 0 => Timeout
   | S n => match e with
           (** Var: simple lookup of the store *)
-          | var x => (**r [e = x] *)
+          | e_var x => (**r [e = x] *)
               (match (getVal ρ x) with
                | Some v => (Success v σ)
                | _ => Error
                end )
 
           (** This: returns current value *)
-          | this => (Success v σ) (**r [e = this] *)
+          | e_this => (Success v σ) (**r [e = this] *)
 
           (** Field access: compute object value and access field *)
-          | fld e0 x => (**r [e = e0.x] *)
-              ( match (⟦e0⟧(σ, ρ, v)(n)) with
+          | e_fld e0 x => (**r [e = e0.x] *)
+              ( match (⟦e0⟧(σ, ρ, v, n)) with
                 | Success v0 σ1 =>
                     match (getObj σ1 v0) with
                     | Some (c, f) =>
@@ -60,8 +59,8 @@ Fixpoint eval e σ ρ v k :=
                 | z => z end )
 
           (** Method call : compute object value, compute arguments and do the call*)
-          | mtd e0 m el => (**r [e = e0.m(el)] *)
-              (match (⟦e0⟧(σ, ρ, v)(n)) with
+          | e_mtd e0 m el => (**r [e = e0.m(el)] *)
+              (match (⟦e0⟧(σ, ρ, v, n)) with
                | Success v0 σ1 =>
                    ( match (getObj σ1 v0) with
                      | Some (C, _) =>
@@ -69,9 +68,9 @@ Fixpoint eval e σ ρ v k :=
                            | (class _  _ Mtds) =>
                                ( match Mtds m with
                                  | Some (method μ x _ e1) =>
-                                     ( match (⟦_ el _⟧(σ1, ρ, v)(n)) with
+                                     ( match (⟦_ el _⟧(σ1, ρ, v, n)) with
                                        | Success_l args_val σ2 =>
-                                           let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0)(n)
+                                           let ρ1 := args_val in ⟦e1⟧(σ2, ρ1, v0, n)
                                        | Error_l => Error
                                        | Timeout_l => Timeout
                                        end)
@@ -81,8 +80,8 @@ Fixpoint eval e σ ρ v k :=
                | z => z end)
 
           (** New class *)
-          | new C args => (**r [e = new C(args)] *)
-              (match (⟦_ args _⟧(σ, ρ, v)(n)) with
+          | e_new C args => (**r [e = new C(args)] *)
+              (match (⟦_ args _⟧(σ, ρ, v, n)) with
                | Success_l args_val σ1 =>
                    ( let I := (length σ1) in (* Fresh location for new object *)
                      let ρ_init := args_val in (* Local env during initialization *)
@@ -98,18 +97,18 @@ Fixpoint eval e σ ρ v k :=
                end) (* Invalid args *)
 
           (** Field assignment *)
-          | asgn e1 x e2 e' => (**r [e = (e1.x ← e2 ; e')] *)
-              (match (⟦e1⟧(σ, ρ, v)(n)) with
+          | e_asgn e1 x e2 e' => (**r [e = (e1.x ← e2 ; e')] *)
+              (match (⟦e1⟧(σ, ρ, v, n)) with
                | Success v1 σ1 =>
-                   match (⟦e2⟧(σ1, ρ, v)(n)) with
+                   match (⟦e2⟧(σ1, ρ, v, n)) with
                    | Success v2 σ2 =>
                        ( let σ3 := (assign v1 x v2 σ2) in
-                         ⟦e'⟧(σ3, ρ, v)(n))
+                         ⟦e'⟧(σ3, ρ, v, n))
                    | z => z end
                | z => z end )
           end
   end
-where "'⟦' e '⟧' '(' σ ',' ρ ',' v ')(' k ')'"  := (eval e σ ρ v k)
+where "⟦ e ⟧ ( σ , ρ , ψ , n )" := (eval e σ ρ ψ n)
 (** Evaluation of a list of expressions (fold) *)
 with eval_list (e_l: list Expr) σ ρ ψ n :=
        match n with
@@ -117,9 +116,9 @@ with eval_list (e_l: list Expr) σ ρ ψ n :=
        | S n => match e_l with
                | [] => Success_l [] σ
                | e::e_l =>
-                   match (⟦e⟧(σ, ρ, ψ)(n)) with
+                   match (⟦e⟧(σ, ρ, ψ, n)) with
                    | Success v σ' =>
-                       match ⟦_ e_l _⟧(σ', ρ, ψ)(n) with
+                       match ⟦_ e_l _⟧(σ', ρ, ψ, n) with
                        | Success_l vl σ'' => Success_l (v::vl) σ''
                        | z => z
                        end
@@ -128,7 +127,7 @@ with eval_list (e_l: list Expr) σ ρ ψ n :=
                    end
                end
        end
-where  "'⟦_' e '_⟧' '(' σ ',' ρ ',' v ')(' k ')'" := (eval_list e σ ρ v k)
+where  "⟦_ el _⟧ ( σ , ρ , ψ , n )" := (eval_list el σ ρ ψ n)
 (** Initialization of a list of fields using (fold) *)
 with init (C: ClN) (flds: list Field) (I : Loc) x ρ σ n : result_i :=
        match n with
@@ -136,7 +135,7 @@ with init (C: ClN) (flds: list Field) (I : Loc) x ρ σ n : result_i :=
        | S n => match flds with
                | [] => Success_i σ
                | (field T e)::flds =>
-                   match ⟦e⟧(σ, ρ, I)(n) with
+                   match ⟦e⟧(σ, ρ, I, n) with
                    | Success v σ' =>
                        match (assign_new I x v σ') with
                        | Some σ'' => init C flds I (S x) ρ σ'' n
@@ -153,7 +152,7 @@ Definition eval_prog n :=
   match ct Entry with
   | class nil nil Mtds =>
       match Mtds main  with
-      | Some (method hot nil T e) => ⟦e⟧([(Entry, [])], [], 0)(n)
+      | Some (method hot nil T e) => ⟦e⟧([(Entry, [])], [], 0, n)
       | _ => Error
       end
   | _ => Error
@@ -163,10 +162,10 @@ Definition eval_prog n :=
 (** Associated ltac tactics : *)
 Ltac destruct_eval He v σ' :=
   match goal with
-  | H: context[ match ⟦ ?e ⟧ (?σ, ?ρ, ?ψ )(?k) with _ => _ end ] |- _ =>
-      destruct (⟦ e ⟧ (σ, ρ, ψ )( k)) as [ | | v σ' ] eqn:He
-  | H: context[ match ⟦_ ?el _⟧ (?σ, ?ρ, ?ψ )(?k) with _ => _ end ] |- _ =>
-      destruct (⟦_ el _⟧ (σ, ρ, ψ )( k)) as [ | | v σ' ] eqn:He
+  | H: context[ match ⟦ ?e ⟧(?σ, ?ρ, ?ψ , ?k) with _ => _ end ] |- _ =>
+      destruct (⟦ e ⟧ (σ, ρ, ψ, k)) as [ | | v σ' ] eqn:He
+  | H: context[ match ⟦_ ?el _⟧ (?σ, ?ρ, ?ψ, ?k) with _ => _ end ] |- _ =>
+      destruct (⟦_ el _⟧ (σ, ρ, ψ, k)) as [ | | v σ' ] eqn:He
   end; try congruence.
 
 Ltac destruct_eval_f :=
@@ -178,7 +177,7 @@ Ltac destruct_eval_f :=
 (** A simple result on lengths *)
 Lemma EvalListLength :
   forall el n σ σ' ρ ψ vl ,
-    ⟦_ el _⟧(σ, ρ, ψ)(n) = Success_l vl σ' ->
+    ⟦_ el _⟧(σ, ρ, ψ, n) = Success_l vl σ' ->
     length el = length vl.
 Proof.
   induction el; steps;
@@ -193,11 +192,11 @@ Qed.
 (** ** Evaluator fuel-monotonicity *)
 Lemma eval_step_monotonicity_aux: forall n,
     (forall m, m > n ->
-          (forall e σ ρ ψ v σ', ⟦ e ⟧ (σ, ρ, ψ)(n) = Success v σ' ->
-                           ⟦ e ⟧ (σ, ρ, ψ)(m) = Success v σ')) /\
+          (forall e σ ρ ψ v σ', ⟦ e ⟧ (σ, ρ, ψ, n) = Success v σ' ->
+                           ⟦ e ⟧ (σ, ρ, ψ, m) = Success v σ')) /\
       (forall m, m > n ->
-            (forall el σ ρ ψ vl σ', ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
-                               ⟦_ el _⟧ (σ, ρ, ψ)(m) = Success_l vl σ')) /\
+            (forall el σ ρ ψ vl σ', ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' ->
+                               ⟦_ el _⟧ (σ, ρ, ψ, m) = Success_l vl σ')) /\
       (forall m, m > n ->
             (forall C flds I x ρ σ σ', init C flds I x ρ σ n = Success_i σ' ->
                                   init C flds I x ρ σ m = Success_i σ')).
@@ -246,8 +245,8 @@ Qed.
 Theorem eval_step_monotonicity:
   forall n m e σ ρ ψ l σ',
     n < m ->
-    ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ' ->
-    ⟦ e ⟧ (σ, ρ, ψ)(m) = Success l σ'.
+    ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ' ->
+    ⟦ e ⟧ (σ, ρ, ψ, m) = Success l σ'.
 Proof.
   intros.
   pose proof (eval_step_monotonicity_aux n) as [He _].
@@ -257,8 +256,8 @@ Qed.
 Theorem evalList_step_monotonicity:
   forall n m el σ ρ ψ vl σ',
     n < m ->
-    ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
-    ⟦_ el _⟧ (σ, ρ, ψ)(m) = Success_l vl σ'.
+    ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' ->
+    ⟦_ el _⟧ (σ, ρ, ψ, m) = Success_l vl σ'.
 Proof.
   intros.
   pose proof (eval_step_monotonicity_aux n) as [_ [Hel _]].
@@ -278,12 +277,12 @@ Qed.
 
 Theorem evalP_eval :
   forall e σ ρ ψ l σ',
-    ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ') <-> exists n, ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ'.
+    ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ') <-> exists n, ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ'.
 Proof with (eauto using evalP, initP; try lia).
   split; intros.
   - induction H using evalP_ind2 with
       (Pl := fun el σ ρ ψ vl σ' (H__el : evalListP el σ ρ ψ vl σ') =>
-               exists n, ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ')
+               exists n, ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ')
       (Pin := fun C I x ρ σ σ' (H__init : initP C I x ρ σ σ') =>
                 exists n Args Flds Mtds DoneFlds flds,
                   ct C = class Args Flds Mtds /\
@@ -331,7 +330,7 @@ Proof with (eauto using evalP, initP; try lia).
     gen e σ ρ ψ l σ'.
     eapply proj1 with (
         (forall el σ ρ ψ vl σ',
-            ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' ->
+            ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' ->
             ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ')) /\
           (forall C flds I x ρ σ σ' Args Flds Mtds DoneFlds,
               init C flds I x ρ σ n = Success_i σ' ->
@@ -343,11 +342,11 @@ Proof with (eauto using evalP, initP; try lia).
     destruct n; repeat split => //; intros;
       move : (IHn n) => [ ] // => IHn__e [IHn__el IHn__init]; clear IHn.
     + simpl in H. steps; eauto using evalP.
-      eapply e_new... eapply IHn__init with (DoneFlds := [])...
+      eapply bs_new... eapply IHn__init with (DoneFlds := [])...
     + steps; eauto using evalP...
       apply IHn__e in matched.
       apply IHn__el in matched0.
-      eapply el_cons...
+      eapply bs_cons...
     + steps; eauto using initP...
       * rewrite app_nil_r in H0...
       * apply IHn__e in matched.
@@ -360,19 +359,19 @@ Qed.
 
 
 Corollary eval_implies_evalp :
-  forall e σ ρ ψ l σ' n, ⟦ e ⟧ (σ, ρ, ψ)(n) = Success l σ' -> ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ').
+  forall e σ ρ ψ l σ' n, ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ' -> ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ').
 Proof.
   intros.
   apply evalP_eval; eauto.
 Qed.
 
 Corollary eval_list_implies_evalp :
-  forall el σ ρ ψ vl σ' n, ⟦_ el _⟧ (σ, ρ, ψ)(n) = Success_l vl σ' -> ⟦_ el _⟧p (σ, ρ, ψ) --> (vl,σ').
+  forall el σ ρ ψ vl σ' n, ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' -> ⟦_ el _⟧p (σ, ρ, ψ) --> (vl,σ').
 Proof.
   induction el; intros.
   - destruct n; steps.
   - destruct n; steps.
-    eapply el_cons;
+    eapply bs_cons;
       eauto using evalP, eval_implies_evalp.
 Qed.
 

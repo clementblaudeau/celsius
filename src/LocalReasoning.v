@@ -21,7 +21,8 @@ Lemma local_reasoning:
     σ  ⊨ L  : hot ->
     σ' ⊨ L' : hot.
 Proof with (eauto with rch).
-  intros. intros l' H__l' l H__rch.
+  intros. intros l' H__l'.
+  apply sm_hot => l H__rch.
   assert (dom σ <= dom σ') by eauto with pM.
   assert (l < dom σ \/ l >= dom σ) as [|] by lia.
   + (* l ∈ (dom σ) : the object was already in the store *)
@@ -29,7 +30,10 @@ Proof with (eauto with rch).
     assert (σ ⊨ L ⇝ l).
     * eapply H2...
       eexists...
-    * rch_set. eapply H5...
+    * rch_set.
+      lets: H5 H__ln.
+      inverts H9...
+      apply H10...
   + (* l ∉ (dom σ) *)
     destruct (H3 l); eauto with lia rch.
 Qed.

@@ -2,10 +2,11 @@
 
 ![Celsius logo](https://github.com/clementblaudeau/celsius/blob/master/logo.png)
 
-# Celsius Coq formalization
+# Celsius coq formalization
 
-Accessing uninitialized data during object initialization is a common and subtle programming error. This
-error is either not prevented by mainstream languages, like in Java, C++, Scala, or it is prevented by greatly restricting initialization patterns, like in Swift. The Celsius model for safe and modular initialization of objects aims at solving this issue, via a light annotation mechanism (*cold*, *warm*, *hot*). This repository contains the Coq formalization of a small object-oriented language with *celsius* annotations. Several results are proved on the semantic model and the typing is shown sound.
+This repository contains the Coq formalization of the paper:
+* A Conceptual framework for Safe Object initialization, (submitted to OOPSLA 2022)
+  Clément Blaudeau and Fengyun Liu
 
 ## Build
 
@@ -14,33 +15,71 @@ To build the coq project, you'll need `coq` ( >= 8.14). From the top-level direc
 make Makefile.coq
 make
 ```
-
 ## Project structure
-The project has three main parts:
-1. **Basics**: Language definition, helpers, notations (in the files `Language.v`, `Helpers.v` and `Notations.v`). The big-step semantics are given in `Semantics.v`. A step-indexed evaluator is defined and shown equivalent to the semantics in `Eval.v`. The typing rules are given in `Typing.v`.
-2. **Local reasoning**: The properties of the state of memory (named a `Store`) during initialization are defined and studied in `PartialMonotonicity.v`, `Wellformedness.v`, `Stackability.v` and `Scopatibility.v`. They all converge to the *local reasoning* theorem in `LocalReasoning.v`. More details below.
-3. **Typing**: The properties of the *abstract* state of memory (named a `StoreTyping`) used for typing are defined in `MetaTheory.v`. They are used to show the soundness of typing (in `Soundness.v`)
 
-## Local reasoning
-We first explore the properties of the state of memory during evaluation of an expression.
+### Preliminaries
+* [src/LibTactics](src/LibTactics.v): tactics borrowed from [Software Foundations](https://www.cis.upenn.edu/~cis500/cis500-f17/sf/plf-current/LibTactics.html)
+* [src/Tactics](src/Tactics.v): additional tactics adapted from [SystemFr](https://github.com/epfl-lara/SystemFR)
 
-### Reachability : `σ ⊨ l ⇝ l'`
-Defines the reachability relationship. A location `l'` is reachable from `l` in a store `σ` if either `l = l'` or, by hoping from pointers to pointers we can go from `l` to `l'`.
+### Language
+* [src/Language.v](src/Language.v): definition of the Celsius calculus and global parameters.
+* [src/Notations.v](src/Notations.v): all notations are reserved in this file, with type classes for overloaded notations.
+* [src/Helpers.v](src/Helpers.v): basic functions, lemmas and tactics for getters, updates, assignments, etc.
 
-### Wellformedness : `wf σ`
-Technical guaranties. A wellformed store `σ` contains only locations that are within the store, and object have a number of fields bounded by their definition.
-
-### PartialMonotonicity : `σ ⪯ σ'`
-Defines the partial monotonicity between stores. Store `σ` and `σ'` are in a _partial monotonicity_ relationship if `σ'` has more fields in every local environments associated with a stored object. The evaluator's initial and result stores are in a partial monotonicity relationship (`pM_theorem`).
-
-### Stackability : `σ ≪ σ'`
-Defines the stackability relationship. Stores `σ` and `σ'` are _stackable_ if all objects that are in `σ'` are either `warm` (all fields initialized), or were already in `σ`. This captures the idea that *newly created objects have initialized fields*. The evaluator's initial and result stores are stackable (`stk_theorem`).
-
-### Scopability: `(σ, L)  ⋖  (σ', L')`
-A more suble relation that allows to control the set of reachable locations. A set of location `L` and a store `σ` are scoping another set `L'` and store `σ` if all the locations reachable in `σ'` from a point in `L'` are also reachable from `L` in `σ`. This allows us to control what objects can be reached during initialization.
+### Semantics
+* [src/Semantics.v](src/Semantics.v): big-step semantic rules and custom induction predicate on the rules.
+* [src/Eval.v](src/Eval.v): definitional interpreter for the language and equivalence result with the big step rules.
 
 ### Local reasoning
-All the previous properties are used to show that when initializing an object, we get an object with fields that are all initialized and pointing towards fully initialized objects (an hot object). This is a key property of the semantic.
+* [src/Reachability.v](src/Reachability.v): definition of the accessibility inside a store, and the semantic meaning of modes
+* [src/PartialMonotonicity.v](src/PartialMonotonicity.v): (semantic) partial monotonicity definition and theorem
+* [src/Wellformedness.v](src/Wellformedness.v): wellformedness conditions and theorem
+* [src/Stackability.v](src/Stackability.v): (semantic) stackability definition and theorem
+* [src/Scopatibility.v](src/Scopatibility.v): scopatibility definition and theorem
+* [src/LocalReasoning.v](src/LocalReasoning.v): semantic local reasoning, promotion and local reasoning for typing theorems.
 
-## Typing
-Here we state the properties of the abstract representation of memory (store typing) during evaluation. (to be expanded)
+### Soundness
+* [src/Typing.v](src/Typing.v): Typing rules and inversion lemmas
+* [src/MetaTheory.v](src/MetaTheory.v): Typing definition of the core principles, store typing definition and lemmas
+* [src/Soundness.v](src/Soundness.v): Soundness theorem (and helper lemmas)
+
+
+## Paper-formalization correspondence
+
+### Definitions
+The powerful notation mechanism of Coq allowed us to have notations that match the paper quite directly.
+|                          | Paper **and** coq formalization        | Coq term                             | File                                                                              |
+| ------------------------ | -------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
+| Reachability             | $\sigma ⊨ l ⇝ l'$                      | `reachability`                       | [src/Reachability.v](src/Reachability.v)                                          |
+| Semantic modes           | $\sigma ⊨ l : \mu$                     | `semantic_mode`                      | [src/Reachability.v](src/Reachability.v)                                          |
+| BS semantics             | $⟦e⟧(σ, ρ, ψ) \longrightarrow (v, σ')$ | `evalP`                              | [src/Semantics.v](src/Semantics.v)                                                |
+| Partial monotonicity     | $σ \preceq σ'$                         | `partial_monotonicity`               | [src/PartialMonotonicity.v](src/PartialMonotonicity.v)                            |
+| Monotonicity             | $Σ ≼ Σ'$                               | `monotonicity`                       | [src/MetaTheory.v](src/MetaTheory.v)                                              |
+| Authority                | $σ ▷ σ'$ and $Σ ▷ Σ'$                  | `authority` and `authority_st`       | [src/Authority.v](src/Authority.v) and [src/MetaTheory.v](src/MetaTheory.v)       |
+| Stackability             | $σ ≪ σ'$ and $Σ ≪ Σ'$                  | `stackability` and `stackability_st` | [src/Stackability.v](src/Stackability.v) and [src/MetaTheory.v](src/MetaTheory.v) |
+| Scopability              | $(σ,L)⋖(σ',L')$                        | `scopability`                        | [src/Scopability.v](src/Scopability.v)                                            |
+| Typing                   | $(Γ,T_\mathtt{this})⊢e:T$              | `expr_typing`                        | [src/Typing.v](src/Typing.v)                                                      |
+| Object typing            | $Σ⊨(C,ω):(C, cold)$                    | `object_typing`                      | [src/MetaTheory.v](src/MetaTheory.v)                                              |
+| Store typing abstraction | $Σ⊨σ$                                  | `store_typing`                       | [src/MetaTheory.v](src/MetaTheory.v)                                              |
+| Env typing               | $Σ⊨𝜌:Γ$                                | `env_typing`                         | [src/MetaTheory.v](src/MetaTheory.v)                                              |
+
+### Theorems correspondence
+| Theorem, lemma, statement            | Coq term                     | File                                                   |
+| ------------------------------------ | ---------------------------- | ------------------------------------------------------ |
+| Partial monotonicity theorem         | `pM_theorem`                 | [src/PartialMonotonicity.v](src/PartialMonotonicity.v) |
+| Authority theorem                    | `aty_theorem`                | [src/Authority.v](src/Authority.v)                     |
+| Stackability theorem                 | `stk_theorem`                | [src/Stackability.v](srv/Stackability.v)               |
+| Scopability theorem                  | `scp_theorem`                | [src/Scopability.v](srv/Scopability.v)                 |
+| Local reasoning                      | `Local_reasoning`            | [src/LocalReasoning.v](src/LocalReasoning.v)           |
+| Promotion lemma                      | `promotion`                  | [src/MetaTheory.v](src/MetaTheory.v)                   |
+| Local reasoning for typing           | `Local_reasoning_for_typing` | [src/LocalReasoning.v](src/LocalReasoning.v)           |
+| Soundness statement (expressions)    | `expr_soundness`             | [src/Soundness.v](src/Soundness.v)                     |
+| Soundness statement (initialization) | `init_soundness`             | [src/Soundness.v](src/Soundness.v)                     |
+| Soundness theorem                    | `Soundness`                  | [src/Soundness.v](src/Soundness.v)                     |
+| Program soundness corollary          | `Program_soundness`          | [src/Soundness.v](src/Soundness.v)                     |
+
+### Implementation details and assumptions
+Our implementation makes some assumptions and representation choices, which we believe are without loss of generality:
+* We represent variables, fields, locations (and thus, values) as integers.
+* We represent stores and (local) environments as lists.
+* We assume a globally accessible class table `ct` (defined as a `Parameter`) and an entry class `EntryClass`.

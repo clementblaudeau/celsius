@@ -1,37 +1,32 @@
 (* Celsius project *)
-(* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the notion of reachability of a location in a given store. The set of reachable locations, starting from a given one l is transitively defined as the ones that can be accessed by following pointers in object local environments. We then define and prove basic properties around this notion. In the second part, we show the equivalence between the inductive definition and a path-based definition. This allows us to reason about paths from one location to another, especially for scopability results.  *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+
+(** This file defines the notion of reachability of a location in a given store. The set of
+reachable locations, starting from a given one l is transitively defined as the ones that can be
+accessed by following pointers in object local environments. We then define and prove basic
+properties around this notion. At the end, the Reachability_dec section shows that the predicate is
+decidable *)
+
 From Celsius Require Export Language Helpers Notations.
 Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Psatz Ensembles.
 Import ListNotations.
 Open Scope list_scope.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet).
 
-(* TOCLEAN *)
-Ltac app_eq_nil :=
-  repeat match goal with
-         | H: [] = _ ++ (_ :: _) |- _ => symmetry in H
-         | H: _ ++ (_ :: _) = [] |- _ =>
-             exfalso; apply app_eq_nil in H as [_ H];
-             inverts H
-         end.
-Global Hint Extern 1 => app_eq_nil: core.
-
-
 (** ** Definitions and notations *)
 (** We first define the reachability predicate between two individual locations *)
 Inductive reachability : Store -> Loc -> Loc -> Prop :=
-| rch_heap: (**r we can access the current location *)
+| rch_heap: (** we can access the current location *)
     forall l σ,
       l < dom σ ->
       reachability σ l l
-| rch_step: (**r we can access a location in the local environment of the object at l0 *)
+| rch_step: (** we can access a location in the local environment of the object at l0 *)
     forall l0 l1 C f ω σ,
       l1 < dom σ ->
       getObj σ l0 = Some (C, ω) ->
       getVal ω f = Some l1 ->
       reachability σ l0 l1
-| rch_trans: (**r transitive case *)
+| rch_trans: (** transitive case *)
     forall l0 l1 l2 σ,
       reachability σ l0 l1 ->
       reachability σ l1 l2 ->
@@ -44,53 +39,50 @@ Global Instance notation_reachability : notation_dash_arrow Store Loc Loc :=
 Global Hint Unfold dash_arrow_ notation_reachability: rch.
 
 (** Then we define the reachability predicate for sets of locations *)
-Definition reachability_set σ L l := exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
+Definition reachability_set σ L l :=
+  exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
+
 Global Instance notation_reachability_set : notation_dash_arrow Store LocSet Loc :=
   { dash_arrow_ := reachability_set }.
 Notation "σ ⊨ { l } ⇝ l'" := (reachability_set σ {l} l')  (at level 60, l at level 98, l' at level 98).
 Global Hint Unfold notation_reachability_set: rch.
 
-(** Depending on the temperature of objects we can reach, we have three predicates about the store. Inside a store [σ], a location [l] is said to be:
-- [reachable_cold]: if the location is in the heap (but might point to an object with unitialized fields)
-- [reachable_warm]: if the location points to an object with all initialized fields (but those might point to cold objects)
+(** Depending on the temperature of objects we can reach, we have three predicates about the
+store. Inside a store [σ], a location [l] is said to be:
+- [reachable_cold]: if the location is in the heap (but might point to an object with unitialized
+fields)
+- [reachable_warm]: if the location points to an object with all initialized fields (but
+those might point to cold objects)
 - [reachable_hot]: if the location points to a hot object (transitively all initialized) *)
-Definition reachable_cold σ l :=
-  (l < dom σ).
 
-Definition reachable_warm σ l :=
-  (exists C ω Args Flds Mtds ,
-      (getObj σ l) = Some (C, ω) /\
-        (ct C = (class Args Flds Mtds)) /\
-        (length Flds <= length ω)).
+Inductive semantic_mode : Store -> Loc -> Mode -> Prop :=
+| sm_cold: forall σ l, l < dom σ -> semantic_mode σ l cold
+| sm_warm: forall σ l C ω Args Flds Mtds,
+    getObj σ l = Some (C, ω) ->
+    ct C = class Args Flds Mtds ->
+    length Flds <= length ω ->
+    semantic_mode σ l warm
+| sm_cool: forall σ l Ω C ω Args Flds Mtds,
+    getObj σ l = Some (C, ω) ->
+    ct C = class Args Flds Mtds ->
+    Ω <= dom ω ->
+    semantic_mode σ l (cool Ω)
+| sm_hot: forall σ l,
+    (forall (l': Loc),
+        σ ⊨ l ⇝ l' ->
+        semantic_mode σ l' warm) ->
+    semantic_mode σ l hot.
+Global Hint Constructors semantic_mode: core.
 
-Definition reachable_cool σ l Ω :=
-  exists C ω Args Flds Mtds ,
-    getObj σ l = Some (C, ω) /\
-      ct C = (class Args Flds Mtds) /\
-      Ω <= dom ω.
-
-Definition reachable_hot σ l :=
-  forall (l': Loc),
-    σ ⊨ l ⇝ l' ->
-    reachable_warm σ l'.
-
-Global Instance notation_reachability_mode : notation_dash_colon Store Loc Mode :=
-  { dash_colon_ := fun σ l μ =>
-                     match μ with
-                     | cold => (reachable_cold σ l)
-                     | warm => (reachable_warm σ l)
-                     | hot => (reachable_hot σ l)
-                     | cool Ω => reachable_cool σ l Ω
-                     end
-  }.
-Global Instance notation_reachability_set_mode : notation_dash_colon Store LocSet Mode :=
+Global Instance notation_semantic_mode : notation_dash_colon Store Loc Mode :=
+  { dash_colon_ := semantic_mode}.
+Global Instance notation_semantic_set_mode : notation_dash_colon Store LocSet Mode :=
   { dash_colon_ := fun σ L μ => forall l, l ∈ L -> σ ⊨ l : μ }.
 
-Global Hint Unfold reachable_cold reachable_cool reachable_hot reachable_warm: rch.
-Global Hint Unfold notation_reachability_mode notation_reachability_set_mode: rch.
+Global Hint Unfold notation_semantic_mode notation_semantic_set_mode: rch.
+Hint Extern 1 => (eapply sm_warm): rch.
 
 (** ** Tactics *)
-
 Ltac rch_singleton :=
   repeat match goal with
   | H: (reachability_set ?s (Singleton Loc ?l1) ?l2) |- _ =>
@@ -110,17 +102,18 @@ Ltac rch_set :=
 
 Global Hint Extern 1 => updates: rch.
 
-(** *** Basic results *)
+(** ** Basic results *)
 (** Rechable locations from a hot location lead to other hot locations *)
 Lemma rch_hot_trans:
   forall σ l l',
     σ ⊨ l : hot ->
     σ ⊨ l ⇝ l' ->
-    σ ⊨ l': hot.
+    σ ⊨ l' : hot.
 Proof.
-  intros. cbn in *.
-  unfold reachable_hot in *.
-  eauto with rch.
+  intros.
+  apply sm_hot; intros.
+  inverts H;
+    eauto with rch.
 Qed.
 
 (** Reaching from a singleton is the same as reaching from the only element of the singleton *)
@@ -142,7 +135,6 @@ Proof.
 Qed.
 Global Hint Resolve rch_dom: rch.
 
-(* Reachable objects are inside the store *)
 Lemma rch_dom2 :
   forall σ l1 l2,
     σ ⊨ l1 ⇝ l2 ->
@@ -154,6 +146,7 @@ Proof.
 Qed.
 Global Hint Resolve rch_dom2: rch.
 
+(* Basic results about reachability and unions *)
 Lemma rch_union_introl :
   forall σ L1 L2 l,
     σ ⊨ L1 ⇝ l ->
@@ -171,22 +164,13 @@ Proof.
   intros. destruct H as (l0 & ? & ?).
   exists l0; split; eauto using Union_intror.
 Qed.
-
 Global Hint Resolve rch_union_introl rch_union_intror: rch.
 
-(** We define a custom induction predicate. If a transitive property is true along heap paths, then it is true between any two reachable locations. *)
-(* Lemma reachability_rev_ind: *)
-(*   forall (P: Loc -> Loc -> Prop) σ, *)
-(*     (forall l, l < dom σ -> P l l) -> (**r Heap case *) *)
-(*     (forall l1 l2 l3, P l1 l2 -> P l2 l3 -> P l1 l3) -> (**r Transitive case *) *)
-(*     (forall l l' C ω f , l' < dom σ -> getObj σ l = Some(C, ω) /\ getVal ω f = Some l' -> P l l') -> (**r Hop case *) *)
-(*     (forall l l', σ ⊨ l ⇝ l' -> P l l'). *)
-(* Proof. *)
-(*   intros. *)
-(*   induction H2; eauto. *)
-(* Qed. *)
 
-(** When we ad a new location inside a local environment of an object, any new paths were either already in the previous store, or go through the added location *)
+(** ** Reachability and assignments *)
+
+(** When we *add a new location* inside a local environment of an object, any new paths were either
+already in the previous store, or go through the added location *)
 Lemma rch_asgn_new:
   forall σ l0 l1 C ω,
     getObj σ l0 = Some(C, ω) ->
@@ -205,7 +189,8 @@ Proof with eauto with rch notations.
     + right; split...
 Qed.
 
-(** A path in an updated store either goes through the new value or was already valid in the un-updated store*)
+(** A path in an updated store either goes through the new value or was already valid in the
+un-updated store*)
 Lemma rch_asgn :
   forall σ C ω f l0 l1,
     getObj σ l0 = Some (C, ω) ->
@@ -225,7 +210,7 @@ Proof with (eauto with rch).
 Qed.
 
 
-(** Decidability of reachability *)
+(** ** Decidability of reachability *)
 Section Reachability_Dec.
 
   Reserved Notation "s ⊨ x ⇝ y ↑ tr" (at level 60, x at level 98, y at level 98, tr at level 98).
@@ -320,6 +305,7 @@ Section Reachability_Dec.
     induction tr; intros.
     - inverts H;
         exists ([]: list Loc); splits...
+      apply app_eq_nil in H0 as [_ H0]. inversion H0.
     - lets [ ]: rch_tr_hd_rch H.
       lets (tr__nd & ? & ?): IHtr H1.
       destruct (in_dec (PeanoNat.Nat.eq_dec) a tr__nd).

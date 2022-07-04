@@ -12,25 +12,25 @@ Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
 (** ** Definitions and Notations *)
 (* The scoping relation, with the hypothesis that the sets of locations are "correct" (within the stores) *)
 
-Definition scoping σ σ' L L' :=
+Definition scopability σ σ' L L' :=
   L ⪽ σ ->
   L' ⪽ σ' ->
   (forall (l:Loc), l < dom σ -> (σ' ⊨ L' ⇝ l) -> σ ⊨ L ⇝ l).
 
 
-Notation "( σ1 , L1 )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 L1 L2) (at level 0).
-Notation "( σ1 ,  { l } )  ⋖  ( σ2 , L2 )" := (scoping σ1 σ2 {l} L2) (at level 0).
-Notation "( σ1 , L1 )  ⋖  ( σ2 ,  { l } )" := (scoping σ1 σ2 L1 {l}) (at level 0).
-Notation "( σ1 ,  { l1 } )  ⋖  ( σ2 ,  { l2 } )" := (scoping σ1 σ2 {l1} {l2}) (at level 0).
+Notation "( σ1 , L1 )  ⋖  ( σ2 , L2 )" := (scopability σ1 σ2 L1 L2) (at level 0).
+Notation "( σ1 ,  { l } )  ⋖  ( σ2 , L2 )" := (scopability σ1 σ2 {l} L2) (at level 0).
+Notation "( σ1 , L1 )  ⋖  ( σ2 ,  { l } )" := (scopability σ1 σ2 L1 {l}) (at level 0).
+Notation "( σ1 ,  { l1 } )  ⋖  ( σ2 ,  { l2 } )" := (scopability σ1 σ2 {l1} {l2}) (at level 0).
 
-Local Hint Unfold scoping : scp.
+Local Hint Unfold scopability : scp.
 Local Hint Unfold reachability_set: scp.
 Local Hint Resolve Union_introl: scp.
 Local Hint Resolve Union_intror: scp.
 Local Hint Resolve In_singleton: core.
 
 (** ** Basic results *)
-(** We first show a set of basic results about scoping. The premisses can sometime look a bit arbitrary, but they are actually fine-tuned *)
+(** We first show a set of basic results about scopability. The premisses can sometime look a bit arbitrary, but they are actually fine-tuned *)
 Lemma scp_refl :
   forall σ L, (σ, L) ⋖ (σ, L).
 Proof.
@@ -41,7 +41,7 @@ Global Hint Resolve scp_refl: scp.
 Lemma scp_refl2 :
   forall σ L1 L2, L2 ⊆ L1 -> (σ, L1) ⋖ (σ, L2).
 Proof.
-  unfold scoping. steps; rch_set.
+  unfold scopability. steps; rch_set.
   exists l0; steps; eapply H => //.
 Qed.
 (* Global Hint Resolve scp_refl2: scp. *)
@@ -53,7 +53,7 @@ Lemma scp_subset :
     L2 ⪽ σ2  ->
     (σ1, L1) ⋖ (σ2, L).
 Proof with (eauto with scp lia).
-  unfold scoping; steps ...
+  unfold scopability; steps ...
   apply H ...
   rch_set.
   exists l0; steps ...
@@ -66,7 +66,7 @@ Lemma scp_union :
     (σ1, L)  ⋖ (σ2, L2) ->
     (σ1, L)  ⋖ (σ2, L1∪L2).
 Proof with (eauto with wf rch).
-  unfold scoping; intros.
+  unfold scopability; intros.
   inversion H4; steps...
   inversion H6; steps...
   - apply H5...
@@ -82,7 +82,7 @@ Lemma scp_union_introl :
     (σ1, L) ⋖ (σ2, L1∪L2) ->
     (σ1, L) ⋖ (σ2, L1).
 Proof with (eauto with wf rch).
-  unfold scoping; intros.
+  unfold scopability; intros.
   inversion H4; steps...
 Qed.
 (* Global Hint Resolve scp_union_introl: scp. *)
@@ -93,7 +93,7 @@ Lemma scp_union_intror :
     (σ1, L) ⋖ (σ2, L1∪L2) ->
     (σ1, L) ⋖ (σ2, L2).
 Proof with (eauto with wf rch).
-  unfold scoping; intros.
+  unfold scopability; intros.
   inversion H4; steps...
 Qed.
 (* Global Hint Resolve scp_union_intror: scp. *)
@@ -103,7 +103,7 @@ Lemma scp_reachability:
     σ ⊨ l1 ⇝ l2 ->
     (σ, {l1}) ⋖ (σ, {l2}).
 Proof with (eauto with rch).
-  unfold scoping; intros; rch_set...
+  unfold scopability; intros; rch_set...
 Qed.
 Global Hint Resolve scp_reachability: scp.
 
@@ -149,7 +149,7 @@ Lemma scp_add_env:
       (σ0, L0) ⋖ (s, L2) ->
       (σ0, L0) ⋖ ([I ↦ (c, e0 ++ [v])] (s), L2).
 Proof.
-  intros; unfold scoping; simpl; intros.
+  intros; unfold scopability; simpl; intros.
   destruct H8; steps.
   assert ((s ⊨ x ⇝ l) \/ ((s ⊨ x ⇝ I) /\ (s ⊨ v ⇝ l))) by
       eauto using rch_asgn_new with lia updates.
@@ -190,7 +190,7 @@ Lemma scp_assign:
     (σ, L ∪ {v}) ⋖ ([l ↦ (C, [f ↦ v] (ω))]σ, L ∪ {v}).
 
 Proof with (eauto with scp rch).
-  unfold scoping; intros.
+  unfold scopability; intros.
   destruct H3 as [l1 [H__l1 H__rch]].
   lets [? | [H__rch1 H__rch2 ]]: rch_asgn H__rch; eauto;
     eexists...
@@ -202,7 +202,7 @@ Lemma scp_assign_new:
     assign_new C x v σ = Some σ' ->
     (σ, L ∪ {v}) ⋖ (σ', L ∪ {v}).
 Proof with (eauto with scp rch).
-  unfold scoping, assign_new; intros. steps.
+  unfold scopability, assign_new; intros. steps.
   rewrite_anywhere PeanoNat.Nat.eqb_eq. subst.
   destruct H4 as [l1 [H__l1 H__rch]].
   lets [? | [H__rch1 H__rch2 ]]: rch_asgn_new H__rch; eauto;
@@ -241,18 +241,18 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
 
   - (* e = x *)
     apply scp_union...
-    unfold scoping; steps ... ss.
+    unfold scopability; steps ... ss.
     exists l; split; eauto using getVal_codom with ss.
 
   - (* e = this *)
     apply scp_union...
-    unfold scoping; steps...
+    unfold scopability; steps...
     exists ψ; split...
 
   - (* e = e.f *)
     intuition auto...
     lets: H5 L H2...
-    unfold scoping; steps...
+    unfold scopability; steps...
     apply H4...
     inverts H__ln...
     + exists l0...
@@ -262,7 +262,7 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     assert ((codom vl2 ∪ {v1}) ⪽ σ2); ss...
     assert (((L ∪ {v1}) ∪ codom vl2) ⪽ σ2); ss... apply ss_trans with σ...
     intuition auto.
-    unfold scoping; steps.
+    unfold scopability; steps.
     apply H9...
     apply H10... intros ?...
     apply H11... intros ? [ ]...
@@ -311,7 +311,7 @@ Proof with (rch_set; updates; eauto 3 with scp wf rch lia).
     rewrite codom_cons.
     eapply scp_trans with σ1 (L ∪ {v1})...
     (* Union associativity would simplify things *)
-    unfold scoping; intros.
+    unfold scopability; intros.
     apply IH__el... intros ? ...
     exists l0; split...
     inverts H__ln... inverts H9...

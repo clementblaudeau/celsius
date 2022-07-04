@@ -1,14 +1,11 @@
-Require Import Coq.Strings.String.
-Require Import Coq.Lists.List.
-Require Import Psatz.
-Require Import Coq.Program.Tactics.
+(* Celsius project *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 
-(* Borrowed and adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
-
+Require Import Coq.Strings.String Coq.Lists.List Psatz Coq.Program.Tactics.
+Import ListNotations.
 Open Scope string.
+(* Adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
-
-(* Global Hint Extern 1 => congruence: core. *)
 Global Hint Extern 50 => lia: lia.
 Global Hint Extern 50 => cbn: cbn.
 Global Hint Extern 50 => cbn; intuition auto: cbn_intuition.
@@ -38,16 +35,13 @@ Ltac destruct_and :=
   | H: _ /\ _ |- _ => destruct H
   end.
 
-
 Global Hint Rewrite Bool.andb_true_iff: bools.
 Global Hint Rewrite Bool.andb_false_iff: bools.
 Global Hint Rewrite Bool.orb_true_iff: bools.
 Global Hint Rewrite Bool.orb_false_iff: bools.
 Global Hint Rewrite Bool.negb_true_iff: bools.
 Global Hint Rewrite Bool.negb_false_iff: bools.
-Ltac bools :=
-  autorewrite with bools in *.
-
+Ltac bools := autorewrite with bools in *.
 
 Ltac destruct_match :=
 match goal with
@@ -306,6 +300,17 @@ Ltac move_top t :=
   | H1:t |- _ =>
      move H1 at top
   end.
+
+
+Ltac app_eq_nil :=
+  repeat match goal with
+         | H: nil = _ ++ (_ :: _) |- _ => symmetry in H
+         | H: _ ++ (_ :: _) = nil |- _ =>
+             exfalso; apply app_eq_nil in H as [_ H];
+             inversion H
+    end.
+
+Global Hint Extern 1 => app_eq_nil: core.
 
 
 From Celsius Require Export LibTactics.

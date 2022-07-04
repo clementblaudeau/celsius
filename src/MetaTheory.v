@@ -2,8 +2,8 @@
 (* Clément Blaudeau - LAMP@EPFL 2021 *)
 (** Store typing *)
 
-From Celsius Require Export Typing LibTactics Tactics Reachability Wellformedness.
-Require Import Coq.ssr.ssreflect Coq.ssr.ssrbool Coq.Lists.List Coq.micromega.Psatz Ensembles Coq.Program.Tactics.
+From Celsius Require Export Typing Reachability Wellformedness.
+Require Import ssreflect ssrbool Psatz List Ensembles Program.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
 (* Import ListNotations. *)
 (* Open Scope nat_scope. *)
@@ -19,7 +19,8 @@ Notation "Σ1 ≼ Σ2" := (monotonicity Σ1 Σ2) (at level 60).
 (** ** Authority *)
 Definition authority_st Σ1 Σ2 :=
   forall l C Ω, getType Σ1 l = Some (C, cool Ω) -> getType Σ2 l = Some (C, cool Ω).
-Notation "Σ1 ▷ Σ2" := (authority_st Σ1 Σ2) (at level 60).
+Global Instance notation_stackability_store : notation_authority StoreTyping :=
+  { authority_ := authority_st }.
 
 (** ** Value typing (with variants) *)
 
@@ -296,13 +297,13 @@ Qed.
 
 Lemma env_regularity: forall Γ Σ ρ x U T,
     Σ ⊨ ρ : Γ ->
-    ((Γ, U) ⊢ (var x) : T) ->
+    ((Γ, U) ⊢ (e_var x) : T) ->
     exists l, getVal ρ x = Some l /\ Σ ⊨ l : T.
 Proof.
   intros ...
-  remember (var x) as e.
+  remember (e_var x) as e.
   induction H0; try congruence.
-  - specialize (IHT_Expr H Heqe) as [l [H__val Ht]].
+  - specialize (IHexpr_typing H Heqe) as [l [H__val Ht]].
     exists l; steps.
     inverts Ht.
     eapply vt_sub; eauto with typ.
