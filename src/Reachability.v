@@ -80,7 +80,7 @@ Global Instance notation_semantic_set_mode : notation_dash_colon Store LocSet Mo
   { dash_colon_ := fun σ L μ => forall l, l ∈ L -> σ ⊨ l : μ }.
 
 Global Hint Unfold notation_semantic_mode notation_semantic_set_mode: rch.
-Hint Extern 1 => (eapply sm_warm): rch.
+Global Hint Extern 1 => (eapply sm_warm): rch.
 
 (** ** Tactics *)
 Ltac rch_singleton :=
