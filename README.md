@@ -2,7 +2,7 @@
 
 ![Celsius logo](https://github.com/clementblaudeau/celsius/blob/master/logo.png)
 
-# Celsius coq formalization
+# Celsius Coq formalization
 
 This repository contains the Coq formalization of the paper:
 * A Conceptual framework for Safe Object initialization, (submitted to OOPSLA 2022)
