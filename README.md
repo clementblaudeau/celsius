@@ -10,7 +10,7 @@ This repository contains the Coq formalization of the paper:
 
 ## Build
 
-To build the coq project, you'll need `coq` ( >= 8.14). From the top-level directory, run :
+To build the Coq project, you'll need `coq` ( >= 8.14). From the top-level directory, run :
 ```sh
 make Makefile.coq
 make
@@ -48,7 +48,7 @@ make
 
 ### Definitions
 The powerful notation mechanism of Coq allowed us to have notations that match the paper quite directly.
-|                          | Paper **and** coq formalization        | Coq term                             | File                                                                              |
+|                          | Paper **and** Coq notation        | Coq term                             | File                                                                              |
 | ------------------------ | -------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
 | Reachability             | $\sigma ⊨ l ⇝ l'$                      | `reachability`                       | [src/Reachability.v](src/Reachability.v)                                          |
 | Semantic modes           | $\sigma ⊨ l : \mu$                     | `semantic_mode`                      | [src/Reachability.v](src/Reachability.v)                                          |
