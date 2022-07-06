@@ -3,9 +3,6 @@
 (** This file defines and proves the soundess of the type system. *)
 
 From Celsius Require Export LocalReasoning Eval.
-Require Import ssreflect ssrbool Psatz Sets.Ensembles List Coq.Sets.Finite_sets_facts Coq.Program.Tactics.
-Import ListNotations Arith.
-Open Scope nat_scope.
 Implicit Type (ρ: Env).
 
 Local Hint Constructors evalP: typ.
