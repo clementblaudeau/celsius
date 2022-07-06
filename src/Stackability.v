@@ -9,11 +9,7 @@ if the new objects in [σ'] are warm. To prove this, we use the evaluator result
 custom proof the initialization case *)
 
 From Celsius Require Export Wellformedness.
-Require Import ssreflect ssrbool Psatz List.
-Import ListNotations.
-Open Scope nat_scope.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
-
 
 (** ** Definitions and notations *)
 Definition stackability σ σ' :=

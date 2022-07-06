@@ -1,5 +1,12 @@
-From Celsius Require Import Language.
-Import List Ensembles.
+(* Celsius project *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+
+From Celsius Require Export Language.
+Require Export PeanoNat.
+Export ListNotations.
+Global Open Scope nat_scope.
+Global Open Scope list_scope.
 
 (** ** Overloaded notations *)
 Class notation_dash (A B: Type) :=

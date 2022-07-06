@@ -1,7 +1,8 @@
-From Celsius Require Export Language Notations Helpers LibTactics.
-Require Import List ListSet Psatz.
-Open Scope nat_scope.
-Import ListNotations.
+(* Celsius project *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+
+From Celsius Require Export Helpers.
 
 
 (* Mode lattice *)

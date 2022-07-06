@@ -1,9 +1,9 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
 
-Require Import Coq.Strings.String Coq.Lists.List Psatz Coq.Program.Tactics.
+Require Export String List Psatz Coq.Program.Tactics Arith.
 Import ListNotations.
-Open Scope string.
 (* Adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
 Global Hint Extern 50 => lia: lia.

@@ -1,11 +1,7 @@
 (* Celsius project *)
-(* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the evaluator as a predicate and shows the equivalence with the functional version *)
-
-From Celsius Require Export Language Notations Helpers LibTactics .
-Require Import ssreflect ssrbool  Coq.Program.Tactics.
-Import List Psatz Arith ListNotations.
-Open Scope nat_scope.
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+From Celsius Require Export Helpers.
 
 (* Notation only used for the definition *)
 Reserved Notation "'⟦'  e  '⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' v0 ',' σ0 ')'" (at level 80).

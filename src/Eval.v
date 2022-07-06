@@ -1,13 +1,10 @@
 (* Celsius project *)
-(* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the big-step evaluator of the language (with fuel). It is then shown
-equivalent to the predicate version *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+(* This file defines the big-step evaluator of the language (with fuel). It is then shown equivalent
+to the predicate version *)
 
-From Celsius Require Export Semantics Tactics.
-Require Import ssreflect ssrbool.
-Require Import List Psatz Arith.
-Import ListNotations.
-Open Scope nat_scope.
+From Celsius Require Import Semantics.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
 
 

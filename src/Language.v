@@ -1,10 +1,10 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
 
 (** This file defines all the basic structures of the language (as inductive types). *)
 
-From Celsius Require Export Tactics.
-Require Import Coq.Lists.List Psatz Ensembles.
+Require Export List Ensembles.
 Import ListNotations.
 
 (** * Language structures *)

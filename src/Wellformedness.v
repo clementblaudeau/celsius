@@ -1,8 +1,13 @@
 (* Celsius project *)
-(* Clément Blaudeau - Lamp@EPFL 2021 *)
-(** This file defines the notion of wellformedness for scopes. The set of reachable locations must all be valid locations of the store - that is, locations that are inside of the store. The main result is to show that if we start from a wellformed store that contains the local environment ρ and the [this] pointer, then we end up with a wellformed store that contains the location of the result *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+(* This file defines the notion of wellformedness for scopes. The set of reachable locations must
+all be valid locations of the store - that is, locations that are inside of the store. The main
+result is to show that if we start from a wellformed store that contains the local environment ρ and
+the [this] pointer, then we end up with a wellformed store that contains the location of the
+result *)
 
-From Celsius Require Export Semantics PartialMonotonicity Reachability.
+From Celsius Require Export PartialMonotonicity Reachability.
 Require Import ssreflect ssrbool Psatz List Sets.Ensembles Coq.Program.Tactics Coq.Sets.Finite_sets_facts.
 Import ListNotations.
 Open Scope nat_scope.

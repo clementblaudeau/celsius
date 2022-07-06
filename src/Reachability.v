@@ -1,16 +1,12 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+(* This file defines the notion of reachability of a location in a given store. The set of reachable
+locations, starting from a given one l is transitively defined as the ones that can be accessed by
+following pointers in object local environments. We then define and prove basic properties around
+this notion. At the end, the Reachability_dec section shows that the predicate is decidable *)
 
-(** This file defines the notion of reachability of a location in a given store. The set of
-reachable locations, starting from a given one l is transitively defined as the ones that can be
-accessed by following pointers in object local environments. We then define and prove basic
-properties around this notion. At the end, the Reachability_dec section shows that the predicate is
-decidable *)
-
-From Celsius Require Export Language Helpers Notations.
-Require Import ssreflect ssrbool Coq.Arith.Wf_nat Coq.Wellfounded.Wellfounded List Psatz Ensembles.
-Import ListNotations.
-Open Scope list_scope.
+From Celsius Require Export Helpers.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet).
 
 (** ** Definitions and notations *)
@@ -305,7 +301,6 @@ Section Reachability_Dec.
     induction tr; intros.
     - inverts H;
         exists ([]: list Loc); splits...
-      apply app_eq_nil in H0 as [_ H0]. inversion H0.
     - lets [ ]: rch_tr_hd_rch H.
       lets (tr__nd & ? & ?): IHtr H1.
       destruct (in_dec (PeanoNat.Nat.eq_dec) a tr__nd).

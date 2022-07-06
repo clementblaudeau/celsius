@@ -1,9 +1,10 @@
-From Celsius Require Import Language Notations Tactics LibTactics.
-Import List ListNotations Psatz Ensembles Nat.
-Require Import ssreflect ssrbool Coq.Sets.Finite_sets_facts Coq.Program.Tactics.
-Open Scope list_scope.
-Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
+(* Celsius project *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
 
+From Celsius Require Export Notations LibTactics Tactics.
+Require Export ssreflect ssrbool Coq.Sets.Finite_sets_facts.
+Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
 
 (** ** Helper functions *)
 Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
@@ -11,7 +12,6 @@ Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
 Definition getType (Σ : StoreTyping): Loc -> option Tpe := nth_error Σ.
 Definition typeLookup (Γ: EnvTyping): Loc -> option Tpe := nth_error Γ.
 Local Hint Unfold getObj getVal getType: updates.
-
 
 (** * Updates **)
 Fixpoint update {X : Type} (position : nat) (value : X) (l : list X) : list X :=
@@ -346,7 +346,7 @@ Global Hint Extern 1 => updates: updates.
 (** * Maps *)
 
 Lemma dom_map:
-  forall Σ l (f: Tpe -> Tpe),
+  forall Σ (f: Tpe -> Tpe),
     dom (map (fun T => f T) Σ) = dom Σ.
 Proof.
   intros.

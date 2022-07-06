@@ -1,12 +1,17 @@
 (* Celsius project *)
-(* Clément Blaudeau - Lamp@EPFL 2021 *)
-(** This file defines the notions of scoping and scoping preservation. There are more complex and subtle, and should not serve as an introduction to the local reasonning properties.
-The main idea is pretty natural: to ensure that newly created objects are hot, we need to check that, transitively, all locations reachable from the attributes of the object are intialized. To do so, we need to be able to reason about the set of locations that are reachable from a set of attributes in a given store. Given two stores [σ] and [σ'], and two sets of locations [L] and [L'], the pair [(σ, L)] "scopes" [(σ',L')] if all locations reachable from [L'] in [σ'] were already reachable from [L] in [σ].
- But as we allow to manipulate objects under initialization, we also need to consider a notion of "preservation" : scoping relations that are maintained when updating from one store to another. *)
-From Celsius Require Export PartialMonotonicity Wellformedness Reachability Tactics.
-Require Import ssreflect ssrbool Psatz Sets.Ensembles List.
-Import ListNotations.
-Open Scope nat_scope.
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+(** This file defines the notions of scoping and scoping preservation. There are more complex and
+subtle, and should not serve as an introduction to the local reasonning properties.  The main idea
+is pretty natural: to ensure that newly created objects are hot, we need to check that,
+transitively, all locations reachable from the attributes of the object are intialized. To do so, we
+need to be able to reason about the set of locations that are reachable from a set of attributes in
+a given store. Given two stores [σ] and [σ'], and two sets of locations [L] and [L'], the pair [(σ,
+L)] "scopes" [(σ',L')] if all locations reachable from [L'] in [σ'] were already reachable from [L]
+in [σ].  But as we allow to manipulate objects under initialization, we also need to consider a
+notion of "preservation" : scoping relations that are maintained when updating from one store to
+another. *)
+From Celsius Require Export  Wellformedness.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
 
 (** ** Definitions and Notations *)

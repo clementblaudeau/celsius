@@ -1,11 +1,13 @@
 (* Celsius project *)
-(* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** This file defines the notion of partial monotonicity between stores. The idea behind partial monotonicity is simple: objects that are being initialized (not warm already) can only get "warmer": the number of initialized fields can only increase. Between two stores [σ] and [σ'], it means that all objects in [σ] have more initialized fields in [σ']; it does not states anything about new objects that [σ'] can have. *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+(* This file defines the notion of partial monotonicity between stores. The idea behind partial
+monotonicity is simple: objects that are being initialized (not warm already) can only get "warmer":
+the number of initialized fields can only increase. Between two stores [σ] and [σ'], it means that
+all objects in [σ] have more initialized fields in [σ']; it does not states anything about new
+objects that [σ'] can have. *)
 
 From Celsius Require Export Semantics.
-Require Import ssreflect ssrbool List Psatz Coq.Program.Tactics.
-Import ListNotations.
-Open Scope nat_scope.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
 
 (** ** Definitions and notations *)

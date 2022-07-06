@@ -1,12 +1,9 @@
 (* Celsius project *)
-(* Clément Blaudeau - LAMP@EPFL 2021 *)
-(** Store typing *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
 
-From Celsius Require Export Typing Reachability Wellformedness.
-Require Import ssreflect ssrbool Psatz List Ensembles Program.
+From Celsius Require Export Typing Wellformedness.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
-(* Import ListNotations. *)
-(* Open Scope nat_scope. *)
 
 
 (** * Main definitions *)

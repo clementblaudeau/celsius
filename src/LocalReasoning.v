@@ -2,10 +2,7 @@
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
 (** This file defines the main result of local reasoning, built upon wellformedness, compatibility, scopability and stackability. In a wellformed, fully initialized context, a newly created object can only access hot (transitively fully initialized) locations. *)
 
-From Celsius Require Export Scopability PartialMonotonicity Stackability MetaTheory.
-Require Import ssreflect ssrbool PeanoNat List Psatz Sets.Ensembles Coq.Sets.Finite_sets_facts.
-Import ListNotations.
-Open Scope nat_scope.
+From Celsius Require Export Scopability Stackability MetaTheory.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping).
 
 (** ** Local Reasoning theorem *)
