@@ -1,20 +1,20 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 (* ------------------------------------------------------------------------ *)
-(* This file defines the big-step evaluator of the language (with fuel). It is then shown equivalent
-to the predicate version *)
+(* This file defines the definitional interpreter of the language. It is then shown equivalent to
+the big step-semantics (when it succeeds) *)
 
 From Celsius Require Import Semantics.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
 
-
+(* ------------------------------------------------------------------------ *)
 (** ** Evaluation results *)
 
 (* Evaluation result *)
 Inductive result : Type :=
 | Timeout
 | Error
-| Success : Value -> Store -> result.
+| Success : Loc -> Store -> result.
 
 Inductive result_l : Type :=
 | Timeout_l
@@ -26,8 +26,8 @@ Inductive result_i : Type :=
 | Error_i
 | Success_i σ : result_i.
 
-(** ** Big step evaluator (with fuel) *)
-(** We define the [eval] function along with its notations *)
+(* ------------------------------------------------------------------------ *)
+(** ** Definitional Evaluator (with fuel) *)
 
 Fixpoint eval e σ ρ v k :=
   match k with
@@ -105,7 +105,9 @@ Fixpoint eval e σ ρ v k :=
                | z => z end )
           end
   end
+
 where "⟦ e ⟧ ( σ , ρ , ψ , n )" := (eval e σ ρ ψ n)
+
 (** Evaluation of a list of expressions (fold) *)
 with eval_list (e_l: list Expr) σ ρ ψ n :=
        match n with
@@ -125,7 +127,8 @@ with eval_list (e_l: list Expr) σ ρ ψ n :=
                end
        end
 where  "⟦_ el _⟧ ( σ , ρ , ψ , n )" := (eval_list el σ ρ ψ n)
-(** Initialization of a list of fields using (fold) *)
+
+(** Initialization for the list of fields (when fields up to x have been initialized) *)
 with init (C: ClN) (flds: list Field) (I : Loc) x ρ σ n : result_i :=
        match n with
        | 0 => Timeout_i
@@ -144,7 +147,7 @@ with init (C: ClN) (flds: list Field) (I : Loc) x ρ σ n : result_i :=
                end
        end.
 
-
+(* The evaluation of a program is defined as the evaluation of the [main] of the Entryclass *)
 Definition eval_prog n :=
   match ct Entry with
   | class nil nil Mtds =>
@@ -156,7 +159,7 @@ Definition eval_prog n :=
   end.
 
 
-(** Associated ltac tactics : *)
+(* Associated tactics *)
 Ltac destruct_eval He v σ' :=
   match goal with
   | H: context[ match ⟦ ?e ⟧(?σ, ?ρ, ?ψ , ?k) with _ => _ end ] |- _ =>
@@ -171,7 +174,9 @@ Ltac destruct_eval_f :=
   let freshσ := fresh "σ" in
   destruct_eval freshH freshv freshσ.
 
+(* ------------------------------------------------------------------------ *)
 (** A simple result on lengths *)
+
 Lemma EvalListLength :
   forall el n σ σ' ρ ψ vl ,
     ⟦_ el _⟧(σ, ρ, ψ, n) = Success_l vl σ' ->
@@ -185,8 +190,10 @@ Proof.
     eapply IHel in matched1. steps.
 Qed.
 
-
+(* ------------------------------------------------------------------------ *)
 (** ** Evaluator fuel-monotonicity *)
+(* We show that adding more fuel does not changes a succeeding evaluation *)
+
 Lemma eval_step_monotonicity_aux: forall n,
     (forall m, m > n ->
           (forall e σ ρ ψ v σ', ⟦ e ⟧ (σ, ρ, ψ, n) = Success v σ' ->
@@ -272,104 +279,116 @@ Proof with try lia.
   eauto with lia.
 Qed.
 
+(* ------------------------------------------------------------------------ *)
+(** ** Equivalence *)
+
+(* The success of the big step predicates implies the success of the eval function *)
+Lemma evalP_implies_eval :
+  (forall e σ ρ ψ l σ',
+      ⟦ e ⟧ (σ, ρ, ψ) --> (l,σ') ->
+      exists n, ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ') /\
+    (forall el σ ρ ψ vl σ',
+        ⟦el⟧ (σ, ρ, ψ) --> (vl, σ') ->
+        exists n, ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ') /\
+    (forall C I x ρ σ σ',
+        initP C I x ρ σ σ' ->
+        exists n Args Flds Mtds DoneFlds flds,
+          ct C = class Args Flds Mtds /\
+            Flds = DoneFlds++flds /\
+            x = length DoneFlds /\
+            init C flds I x ρ σ n = Success_i σ').
+Proof with (cross_rewrites; eauto 3 using evalP, evalListP, initP; try lia).
+  apply evalP_multi_ind; intros;
+    try solve [exists 1; steps];
+    repeat match goal with
+      | H: exists n, _ |- _ => destruct H as [?n H]
+      end.
+  + exists (S n); steps.
+  + remember (S (max n1 (max n0 n))) as n2.
+    eapply eval_step_monotonicity with (m := n2) in IH__e0, IH__e2...
+    eapply evalList_step_monotonicity with (m := n2) in IH__el...
+    exists (S n2). simpl; repeat rewrite_any => //.
+  + remember (S (max n n0)) as n1.
+    destruct DoneFlds; simpl in * ...
+    eapply evalList_step_monotonicity with (m := n1) in IH__args...
+    destruct IH__init as (? & ? & _ & IH__init).
+    eapply init_step_monotonicity with (m := n1) in IH__init...
+    exists (S n1). simpl. rewrite IH__args H__ct H0 IH__init => //.
+  + remember (S (max n (max n0 n1))) as n2.
+    eapply eval_step_monotonicity with (m := n2) in IH__e1, IH__e2, IH__e'...
+    exists (S n2). simpl. rewrite IH__e1 IH__e2 IH__e'...
+  + remember (S (max n n0)) as n1.
+    eapply eval_step_monotonicity with (m := n1) in IH__e...
+    eapply evalList_step_monotonicity with (m := n1) in IH__el...
+    exists (S n1). simpl. rewrite IH__e IH__el...
+  + exists 1, Args, Flds, Mtds, Flds, ([]: list Field); simpl; splits...
+    rewrite app_nil_r...
+  + remember (S (max n n0)) as n1.
+    eapply eval_step_monotonicity with (m := n1) in IH__e...
+    destruct IH__init as (? & ? & ? & IH__init).
+    eapply init_step_monotonicity with (m := n1) in IH__init...
+    exists (S n1), Args0, Flds0, Mtds0.
+    lets (?DoneFlds & ?flds & ? & ?) : nth_error_split H__fld.
+    exists DoneFlds0, (field T e :: flds0). splits...
+    simpl in *. rewrite IH__e H__assign.
+    assert (flds = flds0); [|steps].
+    eapply app_inv_tail_length with DoneFlds (DoneFlds0++[field T e]); updates...
+    rewrite app_assoc_reverse...
+Qed.
+
+(* Conversely, the success of the eval function implies the success of the predicate *)
+Lemma eval_implies_evalP :
+  forall n,
+    (forall e σ ρ ψ v σ',
+        ⟦ e ⟧(σ, ρ, ψ, n) = Success v σ' -> ⟦ e ⟧(σ, ρ, ψ) --> (v, σ')) /\
+      (forall el σ ρ ψ vl σ',
+          ⟦_ el _⟧(σ, ρ, ψ, n) = Success_l vl σ' -> ⟦ el ⟧(σ, ρ, ψ) --> (vl,σ')) /\
+      (forall C flds I x ρ σ σ' Args Flds Mtds DoneFlds,
+          init C flds I x ρ σ n = Success_i σ' ->
+          ct C = class Args Flds Mtds ->
+          Flds = DoneFlds ++ flds ->
+          length DoneFlds = x ->
+          initP C I x ρ σ σ').
+Proof with (eauto using evalP, evalListP, initP; try lia).
+  induction n as [n IHn] using lt_wf_ind.
+  destruct n; repeat split => //.
+  all: intros; move : (IHn n) => [ ] // => IHn__e [IHn__el IHn__init]; clear IHn.
+  + simpl in H. steps...
+    eapply bs_new...
+    eapply IHn__init with (DoneFlds := [])...
+  + steps; eauto using evalP...
+  + steps; eauto using initP...
+    * rewrite app_nil_r in H0...
+    * apply IHn__e in matched.
+      eapply IHn__init with (DoneFlds := (DoneFlds ++ [field (c, m) expr])) in H; updates...
+      -- eapply init_cons...
+         rewrite nth_error_app2...
+         rewrite -minus_diag_reverse; simpl...
+      -- rewrite app_assoc_reverse; simpl...
+Qed.
+
+(* Then the theorem : *)
 Theorem evalP_eval :
   forall e σ ρ ψ l σ',
-    ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ') <-> exists n, ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ'.
-Proof with (eauto using evalP, initP; try lia).
-  split; intros.
-  - induction H using evalP_ind2 with
-      (Pl := fun el σ ρ ψ vl σ' (H__el : evalListP el σ ρ ψ vl σ') =>
-               exists n, ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ')
-      (Pin := fun C I x ρ σ σ' (H__init : initP C I x ρ σ σ') =>
-                exists n Args Flds Mtds DoneFlds flds,
-                  ct C = class Args Flds Mtds /\
-                    Flds = DoneFlds++flds /\
-                    x = length DoneFlds /\
-                    init C flds I x ρ σ n = Success_i σ');
-      try solve [exists 1; steps];
-      repeat match goal with
-             | H: exists n, _ |- _ => destruct H as [?n H]
-             end.
-    + exists (S n); steps.
-    + set (n2 := S (max n1 (max n0 n))).
-      eapply eval_step_monotonicity with (m := n2) in IHevalP1, IHevalP3...
-      eapply evalList_step_monotonicity with (m := n2) in IHevalP2...
-      exists (S n2); steps.
-    + remember (S (max n n0)) as n1.
-      eapply evalList_step_monotonicity with (m := (S n1)) in IHevalP...
-      destruct IHevalP0 as (? & ? & ? & IHevalP0).
-      eapply init_step_monotonicity with (m := (S n1)) in IHevalP0...
-      symmetry in H1. apply length_zero_iff_nil in H1.
-      exists (S (S n1)).
-      steps.
-    + remember (S (max n (max n0 n1))) as n2.
-      eapply eval_step_monotonicity with (m := n2) in IHevalP1, IHevalP2, IHevalP3...
-      exists (S n2). steps.
-    + remember (S (max n n0)) as n1.
-      eapply eval_step_monotonicity with (m := n1) in IHevalP...
-      eapply evalList_step_monotonicity with (m := n1) in IHevalP0...
-      exists (S n1). steps.
-    + exists 1, Args, Flds, Mtds, Flds, ([]: list Field); simpl; splits...
-      rewrite app_nil_r...
-    + remember (S (max n n0)) as n1.
-      eapply eval_step_monotonicity with (m := n1) in IHevalP...
-      destruct IHevalP0 as (? & ? & ? & IHevalP0).
-      eapply init_step_monotonicity with (m := n1) in IHevalP0...
-      exists (S n1), Args, Flds, Mtds.
-      cross_rewrites.
-      lets (?DoneFlds & ?flds & ? & ?) : nth_error_split H__fld.
-      exists DoneFlds0, (field T e :: flds0). splits...
-      simpl in *. rewrite IHevalP H__assign.
-      assert (flds = flds0); [|steps].
-      eapply app_inv_tail_length with DoneFlds (DoneFlds0++[field T e]); updates...
-      rewrite app_assoc_reverse. steps.
-  - destruct H as [n H].
-    gen e σ ρ ψ l σ'.
-    eapply proj1 with (
-        (forall el σ ρ ψ vl σ',
-            ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' ->
-            ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ')) /\
-          (forall C flds I x ρ σ σ' Args Flds Mtds DoneFlds,
-              init C flds I x ρ σ n = Success_i σ' ->
-              ct C = class Args Flds Mtds ->
-              Flds = DoneFlds ++ flds ->
-              length DoneFlds = x ->
-              initP C I x ρ σ σ')).
-    induction n as [n IHn] using lt_wf_ind.
-    destruct n; repeat split => //; intros;
-      move : (IHn n) => [ ] // => IHn__e [IHn__el IHn__init]; clear IHn.
-    + simpl in H. steps; eauto using evalP.
-      eapply bs_new... eapply IHn__init with (DoneFlds := [])...
-    + steps; eauto using evalP...
-      apply IHn__e in matched.
-      apply IHn__el in matched0.
-      eapply bs_cons...
-    + steps; eauto using initP...
-      * rewrite app_nil_r in H0...
-      * apply IHn__e in matched.
-        eapply IHn__init with (DoneFlds := (DoneFlds ++ [field (c, m) expr])) in H; updates...
-        -- eapply init_cons...
-           rewrite nth_error_app2...
-           rewrite -minus_diag_reverse; simpl...
-        -- rewrite app_assoc_reverse; simpl...
+    ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ') <-> exists n, ⟦ e ⟧(σ, ρ, ψ, n) = Success l σ'.
+Proof.
+  split; intros;
+    [eapply evalP_implies_eval| inverts H; eapply eval_implies_evalP]; eauto.
 Qed.
 
-
-Corollary eval_implies_evalp :
-  forall e σ ρ ψ l σ' n, ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ' -> ⟦ e ⟧p (σ, ρ, ψ) --> (l,σ').
+(* Specialized lemmas *)
+Corollary eval_implies_evalP_expr :
+  forall e σ ρ ψ l σ' n,
+    ⟦ e ⟧ (σ, ρ, ψ, n) = Success l σ' -> ⟦ e ⟧(σ, ρ, ψ) --> (l,σ').
 Proof.
-  intros.
-  apply evalP_eval; eauto.
+  intros; eapply eval_implies_evalP; eauto.
 Qed.
 
-Corollary eval_list_implies_evalp :
-  forall el σ ρ ψ vl σ' n, ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' -> ⟦_ el _⟧p (σ, ρ, ψ) --> (vl,σ').
+Corollary eval_implies_evalP_list :
+  forall el σ ρ ψ vl σ' n,
+    ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' -> ⟦ el ⟧(σ, ρ, ψ) --> (vl,σ').
 Proof.
-  induction el; intros.
-  - destruct n; steps.
-  - destruct n; steps.
-    eapply bs_cons;
-      eauto using evalP, eval_implies_evalp.
+  intros; eapply eval_implies_evalP; eauto.
 Qed.
 
 Corollary init_implies_initP :
@@ -379,14 +398,6 @@ Corollary init_implies_initP :
     Flds = DoneFlds ++ flds ->
     length DoneFlds = x ->
     initP C I x ρ σ σ'.
-Proof with (eauto using initP with lia).
-  induction flds; intros; destruct n; steps...
-  - rewrite app_nil_r in H0...
-  - eapply init_cons with (σ2 := s0); eauto.
-    + rewrite nth_error_app2...
-      rewrite -minus_diag_reverse; simpl...
-    + eapply eval_implies_evalp...
-    + eapply IHflds with (DoneFlds := DoneFlds ++ [field (c, m) expr])...
-      * rewrite app_assoc_reverse; steps.
-      * updates...
+Proof.
+  intros; eapply eval_implies_evalP; eauto.
 Qed.

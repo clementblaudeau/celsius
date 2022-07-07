@@ -1,31 +1,40 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 (* ------------------------------------------------------------------------ *)
+(* This files defines the big step semantics and an induction predicate on the rules *)
+
 From Celsius Require Export Helpers.
+
+
+(* ------------------------------------------------------------------------ *)
+(** ** Big step semantics *)
 
 (* Notation only used for the definition *)
 Reserved Notation "'⟦'  e  '⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' v0 ',' σ0 ')'" (at level 80).
 Reserved Notation "'⟦_' e '_⟧p' '(' σ ',' ρ ',' v ')'  '-->'  '(' vl ',' σl ')'" (at level 80).
 
-Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
+(* Big step semantics for an expression *)
+Inductive evalP : Expr -> Store -> Env -> Loc -> Loc -> Store -> Prop :=
 
-(** variable *)
+(* Variable : we retrieve the value of x in the local environment ρ *)
 | bs_var : forall σ x ρ ψ l,
     getVal ρ x = Some l ->
     ⟦ e_var x ⟧p (σ, ρ, ψ) --> (l, σ)
 
-(** this *)
+(* This : we return the current this pointer ψ *)
 | bs_this : forall σ ρ ψ,
     ⟦ e_this ⟧p (σ, ρ, ψ) --> (ψ, σ)
 
-(** field access *)
+(* Field access : we compute the object e, and fetch the value of the field in the resulting
+object *)
 | bs_fld : forall σ ρ ψ e f v1 σ1 C ω v,
     ⟦ e ⟧p (σ, ρ, ψ) --> (v1, σ1) ->
     getObj σ1 v1 = Some (C, ω) ->
     getVal ω f = Some v ->
     ⟦ (e_fld e f) ⟧p (σ, ρ, ψ) --> (v, σ1)
 
-(** method call : e0.m(args) *)
+(* Method call : we first compute the object on which the method will be called, then the arguments,
+and then we fetch the body of the method which we execute with the arguments as local environment *)
 | bs_mtd : forall σ e0 m el e2 ρ ψ l1 vl2 l3 σ1 σ2 σ3 C Args Flds Mtds f argsM T μ,
     ⟦ e0 ⟧p (σ, ρ, ψ) --> (l1, σ1) ->
     getObj σ1 l1 = Some (C, f) ->
@@ -35,7 +44,8 @@ Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
     ⟦ e2 ⟧p (σ2, vl2, l1) --> (l3, σ3) ->
     ⟦ e_mtd e0 m el ⟧p (σ, ρ, ψ) --> (l3, σ3)
 
-(** new class *)
+(* New instance : we compute the arguments and call the special procedure [initP] to initialize the
+new instance *)
 | bs_new : forall σ ρ ψ C Args Flds Mtds args vl__args σ1 σ3,
     ⟦_ args _⟧p (σ, ρ, ψ) --> (vl__args, σ1) ->
     ct C = class Args Flds Mtds ->
@@ -43,7 +53,8 @@ Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
     initP C I 0 vl__args (σ1 ++ [(C, [])]) σ3 ->
     ⟦ e_new C args ⟧p (σ, ρ, ψ) --> (I, σ3)
 
-(** assignment *)
+(* Assignment : we compute the object, the value and update the field x. Then we compute the other
+expression e' *)
 | bs_asgn : forall σ ρ ψ e1 x e2 e' σ1 v1 σ2 v2 σ3 v3,
     ⟦ e1 ⟧p (σ, ρ, ψ) --> (v1, σ1) ->
     ⟦ e2 ⟧p (σ1, ρ, ψ) --> (v2, σ2) ->
@@ -52,38 +63,53 @@ Inductive evalP : Expr -> Store -> Env -> Value -> Value -> Store -> Prop :=
 
 where "'⟦' e '⟧p' '(' σ ',' ρ ',' v ')' '-->' '(' v0 ',' σ0 ')' "  := (evalP e σ ρ v v0 σ0)
 
-with evalListP : list Expr -> Store -> Env -> Value -> list Value -> Store -> Prop :=
+(* Big step semantics for a list of expressions (mainly a fold left) *)
+with evalListP : list Expr -> Store -> Env -> Loc -> list Loc -> Store -> Prop :=
+
 | bs_nil : forall σ ρ ψ,
     ⟦_ [] _⟧p (σ, ρ, ψ) --> ([], σ)
+
 | bs_cons : forall σ ρ ψ e el l1 σ1 vl σ2,
     ⟦ e ⟧p (σ, ρ, ψ) --> (l1, σ1) ->
     ⟦_ el _⟧p (σ1, ρ, ψ) --> (vl, σ2) ->
     ⟦_ (e::el) _⟧p (σ, ρ, ψ) --> (l1::vl, σ2)
+
 where "'⟦_' el '_⟧p' '(' σ ',' ρ ',' v ')' '-->' '(' vl ',' σ0 ')' "  := (evalListP el σ ρ v vl σ0)
 
-(* initialize between x and (length Flds)*)
+(* Initialization procedure: we compute the mandatory field initializers for the fields between x
+and (length Flds) *)
 with initP : ClN -> Var -> nat -> Env -> Store -> Store -> Prop :=
+
+(* No fields left to initialize *)
 | init_nil : forall C I ρ σ Args Flds Mtds,
     ct C = class Args Flds Mtds ->
     initP C I (dom Flds) ρ σ σ
+
+(* We compute the value of the defining expression, then update the store (which can already a value
+for x) and proceed *)
 | init_cons : forall C I x ρ σ v T e Args Flds Mtds σ1 σ2 σ3,
     ct C = class Args Flds Mtds ->
     nth_error Flds x = Some (field T e) ->
-
     ⟦ e ⟧p (σ, ρ, I) --> (v, σ1) ->
     assign_new I x v σ1 = Some σ2 ->
     initP C I (S x) ρ σ2 σ3 ->
-
     initP C I x ρ σ σ3.
 
-
-Global Instance notation_big_step_list_expr : notation_big_step (list Expr) (list Value) :=
+(* Overloaded notations between expressions and lists of expressions *)
+Global Instance notation_big_step_list_expr : notation_big_step (list Expr) (list Loc) :=
   { big_step_ := evalListP }.
-
-Global Instance notation_big_step_expr : notation_big_step Expr Value :=
+Global Instance notation_big_step_expr : notation_big_step Expr Loc :=
   { big_step_ := evalP }.
+Global Hint Unfold big_step_: core.
+Global Hint Unfold notation_big_step_expr: core.
+Global Hint Unfold notation_big_step_list_expr: core.
+
+(* ------------------------------------------------------------------------ *)
+(** ** Induction predicate *)
 
 Section evalP_ind.
+  (* We define a custom induction predicate *)
+
   Variable P : forall e σ ρ ψ v σ', (evalP e σ ρ ψ v σ') -> Prop.
   Variable Pl : forall el σ ρ ψ vl σ', (evalListP el σ ρ ψ vl σ') -> Prop.
   Variable Pin : forall C ψ x ρ σ σ', (initP C ψ x ρ σ σ') -> Prop.
@@ -183,9 +209,10 @@ Section evalP_ind.
 
 End evalP_ind.
 
-
+(* ------------------------------------------------------------------------ *)
 (** ** Conservation result *)
-(** The monotonicity on the size of the store is easy to obtain via induction *)
+(* The monotonicity on the size of the store is easy to obtain via induction *)
+
 Theorem dom_theorem:
   (forall e σ ρ ψ v σ',
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> dom σ <= dom σ') /\
@@ -238,6 +265,12 @@ Ltac eval_dom :=
              let fresh := fresh "H_dom" in
              add_hypothesis fresh (evalP_dom e σ ρ ψ v σ' H)
          | H: ⟦_ ?el _⟧p (?σ, ?ρ, ?ψ) --> (?vl, ?σ') |- _ =>
+             let fresh := fresh "H_dom" in
+             add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
+         | H: ⟦ ?e ⟧ (?σ, ?ρ, ?ψ) --> (?v, ?σ') |- _ =>
+             let fresh := fresh "H_dom" in
+             add_hypothesis fresh (evalP_dom e σ ρ ψ v σ' H)
+         | H: ⟦?el ⟧ (?σ, ?ρ, ?ψ) --> (?vl, ?σ') |- _ =>
              let fresh := fresh "H_dom" in
              add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
          | H: initP ?C ?ψ ?x ?ρ ?σ ?σ' |- _ =>

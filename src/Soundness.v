@@ -1,17 +1,20 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
+(* ------------------------------------------------------------------------ *)
 (** This file defines and proves the soundess of the type system. *)
 
 From Celsius Require Export LocalReasoning Eval.
 Implicit Type (ρ: Env).
 
-Local Hint Constructors evalP: typ.
-Local Hint Constructors expr_typing: typ.
-Local Hint Constructors expr_list_typing: typ.
+(* ------------------------------------------------------------------------ *)
+Local Hint Constructors evalP expr_typing expr_list_typing: typ.
 
+(* We assume the class table is well typed : *)
 Parameter typable_classes: T_Classes.
 
+(* ------------------------------------------------------------------------ *)
 (** ** Weakening *)
+
 Lemma S_Typs_weakening:
   forall Γ Γ',
     S_Typs Γ' Γ ->
@@ -24,6 +27,7 @@ Proof with (meta; eauto with typ).
 Qed.
 Global Hint Resolve S_Typs_weakening: typ.
 
+(* Our typing enjoys a weakening lemma *)
 Theorem weakening: forall Γ Γ' U e T,
     (forall x T__x, typeLookup Γ x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x) ->
     ((Γ, U) ⊢ e : T) ->
@@ -40,21 +44,8 @@ Proof with (meta; eauto using expr_typing with typ lia).
   eapply H in H__lkp as [T__x' [ ]]...
 Qed.
 
-Lemma P_Hots_env:
-  forall Args l args_val Σ1,
-    P_hots Args ->
-    Σ1 ⊨ args_val : Args ->
-    l ∈ codom args_val ->
-    Σ1 ⊨ l : hot.
-Proof with (meta; eauto with typ).
-  induction Args; intros; steps;
-    inverts H0; inverts H1; simpl in * ...
-  - inverts H.
-    unfold P_hot in H6; steps ...
-    exists c. eapply vt_sub ...
-  - inverts H ...
-Qed.
-Global Hint Resolve P_Hots_env: typ.
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness statements *)
 
 Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
     ((Γ, U) ⊢ e : T) ->
@@ -69,8 +60,6 @@ Definition expr_soundness n e ρ σ ψ r Γ Σ U T :=
       r = Success v σ' /\
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
         Σ' ⊨ v : T.
-
-(* Expr soundness trans lemma *)
 
 Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
     ((Γ, U) ⊩ el : Tl) ->
@@ -107,6 +96,11 @@ Definition init_soundness n C flds I x ρ σ Γ Σ r :=
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ ([I↦(C,cool (dom Flds))]Σ ▷ Σ') /\ (Σ' ⊨ σ') /\ wf σ' /\
         getType Σ' I = Some (C, cool (dom Flds)).
 
+(* We then prove several cases as lemmas *)
+
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness of field access *)
+
 Lemma soundness_fld:
   forall n,
     (forall e ρ σ ψ r Γ Σ U T,
@@ -134,7 +128,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct_eval H__eval v' σ';
     lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
     IH__expr HT__e H0 H1 H3 H__eval; try inverts H__r; try congruence ...
-  eapply eval_implies_evalp in H__eval.
+  eapply eval_implies_evalP_expr in H__eval.
   lets (?C & ?ω & ?μ & H__obj & ? & H__ot): (proj2 H__st0) v0 ...
   rewrite H__obj in H5 |- *.
 
@@ -159,9 +153,13 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       exists Σ0, v1, σ0; splits ...
     * (* cool Ω1 + Ω2 *)
       destruct (getVal ω f) as [v1 |] eqn:H__getVal; [|apply nth_error_None in H__getVal] ...
-      lets: H16 H__getVal H__fieldType...
+      lets: H17 H__getVal H__fieldType...
       exists Σ0, v1, σ0; splits ...
 Qed.
+
+
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness of method call *)
 
 Lemma soundness_mtd:
   forall n,
@@ -190,7 +188,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct_eval H__eval0 v σ';
     lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
     IH__expr HT__e0 H0 H1 H3 H__eval0; try inverts H__r; try congruence ...
-  eapply eval_implies_evalp in H__eval0.
+  eapply eval_implies_evalP_expr in H__eval0.
   lets H__pM0: pM_theorem_expr H__eval0.
   lets (?C & ?ω & ?μ & H__obj & ? & ?): (proj2 H__st0) v0 ...
   rewrite H__obj in H5 |- *.
@@ -200,6 +198,19 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct (ct C) as [Args1 Flds1 Mtds1] eqn:H__ct1.
   destruct (Mtds1 m) as [[?μ__r Ts retT ?] |] eqn:H__Mtds1; [| steps] . inverts H__mtdinfo...
 
+  repeat
+    match goal with
+    | H:⟦ ?e ⟧(?σ, ?ρ, ?ψ) --> (?v, ?σ')
+      |- _ => let fresh := fresh "H_dom" in
+            add_hypothesis fresh (evalP_dom e σ ρ ψ v σ' H)
+    | H:⟦ ?el ⟧(?σ, ?ρ, ?ψ) --> (?vl, ?σ')
+      |- _ => let fresh := fresh "H_dom" in
+            add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
+    | H:initP ?C ?ψ ?x ?ρ ?σ ?σ'
+      |- _ => let fresh := fresh "H_dom" in
+            add_hypothesis fresh (initP_dom C ψ x ρ σ σ' H)
+    end.
+
   (* Destruct evaluation of arguments *)
   lets H__env0: env_typing_monotonicity H__mn0 H0.
   eval_dom. eval_wf...
@@ -207,7 +218,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct_eval H__eval1 vl σ';
     lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
     IH__list HT__args H__env0 H__st0 H__wf0 H__eval1; try inverts H__r; try congruence ...
-  eapply eval_list_implies_evalp in H__eval1. eval_dom; eval_wf.
+  eapply eval_implies_evalP_list in H__eval1. eval_dom; eval_wf.
 
   (* Extract typing for method body from Ξ (well-typed) *)
   pose proof (typable_classes C) as HT__em.
@@ -223,7 +234,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct (⟦ e__m ⟧ (σ1, args_val, v0 ,  n)) as [ | | σ' v' ] eqn:H__eval2; try congruence;
     lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
     IH__expr HT__em' H__v1 H__st1 H__wf1 H__eval2; try inverts H__r; try congruence ...
-  eapply eval_implies_evalp in H__eval2. subst.
+  eapply eval_implies_evalP in H__eval2. subst.
 
   (* Result *)
   eval_dom; eval_wf.
@@ -242,6 +253,9 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       lets (?T & ?T & ? &?&?): H13 v2...
       exists Σ3, v2, σ2; splits ; auto; [ | | | eexists ]; eauto with typ.
 Qed.
+
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness of instance creation *)
 
 Lemma soundness_new:
   forall n,
@@ -271,7 +285,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     IH__list HT__args H0 H1 H3 H__eval1; try inverts H__r; try congruence ...
   inverts H...
   rewrite H__ct in H5 |- *.
-  eapply eval_list_implies_evalp in H__eval1...
+  eapply eval_implies_evalP_list in H__eval1...
 
   (* Destruct result of initialization *)
   remember (Σ1 ++ [(C, cool 0)]) as Σ2.
@@ -298,8 +312,8 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       repeat eexists... }
   lets H__wf2: wf_add_empty C H__wf1. rewrite -Heqσ2 in H__wf2.
   lets: getObj_last σ1 C ([]: Env).
-  destruct (init C Flds dom σ1 0 args_val (σ1 ++ [(C, [])]) n) as [ | | σ3] eqn:Heq;
-    rewrite Heq in H5 |- *; try congruence;
+  destruct (init C Flds dom σ1 0 args_val σ2 n) as [ | | σ3] eqn:Heq;
+    try rewrite Heq in H5 |- *; try congruence;
     specialize (IH__init C Flds (dom σ1) 0 args_val σ2 argsTs Σ2);
   lets (Σ4 & σ4 & H__r & H__mn4 & H__stk4 & H__aty4 & H__st4 & H__wf4 & H__getType4):
      IH__init ([]: list Field) H__st2 H__wf2 H__ct ; subst; simpl in *...
@@ -357,6 +371,9 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       lets: H__vnew (dom σ1) In_singleton... inverts H16... inverts H18...
 Qed.
 
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness of assignment *)
+
 Lemma soundness_asgn:
   forall n,
     (forall e ρ σ ψ r Γ Σ U T,
@@ -384,7 +401,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct_eval H__eval1 v' σ';
     lets (Σ1 & v1 & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
     IH__expr HT__e1 H0 H1 H3 H__eval1; try inverts H__r; try congruence ...
-  eapply eval_implies_evalp in H__eval1.
+  eapply eval_implies_evalP_expr in H__eval1.
   lets (?C & ?ω & ?μ & H__obj & ? & H__ot): (proj2 H__st1) v1 ...
 
   (* Destruct evaluation of e2 *)
@@ -394,7 +411,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct_eval H__eval2 v' σ';
     lets (Σ2 & v2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__v2) :
     IH__expr HT__e2 H__env1 H__st1 H__wf1 H__eval2; try inverts H__r; try congruence ...
-  eapply eval_implies_evalp in H__eval2. eval_dom; eval_wf.
+  eapply eval_implies_evalP_expr in H__eval2. eval_dom; eval_wf.
   lets (?T & ?T & ? & ? & ?): H__mn2 ψ ...
 
   (* Destruct assignment *)
@@ -402,18 +419,13 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct (getObj σ2 v1) as [[?C ?ω] |] eqn:H__getObj.
 
   + (* Useful assignment *)
-    remember ([v1 ↦ (C, [f ↦ v2] (ω0))] (σ2)) as σ2'. rewrite -Heqσ2' in H6.
+    remember ([v1 ↦ (C, [f ↦ v2] (ω0))] (σ2)) as σ2'. rewrite Heqσ2' in H6.
     assert (H__st2': Σ2 ⊨ σ2'). {
       subst. rename v1 into l, v2 into v.
       lets [?ω [H__obj2 _]]: pM_theorem_expr H__eval2 H__obj.
       lets [v0 [H__v0 ?]]: cool_selection D0 l H__st2 H__obj2... {
         lets (?T & ?T & ? & ? & ?): H__mn2 l...
         steps...
-        apply vt_sub with (C, μ5)...
-        apply s_typ_mode...
-        eapply s_mode_trans...
-        eapply s_mode_trans...
-        apply s_mode_cool...
       }
       meta.
       eapply storeTyping_assgn with (μ0 := μ5) ...
@@ -432,10 +444,13 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     destruct (⟦ e' ⟧ (σ2, ρ, ψ ,  n)) as [ | | σ' v' ] eqn:H__eval3; try congruence;
       lets (Σ3 & v3 & σ3 & H__r & H__mn3 & H__stk3 & H__aty3 & H__st3 & H__wf3 & H__v3) :
       IH__expr HT__e3 H__st2 H__wf2 H__eval3; try inverts H__r; try congruence ...
-    eapply eval_implies_evalp in H__eval3. eval_dom; eval_wf.
+    eapply eval_implies_evalP_expr in H__eval3. eval_dom; eval_wf.
     exists Σ3, v3, σ3; splits...
     all: eauto with typ.
 Qed.
+
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness of initialization of a field *)
 
 Lemma soundness_init_cons:
   forall n,
@@ -470,7 +485,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   destruct_eval H__eval v' σ';
     lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
     IH__expr HT__e H0 H1 H2 H__eval; try inverts H__r; try congruence ...
-  eapply eval_implies_evalp in H__eval.
+  eapply eval_implies_evalP_expr in H__eval.
   (* lets H__eM: aty_theorem_expr H__eval. lets [ω' [ ]]: H__eM H4. *)
   lets: monotonicity_dom H__mn0.
   lets (? & ? & ? & ? & ?): H__mn0 I...
@@ -528,6 +543,10 @@ Proof with (meta; meta_clean; eauto 2 with typ;
          eapply H__aty2. updates...
 Qed.
 
+
+(* ------------------------------------------------------------------------ *)
+(** ** Final soundness theorem *)
+
 Theorem soundness:
   forall n,
     (forall e ρ σ ψ r Γ Σ U T,
@@ -579,7 +598,7 @@ Proof with (
     destruct_eval H__eval v' σ';
       lets (Σ0 & v & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
       IH__expr H14 H0 H1 H3 H__eval; try inverts H__r; try congruence ...
-    eapply eval_implies_evalp in H__eval. eval_dom.
+    eapply eval_implies_evalP_expr in H__eval. eval_dom.
 
     (* Destruct evaluation of tail *)
     lets (?T & ?T & ? & ? & ?): H__mn0 ψ...
@@ -603,6 +622,10 @@ Proof with (
   - (* init_cons *)
     eapply soundness_init_cons...
 Qed.
+
+
+(* ------------------------------------------------------------------------ *)
+(** ** Soundness corollaries *)
 
 Theorem Soundness :
   forall n e ρ σ ψ r Γ Σ Tthis T,

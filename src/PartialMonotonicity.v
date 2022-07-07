@@ -10,15 +10,18 @@ objects that [σ'] can have. *)
 From Celsius Require Export Semantics.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
 
+(* ------------------------------------------------------------------------ *)
 (** ** Definitions and notations *)
+
 Definition partial_monotonicity σ σ' :=
   forall l C ω, getObj σ l = Some(C, ω) -> exists ω', getObj σ' l = Some(C, ω') /\ dom ω <= dom ω'.
 Notation "s ⪯ s'" := (partial_monotonicity s s') (at level 60).
-
 Local Hint Unfold partial_monotonicity: pM.
 
+(* ------------------------------------------------------------------------ *)
 (** ** Basic results on partial monotonicity*)
-(** The relation is trivially reflexive and transitive *)
+(* The relation is trivially reflexive and transitive *)
+
 Lemma pM_refl: forall σ,
     σ ⪯ σ.
 Proof. eauto with pM. Qed.
@@ -43,8 +46,9 @@ Ltac pM_trans :=
          end.
 Global Hint Extern 1 => pM_trans: pM.
 
+(* ------------------------------------------------------------------------ *)
+(* We have a result on the store sizes *)
 
-(** We have a result on the store sizes *)
 Lemma pM_domains:
   forall σ σ',
     σ ⪯ σ' -> dom σ <= dom σ'.
@@ -63,9 +67,10 @@ Proof.
 Qed.
 Global Hint Resolve pM_domains: pM.
 
-
+(* ------------------------------------------------------------------------ *)
 (** ** Main Monotonicity result *)
-(** We start with two technical results on partial monotonicity for assignment (update) and fresh location *)
+(* We start with two technical results on partial monotonicity for assignment (update) and fresh
+location *)
 Lemma pM_assign:
   forall σ l C ω f v,
     getObj σ l = Some (C, ω) ->
@@ -122,6 +127,7 @@ Proof with (eauto with pM updates lia).
     flatten; pM_trans; try discriminate...
 Qed.
 
+(* Specialized corollaries *)
 Corollary pM_theorem_expr:
   forall e σ ρ ψ v σ',
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ⪯ σ'.

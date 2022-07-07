@@ -1,17 +1,19 @@
 (* Celsius project *)
-(* Clément Blaudeau - LAMP@EPFL 2021 *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
+(* ------------------------------------------------------------------------ *)
+
 (** This file defines the notion of stackability between stores. When we evaluate expressions, it
 might have the effect of creating new objects. If we are in the middle of the creation of a new
 object, the newly added objects might point to the current [this], which might be not fully
 initialized. So those newly created objects might not be hot. However, they have to be fully
 initialized, and thus, warm. Stackability states exactly this: two stores [σ] and [σ'] are stackable
-if the new objects in [σ'] are warm. To prove this, we use the evaluator results of Eval.v, whith a
-custom proof the initialization case *)
+if the new objects in [σ'] are warm. *)
 
 From Celsius Require Export Wellformedness.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (el: list Expr).
 
-(** ** Definitions and notations *)
+(* ------------------------------------------------------------------------ *)
+(** ** Definition  *)
 Definition stackability σ σ' :=
   forall l, l < (dom σ') -> ((σ' ⊨ l : warm) \/ (l < (dom σ))).
 Global Instance notation_stackability_store : notation_stackability Store :=
@@ -20,8 +22,10 @@ Global Instance notation_stackability_store : notation_stackability Store :=
 Local Hint Unfold notation_stackability_store: notations.
 Local Hint Unfold stackability : stk.
 
+(* ------------------------------------------------------------------------ *)
 (** ** Basic results *)
 (** Reflexivity: *)
+
 Lemma stk_refl:
   forall σ, σ ≪ σ.
 Proof.
@@ -46,7 +50,8 @@ Proof.
 Qed.
 Global Hint Resolve stk_trans: stk.
 
-(** Assignment *)
+(** Assignments *)
+
 Lemma stk_assign : forall σ l C ω f v,
     getObj σ l = Some (C, ω) ->
     σ ≪ [l ↦ (C, [f ↦ v]ω)]σ.
@@ -68,12 +73,12 @@ Qed.
 Local Hint Resolve stk_assign_new: stk.
 
 
-(** ** Main stackability theorem *)
-(** Here we show the main result. We proceed by induction, enriching the goal with partial
-monotonicity and compatibility.Stackability is not maintained throughout the initialization of a new
-object, as its fields are being initialized. For the proof, we use a custom predicate [Pin] : the
-stores grows and the number of initialized fields grows too. Doing this, when we reach the end of
-initialization, we get a store with all initialized fields for the new object *)
+(* ------------------------------------------------------------------------ *)
+(** ** Stackability theorem *)
+(** Stackability is not maintained throughout the initialization of a new object, as the field of
+the current object are being initialized. We can however show that the number of initialized fields
+grows during initialization, reaching warm at the end (thanks to the mandatory field initializers)
+*)
 
 Theorem stk_theorem :
   (forall e σ ρ ψ v σ',

@@ -1,19 +1,25 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 (* ------------------------------------------------------------------------ *)
+(* This files defines basic getters (getObj, getVal, getType), update functions, some lemmas and
+some tactics *)
 
 From Celsius Require Export Notations LibTactics Tactics.
 Require Export ssreflect ssrbool Coq.Sets.Finite_sets_facts.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping) (T: Tpe) (μ: Mode) (Γ: EnvTyping).
 
+(* ------------------------------------------------------------------------ *)
 (** ** Helper functions *)
+
 Definition getObj (l : list Obj)    : Loc -> option Obj := nth_error l.
-Definition getVal (l : list Value)  : Loc -> option Value := nth_error l.
+Definition getVal (l : list Loc)  : Loc -> option Loc := nth_error l.
 Definition getType (Σ : StoreTyping): Loc -> option Tpe := nth_error Σ.
 Definition typeLookup (Γ: EnvTyping): Loc -> option Tpe := nth_error Γ.
 Local Hint Unfold getObj getVal getType: updates.
 
+(* ------------------------------------------------------------------------ *)
 (** * Updates **)
+
 Fixpoint update {X : Type} (position : nat) (value : X) (l : list X) : list X :=
   match (l, position) with
   | ([], _) => []
@@ -119,8 +125,9 @@ Qed.
 Global Hint Resolve getType_dom: updates.
 
 
+(* ------------------------------------------------------------------------ *)
+(** ** Domains lemmas *)
 
-(** * Domains *)
 Lemma getObj_Some : forall σ l,
     l < dom σ ->
     exists C ω, getObj σ l = Some (C, ω).
@@ -149,9 +156,12 @@ Proof.
   exfalso. eapply nth_error_None in Heqo. lia.
 Qed.
 
-(** * Assignments *)
 
-(** Update store with new value in local env : adds a (new) field of index x to an existing object *)
+(* ------------------------------------------------------------------------ *)
+(** ** Assignments *)
+
+(* This function tries to add the new field of index x to an existing object, and does nothing if
+the object already exists with not the right number of fields *)
 Definition assign_new l x v σ : option Store :=
   match (getObj σ l) with
   | Some (C, ω) => if (x =? length ω) then
@@ -169,14 +179,16 @@ Proof.
   unfold assign_new; steps; try rewrite update_length; done.
 Qed.
 
-(** Update store with update in local env : update an already-existing field of an existing object*)
+(* Update store with update in local env : update an already-existing field of an existing object *)
 Definition assign l x v σ : Store :=
   match (getObj σ l) with
   | Some (C, ω) => [ l ↦ (C, [x ↦ v]ω)] σ
   | None => σ (* ? *)
   end.
 
-(** Class info *)
+
+(* ------------------------------------------------------------------------ *)
+(** ** Class info *)
 
 Definition fieldType C f :=
   match ct C with
@@ -197,7 +209,9 @@ Definition methodInfo C m :=
   end.
 
 
-(** * Additions *)
+(* ------------------------------------------------------------------------ *)
+(** ** Additions of new objects *)
+
 Lemma getObj_last :
   forall σ C ρ,
     getObj (σ++[(C,ρ)]) (dom σ) = Some (C, ρ).
@@ -235,7 +249,6 @@ Proof.
     steps;
     eauto with lia.
 Qed.
-
 
 Lemma getObj_last_empty :
   forall σ C C' ω l f v,
@@ -282,7 +295,9 @@ Proof.
 Qed.
 
 
-(** * Tactic *)
+(* ------------------------------------------------------------------------ *)
+(** ** Tactics *)
+
 Ltac ct_lookup C :=
   destruct (ct C) as [?Args ?Flds ?Mtds] eqn:?H__ct.
 
@@ -343,7 +358,8 @@ Ltac updates :=
 Global Hint Extern 1 => updates: updates.
 
 
-(** * Maps *)
+(* ------------------------------------------------------------------------ *)
+(** ** Maps *)
 
 Lemma dom_map:
   forall Σ (f: Tpe -> Tpe),
@@ -363,7 +379,8 @@ Proof.
   rewrite nth_error_map H. steps.
 Qed.
 
-(** * List Loc *)
+(* ------------------------------------------------------------------------ *)
+(** ** List Loc *)
 
 Ltac inSingleton :=
   match goal with
@@ -372,7 +389,8 @@ Ltac inSingleton :=
   end.
 
 
-(** * Store Subset *)
+(* ------------------------------------------------------------------------ *)
+(** ** Store Subset *)
 
 (** A set of locations is contained in a store: [L ⪽ σ] *)
 Definition storeSubset σ L :=
@@ -387,9 +405,7 @@ Notation " a ∪ { b } " := (Union Loc a (Singleton Loc b)) (at level 80).
 Notation "{ l } ⪽ σ" := (storeSubset σ (Singleton Loc l)) (at level 80).
 
 Local Hint Unfold storeSubset: ss.
-Global Hint Resolve Union_intror: ss.
-Global Hint Resolve Union_introl: ss.
-Global Hint Resolve In_singleton: ss.
+Global Hint Resolve Union_intror Union_introl In_singleton: core.
 
 Lemma ss_trans :
   forall a s s',
@@ -446,7 +462,6 @@ Lemma ss_singleton_inv :
     {a} ⪽ σ -> a < dom σ.
 Proof.
   unfold storeSubset; steps.
-  induction (H a) ; steps.
 Qed.
 
 Lemma ss_codom_empty : forall s, codom [] ⪽ s.
@@ -520,7 +535,8 @@ Ltac ss :=
 Global Hint Extern 1 => ss : core.
 
 
-(** * Finite sets results **)
+(* ------------------------------------------------------------------------ *)
+(** ** Finite sets results **)
 
 Lemma storeSubset_finite: forall σ L,
     L ⪽ σ ->
@@ -567,10 +583,11 @@ Proof.
     apply H6; eauto.
   - apply H7, Extensionality_Ensembles.
     unfold Same_set, Included; steps.
-    apply Union_introl; eauto.
 Qed.
 
-(** * FieldType *)
+
+(* ------------------------------------------------------------------------ *)
+(** ** FieldType *)
 
 Lemma fieldType_exists: forall C Args Flds Mtds f,
     ct C = class Args Flds Mtds ->
@@ -596,7 +613,9 @@ Qed.
 Global Hint Resolve fieldType_some: typ.
 
 
-(** * List lemmas *)
+(* ------------------------------------------------------------------------ *)
+(** ** List lemmas *)
+
 Lemma app_inv_tail_length:
   forall (A: Type) (l l' l1 l2: list A),
     l++l1 = l'++l2 ->

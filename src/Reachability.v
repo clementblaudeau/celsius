@@ -9,24 +9,33 @@ this notion. At the end, the Reachability_dec section shows that the predicate i
 From Celsius Require Export Helpers.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet).
 
-(** ** Definitions and notations *)
-(** We first define the reachability predicate between two individual locations *)
+(* ------------------------------------------------------------------------ *)
+(** ** Reachability *)
+(* We first define the reachability predicate between two individual locations *)
+
 Inductive reachability : Store -> Loc -> Loc -> Prop :=
-| rch_heap: (** we can access the current location *)
+
+(* we can access the current location *)
+| rch_heap:
     forall l σ,
       l < dom σ ->
       reachability σ l l
-| rch_step: (** we can access a location in the local environment of the object at l0 *)
+
+(* we can access a location in the local environment of the object at l0 *)
+| rch_step:
     forall l0 l1 C f ω σ,
       l1 < dom σ ->
       getObj σ l0 = Some (C, ω) ->
       getVal ω f = Some l1 ->
       reachability σ l0 l1
-| rch_trans: (** transitive case *)
+
+(* transitive case *)
+| rch_trans:
     forall l0 l1 l2 σ,
       reachability σ l0 l1 ->
       reachability σ l1 l2 ->
       reachability σ l0 l2.
+
 Global Hint Constructors reachability: rch.
 
 (** We define the instance for the notation *)
@@ -34,7 +43,7 @@ Global Instance notation_reachability : notation_dash_arrow Store Loc Loc :=
   { dash_arrow_ := reachability }.
 Global Hint Unfold dash_arrow_ notation_reachability: rch.
 
-(** Then we define the reachability predicate for sets of locations *)
+(* Then we define the reachability predicate for sets of locations *)
 Definition reachability_set σ L l :=
   exists l', (l' ∈ L) /\ (σ ⊨ l' ⇝ l).
 
@@ -43,31 +52,37 @@ Global Instance notation_reachability_set : notation_dash_arrow Store LocSet Loc
 Notation "σ ⊨ { l } ⇝ l'" := (reachability_set σ {l} l')  (at level 60, l at level 98, l' at level 98).
 Global Hint Unfold notation_reachability_set: rch.
 
-(** Depending on the temperature of objects we can reach, we have three predicates about the
-store. Inside a store [σ], a location [l] is said to be:
-- [reachable_cold]: if the location is in the heap (but might point to an object with unitialized
-fields)
-- [reachable_warm]: if the location points to an object with all initialized fields (but
-those might point to cold objects)
-- [reachable_hot]: if the location points to a hot object (transitively all initialized) *)
+
+(* ------------------------------------------------------------------------ *)
+(** ** Semantic modes *)
+(* We then define the modes (cold, cool, warm, hot) as predicates over the store (and a location):
+- cold: the location is in the heap
+- cool Ω: the object at l as at least Ω fields
+- warm: the object has all fields initialized (regarding its definition)
+- hot: the object can only reach warm objects *)
 
 Inductive semantic_mode : Store -> Loc -> Mode -> Prop :=
+
 | sm_cold: forall σ l, l < dom σ -> semantic_mode σ l cold
+
 | sm_warm: forall σ l C ω Args Flds Mtds,
     getObj σ l = Some (C, ω) ->
     ct C = class Args Flds Mtds ->
     length Flds <= length ω ->
     semantic_mode σ l warm
+
 | sm_cool: forall σ l Ω C ω Args Flds Mtds,
     getObj σ l = Some (C, ω) ->
     ct C = class Args Flds Mtds ->
     Ω <= dom ω ->
     semantic_mode σ l (cool Ω)
+
 | sm_hot: forall σ l,
     (forall (l': Loc),
         σ ⊨ l ⇝ l' ->
         semantic_mode σ l' warm) ->
     semantic_mode σ l hot.
+
 Global Hint Constructors semantic_mode: core.
 
 Global Instance notation_semantic_mode : notation_dash_colon Store Loc Mode :=
@@ -78,7 +93,9 @@ Global Instance notation_semantic_set_mode : notation_dash_colon Store LocSet Mo
 Global Hint Unfold notation_semantic_mode notation_semantic_set_mode: rch.
 Global Hint Extern 1 => (eapply sm_warm): rch.
 
+(* ------------------------------------------------------------------------ *)
 (** ** Tactics *)
+
 Ltac rch_singleton :=
   repeat match goal with
   | H: (reachability_set ?s (Singleton Loc ?l1) ?l2) |- _ =>
@@ -98,8 +115,10 @@ Ltac rch_set :=
 
 Global Hint Extern 1 => updates: rch.
 
+(* ------------------------------------------------------------------------ *)
 (** ** Basic results *)
-(** Rechable locations from a hot location lead to other hot locations *)
+(* Rechable locations from a hot location lead to other hot locations *)
+
 Lemma rch_hot_trans:
   forall σ l l',
     σ ⊨ l : hot ->
@@ -162,11 +181,12 @@ Proof.
 Qed.
 Global Hint Resolve rch_union_introl rch_union_intror: rch.
 
-
+(* ------------------------------------------------------------------------ *)
 (** ** Reachability and assignments *)
 
-(** When we *add a new location* inside a local environment of an object, any new paths were either
+(* When we *add a new location* inside a local environment of an object, any new paths were either
 already in the previous store, or go through the added location *)
+
 Lemma rch_asgn_new:
   forall σ l0 l1 C ω,
     getObj σ l0 = Some(C, ω) ->
@@ -185,8 +205,9 @@ Proof with eauto with rch notations.
     + right; split...
 Qed.
 
-(** A path in an updated store either goes through the new value or was already valid in the
+(* A path in an updated store either goes through the new value or was already valid in the
 un-updated store*)
+
 Lemma rch_asgn :
   forall σ C ω f l0 l1,
     getObj σ l0 = Some (C, ω) ->
@@ -205,8 +226,9 @@ Proof with (eauto with rch).
     + right; split...
 Qed.
 
-
+(* ------------------------------------------------------------------------ *)
 (** ** Decidability of reachability *)
+
 Section Reachability_Dec.
 
   Reserved Notation "s ⊨ x ⇝ y ↑ tr" (at level 60, x at level 98, y at level 98, tr at level 98).

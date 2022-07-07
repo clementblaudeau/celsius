@@ -1,28 +1,26 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 (* ------------------------------------------------------------------------ *)
-(* This file defines the notion of wellformedness for scopes. The set of reachable locations must
-all be valid locations of the store - that is, locations that are inside of the store. The main
-result is to show that if we start from a wellformed store that contains the local environment ρ and
-the [this] pointer, then we end up with a wellformed store that contains the location of the
-result *)
+(* This file defines the notion of wellformedness for stores. The set of reachable locations must
+all be valid locations of the store - that is, locations that are themselves inside of the
+store. The main result is to show that if we start from a wellformed store t hat contains the local
+environment ρ and the [this] pointer, then we end up with a wellformed store that contains the
+location of the result *)
 
 From Celsius Require Export PartialMonotonicity Reachability.
-Require Import ssreflect ssrbool Psatz List Sets.Ensembles Coq.Program.Tactics Coq.Sets.Finite_sets_facts.
-Import ListNotations.
-Open Scope nat_scope.
-
-(** ** Implicit types *)
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (flds: list Field) (el: list Expr).
 
-(** ** Definitions and notations *)
-(** A wellformed store only contains pointers to locations that are within itself *)
+(* ------------------------------------------------------------------------ *)
+(** ** Definition *)
+
 Definition wf σ :=
   forall l C ω,
     getObj σ l = Some(C, ω) ->
+    (* the object have a number of field bounded by its definition *)
     (forall Args Flds Mtds,
         ct C = class Args Flds Mtds ->
         dom ω <= dom Flds) /\
+      (* all fields are valid locations of the store *)
       (forall f l',
           getVal ω f = Some l' ->
           l' < dom σ).
@@ -49,8 +47,10 @@ Proof.
 Qed.
 Global Hint Resolve wf_proj2: wf.
 
+(* ------------------------------------------------------------------------ *)
+(** ** Adding a new object *)
+(* In preparation for initialization theorems, we have technical results about adding a location *)
 
-(** In preparation for initialization theorems, we have technical results about adding a location *)
 Lemma wf_add : forall s C ρ Args Flds Mtds,
     wf s ->
     codom ρ ⪽ s ->
@@ -86,8 +86,10 @@ Qed.
 Global Hint Resolve wf_add_empty: wf.
 
 
-(** ** Evaluation-maintained results *)
-(** First a technical result on assignment *)
+(* ------------------------------------------------------------------------ *)
+(** ** Evaluation-maintained result *)
+(* First a technical result on assignment *)
+
 Lemma wf_assign:
   forall σ ω l v f C,
     (getObj σ l) = Some (C, ω) ->
@@ -105,6 +107,7 @@ Proof.
 Qed.
 Global Hint Resolve wf_assign: wf.
 
+(* Then a result on adding a new field to an existing object *)
 Lemma wf_assign_new:
   forall C σ σ' I x v ω Args Flds Mtds,
     ct C = class Args Flds Mtds ->
@@ -123,7 +126,6 @@ Proof with (updates; cross_rewrites; eauto with wf lia).
   eapply getVal_add in H4; steps...
   eapply H0...
 Qed.
-
 
 (** Then we have the main result *)
 Theorem wf_theorem :
@@ -149,6 +151,7 @@ Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
 
   eapply evalP_multi_ind;
     unfold assign; simpl; intros;
+    try rewrite H__ct;
     eval_dom; ss_trans...
 
   - (* e_var *)
@@ -182,11 +185,7 @@ Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
     destruct IH__el ...
     split... rewrite codom_cons...
 
-  - (* init_nil *)
-    steps.
-
   - (* init_cons *)
-    rewrite H__ct.
     intros.
     destruct IH__e ...
     lets: pM_theorem_expr H__e.
@@ -263,7 +262,10 @@ Proof.
 Qed.
 Global Hint Resolve correct_value: wf.
 
-(** A useful tactic: *)
+
+(* ------------------------------------------------------------------------ *)
+(* A useful tactic: *)
+
 Ltac eval_wf :=
   repeat
     match goal with
@@ -294,7 +296,9 @@ Ltac eval_wf :=
         end
     end.
 
-(** Partially monotonic wellformed stores keep objects warm *)
+(* ------------------------------------------------------------------------ *)
+(* Partially monotonic wellformed stores keep objects warm *)
+
 Lemma pM_wf_warm_monotone:
   forall σ σ' l,
     σ ⪯ σ' ->

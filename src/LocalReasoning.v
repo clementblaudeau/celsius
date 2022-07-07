@@ -1,27 +1,39 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL 2021 *)
-(** This file defines the main result of local reasoning, built upon wellformedness, compatibility, scopability and stackability. In a wellformed, fully initialized context, a newly created object can only access hot (transitively fully initialized) locations. *)
+(* ------------------------------------------------------------------------ *)
+(* This file defines the main result of local reasoning, built upon partial monotonicity,
+ stackability and scopability. In a wellformed, fully initialized context, a newly created object
+ can only access hot (transitively fully initialized) locations. *)
 
 From Celsius Require Export Scopability Stackability MetaTheory.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc) (L: LocSet) (Σ: StoreTyping).
 
+(* ------------------------------------------------------------------------ *)
 (** ** Local Reasoning theorem *)
 (** We start with a lemma : *)
-Lemma local_reasoning:
+
+Lemma hot_preservation:
   forall σ σ' L L',
+    (* Side conditions *)
     L ⪽ σ ->
     L' ⪽ σ' ->
     wf σ' ->
+
+    (* Scopability, stackability, monotonicity *)
     (σ, L) ⋖ (σ', L') ->
     σ ≪ σ' ->
     σ ⪯ σ' ->
+
+    (* Preservation of hot locations *)
     σ  ⊨ L  : hot ->
     σ' ⊨ L' : hot.
+
 Proof with (eauto with rch).
   intros. intros l' H__l'.
   apply sm_hot => l H__rch.
   assert (dom σ <= dom σ') by eauto with pM.
   assert (l < dom σ \/ l >= dom σ) as [|] by lia.
+
   + (* l ∈ (dom σ) : the object was already in the store *)
     eapply pM_wf_warm_monotone...
     assert (σ ⊨ L ⇝ l).
@@ -31,12 +43,13 @@ Proof with (eauto with rch).
       lets: H5 H__ln.
       inverts H9...
       apply H10...
+
   + (* l ∉ (dom σ) *)
     destruct (H3 l); eauto with lia rch.
 Qed.
 
 (* Then the main theorem : *)
-Theorem Local_reasoning:
+Theorem local_reasoning:
   forall e σ ρ ψ v σ',
     ⟦e⟧(σ, ρ, ψ) --> (v, σ') ->
     wf σ ->
@@ -46,13 +59,18 @@ Theorem Local_reasoning:
 Proof.
   intros.
   assert (σ' ⊨ (Singleton Loc v) : hot).
-  + eapply local_reasoning;
+  + eapply hot_preservation;
       eauto using stk_theorem with pM stk wf lia.
     eapply scp_theorem_expr; eauto with pM wf lia; steps.
   + eapply H3; eauto using In_singleton.
 Qed.
 
-(** ** Local reasoning for typing *)
+(* ------------------------------------------------------------------------ *)
+(** ** Local Reasoning for typing *)
+(* We show here that we can upgrade the whole transitive closure to hot while preserving typing
+properties (monotonicity, authority, stackability) *)
+
+(* This axiom could be removed, as Reachability is decidable *)
 Axiom classicT : forall (P : Prop), {P} + {~ P}.
 
 Theorem Local_reasoning_for_typing: forall Σ1 Σ2 σ1 σ2 L1 L2,
@@ -85,10 +103,15 @@ Proof with (meta; eauto 3 with typ lia).
     end.
 
   intros.
-  remember ((fun l' '(C,μ) => if (classicT (σ2 ⊨ L2 ⇝ l')) then (C, hot) else (C, μ)):Loc -> Tpe -> Tpe) as f.
+  remember ((fun l' '(C,μ) => if (classicT (σ2 ⊨ L2 ⇝ l'))
+                           then (C, hot)
+                           else (C, μ)):Loc -> Tpe -> Tpe) as f.
   remember (map (fun '(l, T) => f l T) (combine (seq 0 (dom Σ2)) Σ2)) as Σ2'.
   exists Σ2'.
-  assert ( Σ2 ≪ Σ2' /\ Σ2 ≼ Σ2' /\ (Σ2 ≪ Σ2' -> Σ2 ▷ Σ2') /\ (Σ2 ≪ Σ2' -> Σ2 ≼ Σ2' -> Σ2' ⊨ σ2) /\ Σ2' ⊨ L2 : hot);
+  assert ( Σ2 ≪ Σ2' /\
+             Σ2 ≼ Σ2' /\
+             (Σ2 ≪ Σ2' -> Σ2 ▷ Σ2') /\
+             (Σ2 ≪ Σ2' -> Σ2 ≼ Σ2' -> Σ2' ⊨ σ2) /\ Σ2' ⊨ L2 : hot);
     [| steps; eauto with typ].
   splits; subst.
 

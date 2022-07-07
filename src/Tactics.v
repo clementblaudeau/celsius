@@ -1,10 +1,9 @@
 (* Celsius project *)
 (* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 (* ------------------------------------------------------------------------ *)
-
+(* Adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 Require Export String List Psatz Coq.Program.Tactics Arith.
 Import ListNotations.
-(* Adapted from SystemFR project : https://github.com/epfl-lara/SystemFR *)
 
 Global Hint Extern 50 => lia: lia.
 Global Hint Extern 50 => cbn: cbn.
@@ -228,8 +227,6 @@ Ltac modus :=
   repeat match goal with
          | H: ?A -> ?B, H': ?A |- _ => specialize (H H')
          end.
-
-
 
 
 Ltac move_top t :=
