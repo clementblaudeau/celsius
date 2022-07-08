@@ -79,3 +79,8 @@ Our implementation makes some assumptions and representation choices, which we b
 * We represent variables, fields, locations (and thus, values) as integers.
 * We represent stores and (local) environments as lists.
 * We assume a globally accessible class table `ct` (defined as a `Parameter`) and an entry class `EntryClass`.
+* We added the axiom of classical logic:
+```coq
+Axiom classicT : forall (P : Prop), {P} + {~ P}.
+```
+* For the soundness result, we assume the classtable is well typed : `Parameter typable_classes: T_Classes.`
