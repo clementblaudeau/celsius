@@ -1,4 +1,4 @@
--Q . Celsius
+-Q src Celsius
 src/LibTactics.v
 src/Tactics.v
 src/Language.v
