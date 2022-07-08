@@ -167,9 +167,10 @@ Lemma scp_assign_new:
     assign_new C x v σ = Some σ' ->
     (σ, L ∪ {v}) ⋖ (σ', L ∪ {v}).
 Proof with (eauto with scp rch).
-  unfold scopability, assign_new; intros. steps.
+  unfold assign_new; intros. steps; [| eapply scp_assign; eauto].
   rewrite_anywhere PeanoNat.Nat.eqb_eq. subst.
-  destruct H4 as [l1 [H__l1 H__rch]].
+  unfold scopability; intros.
+  destruct H3 as [l1 [H__l1 H__rch]].
   lets [? | [H__rch1 H__rch2 ]]: rch_asgn_new H__rch; eauto;
     eexists...
 Qed.

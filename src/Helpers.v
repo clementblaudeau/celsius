@@ -167,7 +167,7 @@ Definition assign_new l x v σ : option Store :=
   | Some (C, ω) => if (x =? length ω) then
                     Some [l ↦ (C, ω++[v])]σ
                   else
-                    Some σ
+                    Some [l ↦ (C, [x ↦ v]ω)]σ
   | None => None (* Error : adding a field to non-existing object *)
 end.
 
@@ -294,6 +294,23 @@ Proof.
     rewrite_anywhere PeanoNat.Nat.sub_diag; steps.
 Qed.
 
+Lemma getVal_last :
+  forall ω v,
+    getVal (ω++[v]) (dom ω) = Some v.
+Proof.
+  induction ω; steps.
+Qed.
+Global Hint Resolve getVal_last: core.
+
+Lemma getVal_last2 :
+  forall ω x v,
+    x < (dom ω) ->
+    getVal (ω++[v]) x = getVal ω x.
+Proof.
+  induction ω; simpl; intros; try lia.
+  destruct x; steps;
+    eauto with lia.
+Qed.
 
 (* ------------------------------------------------------------------------ *)
 (** ** Tactics *)

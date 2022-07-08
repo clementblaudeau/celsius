@@ -67,8 +67,8 @@ Lemma stk_assign_new:
     σ ≪ σ'.
 Proof.
   unfold assign_new.
-  autounfold with stk notations; steps.
-  updates; eauto.
+  autounfold with stk notations;
+    steps; updates; eauto.
 Qed.
 Local Hint Resolve stk_assign_new: stk.
 
@@ -134,7 +134,7 @@ Proof with (updates; cross_rewrites; eauto 4 with rch stk pM lia ).
       specialize (IH__init (ω0++[v]) Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]...
       split; [| exists ω1; split]...
     + apply PeanoNat.Nat.eqb_neq in Heq; subst.
-      specialize (IH__init ω0 Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]...
+      specialize (IH__init ([x↦v]ω0) Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]... eauto with updates lia.
       split...
 Qed.
 
