@@ -8,13 +8,9 @@ This repository contains the Coq formalization of the paper:
 * A Conceptual framework for Safe Object initialization, (submitted to OOPSLA 2022)
   Clément Blaudeau and Fengyun Liu
 
-## Build
+## Install/Build
+See `INSTALL.md`
 
-To build the Coq project, you'll need `coq` ( >= 8.14). From the top-level directory, run :
-```sh
-make Makefile.coq
-make
-```
 ## Project structure
 
 ### Preliminaries
