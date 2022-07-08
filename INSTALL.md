@@ -1,8 +1,8 @@
 # Install/Build
 
-There are three possibilities:
+There are three distinct possibilities:
 
-## Docker image
+## 1) Docker image
 You can download the Docker image using [this link](https://drive.google.com/file/d/1WnEN0qw8EBUO_nfYzqK3aXonkWAzm_Fs/view?usp=sharing)
 Then, load and start the image with
 ```sh
@@ -11,7 +11,7 @@ docker run -it celsius
 ```
 Inside the container, go to the celsius directory (with `cd celsius`).
 
-## Local opam switch
+## 2) Local opam switch
 You need to have [opam](https://opam.ocaml.org/doc/Install.html) installed.
 First, you can clone the project with
 ```sh
@@ -23,7 +23,7 @@ Then, just run :
 opam switch create ./
 ```
 
-## If you already have Coq (>= `8.15.2`)
+## 3) If you already have Coq (>= `8.15.2`)
 First, you can clone the project with
 ```sh
 git clone https://github.com/clementblaudeau/celsius
