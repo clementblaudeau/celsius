@@ -23,7 +23,7 @@ install: [
 
 depends: [
   "ocaml" {>= "4.11-flambda"}
-  "coq" {= "8.12"}
+  "coq" {= "8.15.2"}
   #"coq-coq2html" {>= "1.2"}
 ]
 
