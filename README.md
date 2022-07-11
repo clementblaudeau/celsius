@@ -9,7 +9,7 @@ This repository contains the Coq formalization of the paper:
   Clément Blaudeau and Fengyun Liu
 
 ## Install/Build
-See [INSTALL.md](INSTALL.ml)
+See [INSTALL.md](INSTALL.md)
 
 ## Project structure
 
