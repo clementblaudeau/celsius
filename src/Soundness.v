@@ -665,8 +665,7 @@ Proof with (meta; eauto 2 with typ).
     assert (l = 0) by lia; steps.
     exists Entry, ([]: Env), hot; steps.
     eapply ot_hot...
-    * reflexivity.
-    * simpl; intros; lia.
+    simpl; intros; lia.
   + eapply vt_sub; steps.
   + lets (? & ? & ?): H1; steps...
     intros l C ω ?H.
@@ -674,5 +673,3 @@ Proof with (meta; eauto 2 with typ).
     assert (l=0) by lia; steps.
     lets: getVal_dom H6; simpl in *; try lia...
 Qed.
-
-Print Assumptions Program_soundness.
