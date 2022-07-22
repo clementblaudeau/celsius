@@ -151,3 +151,5 @@ Proof.
   apply pM_theorem.
 Qed.
 Global Hint Resolve pM_theorem_init: pM.
+
+Check ct.

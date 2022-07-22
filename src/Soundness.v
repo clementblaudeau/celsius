@@ -1,7 +1,7 @@
 (* Celsius project *)
-(* Clément Blaudeau - Lamp@EPFL 2021 *)
+(* Clément Blaudeau - Lamp@EPFL & Inria 2020-2022 *)
 (* ------------------------------------------------------------------------ *)
-(** This file defines and proves the soundess of the type system. *)
+(* This file defines and proves the soundess of the type system. *)
 
 From Celsius Require Export LocalReasoning Eval.
 Implicit Type (ρ: Env).
@@ -20,20 +20,21 @@ Lemma S_Typs_weakening:
     S_Typs Γ' Γ ->
     forall x T__x, typeLookup Γ x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x.
 Proof with (meta; eauto with typ).
-  intros. gen x T__x.
+  intros. gen x T__x. unfold S_Typs in *.
   induction H; steps.
   - destruct x; steps.
-  - destruct x; steps...
+  - destruct x0; steps...
 Qed.
 Global Hint Resolve S_Typs_weakening: typ.
 
 (* Our typing enjoys a weakening lemma *)
 Theorem weakening: forall Γ Γ' U e T,
-    (forall x T__x, typeLookup Γ x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x) ->
+    S_Typs Γ' Γ ->
     ((Γ, U) ⊢ e : T) ->
     ((Γ', U) ⊢ e : T).
 Proof with (meta; eauto using expr_typing with typ lia).
-  intros. gen Γ'.
+  intros.
+  lets: S_Typs_weakening H. clear H. gen Γ'.
   induction H0 using typing_ind with
     (Pl := fun Γ0 T0 el Ul _ =>
              forall Γ',
@@ -41,7 +42,7 @@ Proof with (meta; eauto using expr_typing with typ lia).
                ((Γ0, T0) ⊩ el : Ul) ->
                ((Γ', T0) ⊩ el : Ul));
     intros ...
-  eapply H in H__lkp as [T__x' [ ]]...
+  eapply H1 in H__lkp as [T__x' [ ]]...
 Qed.
 
 (* ------------------------------------------------------------------------ *)
@@ -87,6 +88,7 @@ Definition init_soundness n C flds I x ρ σ Γ Σ r :=
     Flds = DoneFlds ++ flds ->
     length DoneFlds = x ->
     getType Σ I = Some (C, cool x) ->
+    S_Typs Γ Args ->
 
     init C flds I x ρ σ n = r ->
     r <> Timeout_i ->
@@ -114,7 +116,7 @@ Lemma soundness_fld:
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
-                end).
+                end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
@@ -172,7 +174,7 @@ Lemma soundness_mtd:
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto 4 with typ]
-                end).
+                end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
@@ -268,7 +270,7 @@ Lemma soundness_new:
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
-                end).
+                end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
@@ -384,7 +386,7 @@ Lemma soundness_asgn:
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
-                end).
+                end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
@@ -463,7 +465,7 @@ Lemma soundness_init_cons:
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
-                end).
+                end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
@@ -472,10 +474,10 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   (* Extract typing from the well-typed classes *)
   pose proof (typable_classes C) as HT__C. rewrite H3 in HT__C.
   destruct HT__C as [HT__Field _].
-  eapply T_Fields_In in HT__Field.
-  unfold T_Field in HT__Field.
-  eapply weakening with (Γ' := Γ) in HT__Field; [| intros [ ] Tx Hf; inverts Hf].
+  eapply T_Fields_In in HT__Field. simpl in HT__Field.
+  eapply weakening with (Γ' := Γ) in HT__Field...
   rename HT__Field into HT__e.
+
   (* assert (H__doms: dom DoneFlds = dom ω) by (updates; meta; lia). *)
   (* rewrite H__doms in HT__e |- *. *)
 
@@ -496,8 +498,8 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   (* Use field initialization lemma *)
   lets H__env0: env_typing_monotonicity H__mn0 H.
   clear IH__expr IH__list.
-  lets: H__aty0 I H10.
-  assert (H__field: fieldType C (dom DoneFlds) = Some (C1, μ0)). {
+  lets: H__aty0 I H11.
+  assert (H__field: fieldType C (dom DoneFlds) = Some (C0, μ)). {
     unfold fieldType. rewrite H3.
     rewrite nth_error_app2... subst.
     rewrite -minus_diag_reverse...
@@ -505,7 +507,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   cross_rewrites.
   remember ([I ↦ (C, cool (S (dom DoneFlds)))] (Σ0)) as Σ1.
   lets (H__st1 & H__mn1 & H__stk1): field_initialization I (dom DoneFlds) H__st0 H__field Σ1...
-  { lets: ot_cool_dom H15... }
+  { lets: ot_cool_dom H16... }
 
   (* Use induction hypothesis *)
   lets: env_typing_monotonicity H__mn1 H__env0.
@@ -515,8 +517,8 @@ Proof with (meta; meta_clean; eauto 2 with typ;
                 σ1
                 Γ Σ1
                 (init C flds I (S dom DoneFlds) ρ σ1 n)
-                Args (DoneFlds++(field (C1,μ0) e)::flds) Mtds
-                (DoneFlds ++ [field (C1, μ0) e])).
+                Args (DoneFlds++(field (C0,μ) e)::flds) Mtds
+                (DoneFlds ++ [field (C0, μ) e])).
   subst; modus.
   lets: assign_new_dom H__assign.
   destruct IH__init
@@ -528,7 +530,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   + (* Result *)
     updates.
     lets H__initP: H__r.
-    eapply init_implies_initP with (DoneFlds := DoneFlds ++ [field (C1, μ0) e]) in H__initP;
+    eapply init_implies_initP with (DoneFlds := DoneFlds ++ [field (C0, μ) e]) in H__initP;
       updates; try rewrite app_assoc_reverse...
     lets H__scpInit: scp_theorem_init H__initP.
     lets: scp_theorem_expr H__eval H1...
@@ -659,10 +661,12 @@ Proof with (meta; eauto 2 with typ).
   steps...
   lets: Soundness [(Entry, hot)] H0 H; eauto with typ; steps.
   + split; steps.
+    ct_lookup Entry.
     assert (l = 0) by lia; steps.
     exists Entry, ([]: Env), hot; steps.
     eapply ot_hot...
-    simpl; intros; lia.
+    * reflexivity.
+    * simpl; intros; lia.
   + eapply vt_sub; steps.
   + lets (? & ? & ?): H1; steps...
     intros l C ω ?H.
@@ -670,3 +674,5 @@ Proof with (meta; eauto 2 with typ).
     assert (l=0) by lia; steps.
     lets: getVal_dom H6; simpl in *; try lia...
 Qed.
+
+Print Assumptions Program_soundness.

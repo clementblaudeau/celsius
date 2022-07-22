@@ -50,6 +50,7 @@ Definition LocSet      : Type := Ensemble Loc.
 
 (* ------------------------------------------------------------------------ *)
 (** ** Global Parameters *)
+
 Parameter Ξ: list Class.
 Parameter Entry: ClN.
 Parameter EntryClass: Class.

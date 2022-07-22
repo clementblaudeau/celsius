@@ -35,19 +35,14 @@ Inductive S_Typ : Tpe -> Tpe -> Prop :=
   μ1 ⊑ μ2 ->
   (C, μ1) <: (C, μ2)
 where "T1 <: T2" := (S_Typ T1 T2).
+Global Hint Resolve s_typ_mode: typ.
 
 Ltac S_Typ:= repeat match goal with | H: _ <: _ |- _ => inverts H end.
 Global Hint Extern 1 => S_Typ: typ. (* We want to invert subtyping as it is trivial *)
 
 (* Subtyping between lists of types *)
 
-Inductive S_Typs : (list Tpe) -> (list Tpe) -> Prop :=
-| s_typs_nil: S_Typs nil nil
-| s_typs_cons: forall Ts1 Ts2 T1 T2,
-    S_Typs Ts1 Ts2 ->
-    T1 <: T2 ->
-          S_Typs (T1::Ts1) (T2::Ts2).
-Global Hint Resolve s_typ_mode: typ.
+Definition S_Typs := Forall2 (fun T1 T2 => S_Typ T1 T2).
 
 (* Basic results *)
 
@@ -68,8 +63,8 @@ Global Hint Resolve s_typ_trans: typ.
 Lemma S_typs_refl:
   forall Ts, S_Typs Ts Ts.
 Proof.
-  induction Ts; steps; eauto with typ.
-  apply s_typs_cons; eauto with typ.
+  intros. unfold S_Typs.
+  induction Ts; eauto 3 using Forall2_cons with typ.
 Qed.
 Global Hint Resolve S_typs_refl: typ.
 
@@ -198,24 +193,24 @@ Qed.
 
 Definition T_Field (Γ:EnvTyping) T f :=
   match f with
-  | field U e => ((nil:EnvTyping), T) ⊢ e : U
+  | field U e => (Γ, T) ⊢ e : U
   end.
 
 Inductive T_Fields: EnvTyping -> Tpe -> (list Field) -> Prop :=
 | t_fields_nil: forall Γ Tthis, T_Fields Γ Tthis []
-| f_fields_cool_cons: forall Γ C Ω f fs,
+| t_fields_cool_cons: forall Γ C Ω f fs,
     T_Field Γ (C, cool Ω) f ->
     T_Fields Γ (C, cool (S Ω)) fs ->
     T_Fields Γ (C, cool Ω) (f::fs).
 
 Lemma T_Fields_In:
-  forall Γ C Flds1 f Flds2,
-    T_Fields Γ (C, cold) (Flds1 ++ f :: Flds2) ->
-    T_Field Γ (C, cool dom Flds1) f.
-Proof with (eauto using T_Fields, T_Field with typ lia).
-  destruct Flds1; intros.
-  - simpl in H. inverts H...
-  - simpl in H. inverts H...
+  forall Γ C Flds1 f Flds2 Ω,
+    T_Fields Γ (C, cool Ω) (Flds1 ++ f :: Flds2) ->
+    T_Field Γ (C, cool (Ω+dom Flds1)) f.
+Proof with (eauto using T_Fields with typ lia).
+  induction  Flds1; intros.
+  - simpl in H. simpl. inverts H. rewrite <- plus_n_O...
+  - simpl in H; simpl. inverts H. rewrite <- plus_Snm_nSm ...
 Qed.
 
 (* ------------------------------------------------------------------------ *)
@@ -224,7 +219,7 @@ Qed.
 Definition T_Classes := forall C,
     match (ct C) with
     | class Args Flds Mtds =>
-        T_Fields Args (C, cold) Flds /\
+        T_Fields Args (C, cool 0) Flds /\
           (forall m μ ρ T e, Mtds m = Some (method μ ρ T e) -> (ρ, (C, μ)) ⊢ e : T)
     end.
 
