@@ -3,6 +3,7 @@
 (* ------------------------------------------------------------------------ *)
 (* This files describes the semantic authority that our calculus enjoys. It is not used for
 soundness *)
+
 From Celsius Require Export Semantics.
 Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
 
@@ -10,7 +11,7 @@ Implicit Type (σ: Store) (ρ ω: Env) (l: Loc).
 (** ** Definition *)
 
 Definition authority σ σ' :=
-  forall l C ω, getObj σ l = Some(C, ω) -> exists ω', getObj σ' l = Some(C, ω') /\ dom ω = dom ω'.
+  forall l C ω, getObj σ l = Some(C, ω) -> exists ω', getObj σ' l = Some(C, ω') /\ dom ω >= dom ω'.
 Global Instance notation_authority_store : notation_authority Store :=
   { authority_ := authority }.
 Local Hint Unfold notation_authority_store: notations.
@@ -73,13 +74,13 @@ location *)
 Lemma aty_assignment :
   forall σ l C ω ω',
     getObj σ l = Some (C, ω) ->
-    length ω = length ω' ->
+    length ω >= length ω' ->
     σ ▷ [l ↦ (C, ω')]σ.
 Proof.
   intros. introv ?.
   lets: getObj_dom H.
   destruct_eq (l = l0); subst;
-    updates; eauto.
+    updates; eauto with lia.
 Qed.
 Global Hint Resolve aty_assignment: aty.
 
@@ -103,37 +104,33 @@ Theorem aty_theorem:
         ⟦_ el _⟧p (σ, ρ, ψ) --> (vl, σ') -> σ ▷ σ') /\
     (forall C ψ x ρ σ σ',
         initP C ψ x ρ σ σ' ->
-        forall ω,
-          getObj σ ψ = Some(C, ω) ->
-          σ ▷ [ψ ↦ (C, ω)]σ').
+        [ψ ↦ (C,[])]σ ▷ [ψ ↦ (C, [])]σ').
 
-Proof with (updates; eauto 3 with aty updates lia).
+Proof with (updates; cross_rewrites; eauto 3 with aty updates lia).
   eapply evalP_multi_ind;
     unfold assign; intros;
     repeat destruct_match; eval_dom;
     flatten; aty_trans; try discriminate ...
 
   - (* e_new *)
-    intros l D ω H__get; steps.
-    rewrite getObj_last in IH__init.
-    specialize (IH__init [] eq_refl l D ω).
-    rewrite getObj_last2 in IH__init...
-    rewrite getObj_update_diff in IH__init...
+    intros l D ?ω H__get; steps.
+    specialize (IH__init l D ω).
     lets: getObj_dom H__get...
+    repeat rewrite getObj_update_diff in IH__init...
+    rewrite getObj_last2 in IH__init...
 
   - (* init_cons *)
-    intros l D ω0 H__get; steps.
-    lets: getObj_dom H.
-    apply IH__e in H; steps.
-    unfold assign_new in H__assign... rewrite H3 in H__assign.
-    destruct (Nat.eqb x (dom ω')) eqn:Heq; inverts H__assign.
-    + rewrite getObj_update_same in IH__init; eauto with updates ...
-      destruct_eq (I = l); subst; updates; cross_rewrites...
-      specialize (IH__init _ eq_refl l D ω0) as [ ]...
-    + apply PeanoNat.Nat.eqb_neq in Heq; subst.
-      specialize (IH__init ω' H3).
-      destruct_eq (I = l); subst; updates; cross_rewrites...
-      specialize (IH__init l _ _ H__get)...
+    lets: assign_new_dom H__assign.
+    intros l ?D ?ω H__obj...
+    destruct (getObj σ I) as [[?D ?ω]|] eqn:H2.
+    + lets: IH__e I H2; steps.
+      rewrite /assign_new H4 in H__assign...
+      destruct_if_eqb; inverts H__assign;
+        destruct_eq (I = l); subst...
+    + destruct_eq (I = l); subst...
+      destruct (getObj σ1 I) as [[?D ?ω]|] eqn:H4;
+        rewrite /assign_new H4 in H__assign;
+        try destruct_if_eqb; inverts H__assign...
 Qed.
 
 Corollary aty_theorem_expr:
@@ -151,24 +148,3 @@ Proof.
   apply aty_theorem.
 Qed.
 Global Hint Resolve aty_theorem_list: aty.
-
-(* ------------------------------------------------------------------------ *)
-(** Authority  keep objects warm *)
-
-From Celsius Require Import Reachability.
-Lemma aty_warm_monotone:
-  forall σ σ' l,
-    σ ▷ σ' ->
-    σ  ⊨ l : warm ->
-    σ' ⊨ l : warm.
-Proof.
-  intros.
-  inverts H0.
-  lets: aty_domains H.
-  lets: getObj_dom H1.
-  lets (?C & ?ω & ?): getObj_Some σ' l;
-    eauto with lia.
-  lets [?ω [ ] ] : H l H1; eauto.
-  cross_rewrites.
-  eapply sm_warm; eauto with lia.
-Qed.
