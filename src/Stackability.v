@@ -92,7 +92,7 @@ Proof with (updates; cross_rewrites; eauto 3 with stk pM lia ).
     split; [eapply sm_warm | eexists ]...
   - lets H__pM: pM_theorem_expr H2.
     lets H__pM2: pM_theorem_init H4.
-    inverts H0. inverts H5. inverts H6... rename x0 into ω.
+    inverts H0. inverts H5. inverts H6... rename x into ω.
     lets [?ω [ ]]: H__pM H7...
     rewrite /assign_new H0 in H3.
     lets: getObj_dom H0.

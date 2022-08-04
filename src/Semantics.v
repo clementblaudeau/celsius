@@ -75,7 +75,7 @@ with evalListP : list Expr -> Store -> Env -> Loc -> list Loc -> Store -> Prop :
 
 where "'⟦_' el '_⟧p' '(' σ ',' ρ ',' v ')' '-->' '(' vl ',' σ0 ')' "  := (evalListP el σ ρ v vl σ0)
 
-(* Initialization procedure: we compute the mandatory field initializers for the fields between x
+(* Initialization procedure: we compute the mandatory field initializers for the fields between i
 and (length Flds) *)
 with initP : ClN -> Var -> nat -> Env -> Store -> Store -> Prop :=
 
@@ -86,13 +86,13 @@ with initP : ClN -> Var -> nat -> Env -> Store -> Store -> Prop :=
 
 (* We compute the value of the defining expression, then update the store (which can already a value
 for x) and proceed *)
-| init_cons : forall C I x ρ σ v T e Args Flds Mtds σ1 σ2 σ3,
+| init_cons : forall C ψ i ρ σ v T e Args Flds Mtds σ1 σ2 σ3,
     ct C = class Args Flds Mtds ->
-    nth_error Flds x = Some (field T e) ->
-    ⟦ e ⟧p (σ, ρ, I) --> (v, σ1) ->
-    assign_new I x v σ1 = Some σ2 ->
-    initP C I (S x) ρ σ2 σ3 ->
-    initP C I x ρ σ σ3.
+    nth_error Flds i = Some (field T e) ->
+    ⟦ e ⟧p (σ, ρ, ψ) --> (v, σ1) ->
+    assign_new ψ i v σ1 = Some σ2 ->
+    initP C ψ (S i) ρ σ2 σ3 ->
+    initP C ψ i ρ σ σ3.
 
 (* Overloaded notations between expressions and lists of expressions *)
 Global Instance notation_big_step_list_expr : notation_big_step (list Expr) (list Loc) :=

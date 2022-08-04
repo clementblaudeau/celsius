@@ -227,10 +227,9 @@ Definition T_Classes := forall C,
 (** ** Program typing *)
 
 Definition T_Prog :=
+  T_Classes /\
   match EntryClass with
-  | class nil nil Mtds =>
-    exists e T, Mtds main = Some (method hot nil T e) /\
-             ((nil, (Entry, hot)) ⊢ e : T) /\ T_Classes
+  | class nil nil Mtds => exists T e, Mtds main = Some (method hot nil T e)
   | _ => False
   end.
 

@@ -76,7 +76,7 @@ Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
         Σ' ⊨ vl : Tl.
 
-Definition init_soundness n C ψ n1 n2 ρ σ Γ Σ r :=
+Definition init_soundness n C ψ i i' ρ σ Γ Σ r :=
   forall Args Flds Mtds,
     Σ ⊨ ρ : Γ ->
     Σ ⊨ σ ->
@@ -85,11 +85,11 @@ Definition init_soundness n C ψ n1 n2 ρ σ Γ Σ r :=
     (codom ρ ∪ {ψ} ⪽ σ) ->
 
     ct C = class Args Flds Mtds ->
-    getType Σ ψ = Some (C, cool n2) ->
+    getType Σ ψ = Some (C, cool i') ->
     S_Typs Γ Args ->
-    n2 >= n1 ->
+    i' >= i ->
 
-    init C ψ n1 ρ σ n = r ->
+    init C ψ i ρ σ n = r ->
     r <> Timeout_i ->
 
     exists Σ' σ',
@@ -700,7 +700,9 @@ Proof with (meta; eauto 2 with typ).
   lets H__ct: EntryClass_ct. rewrite H__ct.
   destruct EntryClass.
   steps...
-  lets: Soundness [(Entry, hot)] H0 H; eauto with typ; steps.
+  specialize (H1 Entry). steps.
+  specialize (H2 main hot [] (c,m) e matched).
+  lets: Soundness [(Entry, hot)] H0 H2; eauto with typ; steps.
   + split; steps.
     ct_lookup Entry.
     assert (l = 0) by lia; steps.
@@ -710,7 +712,7 @@ Proof with (meta; eauto 2 with typ).
   + eapply vt_sub; steps.
   + lets (? & ? & ?): H1; steps...
     intros l C ω ?H.
-    lets: getObj_dom H2; simpl in *.
+    lets: getObj_dom H3; simpl in *.
     assert (l=0) by lia; steps.
     lets: getVal_dom H6; simpl in *; try lia...
 Qed.
