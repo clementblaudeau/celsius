@@ -46,9 +46,8 @@ and then we fetch the body of the method which we execute with the arguments as 
 
 (* New instance : we compute the arguments and call the special procedure [initP] to initialize the
 new instance *)
-| bs_new : forall σ ρ ψ C Args Flds Mtds args vl__args σ1 σ3,
+| bs_new : forall σ ρ ψ C args vl__args σ1 σ3,
     ⟦_ args _⟧p (σ, ρ, ψ) --> (vl__args, σ1) ->
-    ct C = class Args Flds Mtds ->
     let I := (length σ1) in
     initP C I 0 vl__args (σ1 ++ [(C, [])]) σ3 ->
     ⟦ e_new C args ⟧p (σ, ρ, ψ) --> (I, σ3)
@@ -130,10 +129,10 @@ Section evalP_ind.
     (IH__e2: P e2 σ2 vl2 v1 v3 σ3 H__e2),
     P( e_mtd e0 m el) σ ρ ψ v3 σ3 (bs_mtd σ e0 m el e2 ρ ψ v1 vl2 v3 σ1 σ2 σ3 C f argsC argsM fields methods T μ H__e0 Hobj H__el Hct Hmth H__e2).
 
-  Variable P_new : forall σ ρ ψ C args vl__args σ1 σ3 Args Flds Mtds H__args H__ct H__init
+  Variable P_new : forall σ ρ ψ C args vl__args σ1 σ3 H__args H__init
     (IH__args: Pl args σ ρ ψ vl__args σ1 H__args)
     (IH__init: Pin C (length σ1) 0 vl__args (σ1 ++ [(C, [])]) σ3 H__init),
-    P (e_new C args) σ ρ ψ (length σ1) σ3 (bs_new σ ρ ψ C Args Flds Mtds args vl__args σ1 σ3 H__args H__ct H__init).
+    P (e_new C args) σ ρ ψ (length σ1) σ3 (bs_new σ ρ ψ C args vl__args σ1 σ3 H__args H__init).
 
   Variable P_asgn :  forall σ ρ ψ e1 x e2 e' σ1 v1 σ2 v2 σ3 v3 H__e1 H__e2 H__e'
     (IH__e1: P e1 σ ρ ψ v1 σ1 H__e1)
@@ -167,8 +166,8 @@ Section evalP_ind.
               (evalP_ind2 e0 σ ρ ψ l1 σ1 H__e0)
               (evalListP_ind2 el σ1 ρ ψ vl2 σ2 H__el)
               (evalP_ind2 e2 σ2 vl2 l1 l3 σ3 H__e2)
-    | bs_new σ ρ ψ C Args Flds Mtds args vl__args σ1 σ3 H__args H__ct H__init =>
-        P_new σ ρ ψ C args vl__args σ1 σ3 Args Flds Mtds H__args H__ct H__init
+    | bs_new σ ρ ψ C args vl__args σ1 σ3 H__args H__init =>
+        P_new σ ρ ψ C args vl__args σ1 σ3 H__args H__init
               (evalListP_ind2 args σ ρ ψ vl__args σ1 H__args)
               (initP_ind2 C (length σ1) 0 vl__args (σ1 ++ [(C, [])]) σ3 H__init)
     | bs_asgn σ ρ ψ e1 x e2 e' σ1 v1 σ2 v2 σ3 v3 H__e1 H__e2 H__e' =>

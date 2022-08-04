@@ -83,8 +83,7 @@ Fixpoint eval e σ ρ v k :=
                    ( let I := (length σ1) in (* Fresh location for new object *)
                      let ρ_init := args_val in (* Local env during initialization *)
                      let σ2 := σ1 ++ [(C, [])] in (* New object with empty local env *)
-                     let 'class Args Flds Mtds := (ct C) in
-                     match (init C Flds I 0 ρ_init σ2 n) with
+                     match (init C I 0 ρ_init σ2 n) with
                      | Success_i σ3 => (Success I σ3) (* Returns new object and updated store *)
                      | Error_i => Error
                      | Timeout_i => Timeout
@@ -129,16 +128,18 @@ with eval_list (e_l: list Expr) σ ρ ψ n :=
 where  "⟦_ el _⟧ ( σ , ρ , ψ , n )" := (eval_list el σ ρ ψ n)
 
 (** Initialization for the list of fields (when fields up to x have been initialized) *)
-with init (C: ClN) (flds: list Field) (I : Loc) x ρ σ n : result_i :=
+with init (C: ClN) (ψ : Loc) x ρ σ n : result_i :=
        match n with
        | 0 => Timeout_i
-       | S n => match flds with
-               | [] => Success_i σ
-               | (field T e)::flds =>
-                   match ⟦e⟧(σ, ρ, I, n) with
-                   | Success v σ' =>
-                       match (assign_new I x v σ') with
-                       | Some σ'' => init C flds I (S x) ρ σ'' n
+       | S n =>
+           let 'class _ fields _ := ct C in
+           match nth_error fields x with
+               | None => if (x =? dom fields) then Success_i σ else Error_i
+               | Some (field T e) =>
+                   match ⟦e⟧(σ, ρ, ψ, n) with
+                   | Success v σ1 =>
+                       match (assign_new ψ x v σ1) with
+                       | Some σ2 => init C ψ (S x) ρ σ2 n
                        | _ => Error_i
                        end
                    | Error => Error_i
@@ -202,15 +203,17 @@ Lemma eval_step_monotonicity_aux: forall n,
             (forall el σ ρ ψ vl σ', ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ' ->
                                ⟦_ el _⟧ (σ, ρ, ψ, m) = Success_l vl σ')) /\
       (forall m, m > n ->
-            (forall C flds I x ρ σ σ', init C flds I x ρ σ n = Success_i σ' ->
-                                  init C flds I x ρ σ m = Success_i σ')).
+            (forall C ψ x ρ σ σ', init C ψ x ρ σ n = Success_i σ' ->
+                                  init C ψ x ρ σ m = Success_i σ')).
 Proof with (try lia).
   induction n as [n IHn] using lt_wf_ind. destruct n.
   - repeat split; intros; inversion H0.
   - repeat split; intros ; destruct m...
     + (* expression *)
       destruct (IHn n) as [Hexp [Hlist Hinit]]...
-      destruct e ; try solve [steps; eauto].
+      destruct e.
+      * steps; eauto.
+      * steps; eauto.
       * inversion H0; repeat destruct_match => //; subst.
         eapply (Hexp m) in matched; steps...
       * inversion H0; repeat destruct_match => //.
@@ -221,7 +224,7 @@ Proof with (try lia).
       * inversion H0; repeat destruct_match => //.
         rewrite_any.
         eapply (Hlist m) in matched...
-        eapply (Hinit m) in matched1...
+        eapply (Hinit m) in matched0...
         steps.
       * inversion H0; repeat destruct_match => //; sort.
         rewrite_any.
@@ -239,7 +242,8 @@ Proof with (try lia).
       steps.
     + (* init *)
       simpl in *.
-      destruct flds as [| [_ e]]; eauto.
+      ct_lookup C.
+      destruct (nth_error Flds x) as [[_ e]|]; eauto.
       destruct_eval_f.
       eapply (IHn n)  with (m := m) in H1; eauto with lia.
       steps.
@@ -269,10 +273,10 @@ Proof.
 Qed.
 
 Theorem init_step_monotonicity:
-  forall n m C flds ρ I x σ σ',
+  forall n m C ρ ψ x σ σ',
     n < m ->
-    init C flds I x ρ σ n = Success_i σ' ->
-    init C flds I x ρ σ m = Success_i σ'.
+    init C ψ x ρ σ n = Success_i σ' ->
+    init C ψ x ρ σ m = Success_i σ'.
 Proof with try lia.
   intros.
   pose proof (eval_step_monotonicity_aux n) as [_ [_ H__init]].
@@ -290,13 +294,9 @@ Lemma evalP_implies_eval :
     (forall el σ ρ ψ vl σ',
         ⟦el⟧ (σ, ρ, ψ) --> (vl, σ') ->
         exists n, ⟦_ el _⟧ (σ, ρ, ψ, n) = Success_l vl σ') /\
-    (forall C I x ρ σ σ',
-        initP C I x ρ σ σ' ->
-        exists n Args Flds Mtds DoneFlds flds,
-          ct C = class Args Flds Mtds /\
-            Flds = DoneFlds++flds /\
-            x = length DoneFlds /\
-            init C flds I x ρ σ n = Success_i σ').
+    (forall C ψ x ρ σ σ',
+        initP C ψ x ρ σ σ' ->
+        exists n, init C ψ x ρ σ n = Success_i σ').
 Proof with (cross_rewrites; eauto 3 using evalP, evalListP, initP; try lia).
   apply evalP_multi_ind; intros;
     try solve [exists 1; steps];
@@ -309,11 +309,10 @@ Proof with (cross_rewrites; eauto 3 using evalP, evalListP, initP; try lia).
     eapply evalList_step_monotonicity with (m := n2) in IH__el...
     exists (S n2). simpl; repeat rewrite_any => //.
   + remember (S (max n n0)) as n1.
-    destruct DoneFlds; simpl in * ...
     eapply evalList_step_monotonicity with (m := n1) in IH__args...
-    destruct IH__init as (? & ? & _ & IH__init).
     eapply init_step_monotonicity with (m := n1) in IH__init...
-    exists (S n1). simpl. rewrite IH__args H__ct H0 IH__init => //.
+    exists (S n1). simpl; subst.
+    rewrite IH__args IH__init => //.
   + remember (S (max n (max n0 n1))) as n2.
     eapply eval_step_monotonicity with (m := n2) in IH__e1, IH__e2, IH__e'...
     exists (S n2). simpl. rewrite IH__e1 IH__e2 IH__e'...
@@ -321,19 +320,16 @@ Proof with (cross_rewrites; eauto 3 using evalP, evalListP, initP; try lia).
     eapply eval_step_monotonicity with (m := n1) in IH__e...
     eapply evalList_step_monotonicity with (m := n1) in IH__el...
     exists (S n1). simpl. rewrite IH__e IH__el...
-  + exists 1, Args, Flds, Mtds, Flds, ([]: list Field); simpl; splits...
-    rewrite app_nil_r...
+  + exists 1; simpl. rewrite H__ct.
+    lets [_ ?]: nth_error_None Flds (dom Flds).
+    rewrite H...
+    rewrite Nat.eqb_refl...
+
   + remember (S (max n n0)) as n1.
     eapply eval_step_monotonicity with (m := n1) in IH__e...
-    destruct IH__init as (? & ? & ? & IH__init).
     eapply init_step_monotonicity with (m := n1) in IH__init...
-    exists (S n1), Args0, Flds0, Mtds0.
-    lets (?DoneFlds & ?flds & ? & ?) : nth_error_split H__fld.
-    exists DoneFlds0, (field T e :: flds0). splits...
-    simpl in *. rewrite IH__e H__assign.
-    assert (flds = flds0); [|steps].
-    eapply app_inv_tail_length with DoneFlds (DoneFlds0++[field T e]); updates...
-    rewrite app_assoc_reverse...
+    exists (S n1).
+    simpl in *. rewrite H__ct H__fld IH__e H__assign...
 Qed.
 
 (* Conversely, the success of the eval function implies the success of the predicate *)
@@ -343,28 +339,17 @@ Lemma eval_implies_evalP :
         ⟦ e ⟧(σ, ρ, ψ, n) = Success v σ' -> ⟦ e ⟧(σ, ρ, ψ) --> (v, σ')) /\
       (forall el σ ρ ψ vl σ',
           ⟦_ el _⟧(σ, ρ, ψ, n) = Success_l vl σ' -> ⟦ el ⟧(σ, ρ, ψ) --> (vl,σ')) /\
-      (forall C flds I x ρ σ σ' Args Flds Mtds DoneFlds,
-          init C flds I x ρ σ n = Success_i σ' ->
-          ct C = class Args Flds Mtds ->
-          Flds = DoneFlds ++ flds ->
-          length DoneFlds = x ->
-          initP C I x ρ σ σ').
+      (forall C ψ x ρ σ σ',
+          init C ψ x ρ σ n = Success_i σ' ->
+          initP C ψ x ρ σ σ').
 Proof with (eauto using evalP, evalListP, initP; try lia).
   induction n as [n IHn] using lt_wf_ind.
   destruct n; repeat split => //.
   all: intros; move : (IHn n) => [ ] // => IHn__e [IHn__el IHn__init]; clear IHn.
   + simpl in H. steps...
-    eapply bs_new...
-    eapply IHn__init with (DoneFlds := [])...
   + steps; eauto using evalP...
   + steps; eauto using initP...
-    * rewrite app_nil_r in H0...
-    * apply IHn__e in matched.
-      eapply IHn__init with (DoneFlds := (DoneFlds ++ [field (c, m) expr])) in H; updates...
-      -- eapply init_cons...
-         rewrite nth_error_app2...
-         rewrite -minus_diag_reverse; simpl...
-      -- rewrite app_assoc_reverse; simpl...
+    apply Nat.eqb_eq in matched1; subst...
 Qed.
 
 (* Then the theorem : *)
@@ -392,12 +377,9 @@ Proof.
 Qed.
 
 Corollary init_implies_initP :
-  forall C flds I x ρ σ n σ' Args Flds Mtds DoneFlds,
-    init C flds I x ρ σ n = Success_i σ' ->
-    ct C = class Args Flds Mtds ->
-    Flds = DoneFlds ++ flds ->
-    length DoneFlds = x ->
-    initP C I x ρ σ σ'.
+  forall C ψ x ρ σ n σ',
+    init C ψ x ρ σ n = Success_i σ' ->
+    initP C ψ x ρ σ σ'.
 Proof.
   intros; eapply eval_implies_evalP; eauto.
 Qed.

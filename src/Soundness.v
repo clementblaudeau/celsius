@@ -76,27 +76,25 @@ Definition expr_list_soundness n el ρ σ ψ r Γ Σ U Tl :=
         Σ ≼ Σ' /\ Σ ≪ Σ' /\ Σ ▷ Σ' /\ (Σ' ⊨ σ') /\ wf σ' /\
         Σ' ⊨ vl : Tl.
 
-Definition init_soundness n C flds I x ρ σ Γ Σ r :=
-  forall Args Flds Mtds DoneFlds,
+Definition init_soundness n C ψ n1 n2 ρ σ Γ Σ r :=
+  forall Args Flds Mtds,
     Σ ⊨ ρ : Γ ->
     Σ ⊨ σ ->
 
     wf σ ->
-    (codom ρ ∪ {I} ⪽ σ) ->
+    (codom ρ ∪ {ψ} ⪽ σ) ->
 
     ct C = class Args Flds Mtds ->
-    Flds = DoneFlds ++ flds ->
-    length DoneFlds = x ->
-    getType Σ I = Some (C, cool x) ->
+    getType Σ ψ = Some (C, cool n2) ->
     S_Typs Γ Args ->
+    n2 >= n1 ->
 
-    init C flds I x ρ σ n = r ->
+    init C ψ n1 ρ σ n = r ->
     r <> Timeout_i ->
 
     exists Σ' σ',
       r = Success_i σ' /\
-        Σ ≼ Σ' /\ Σ ≪ Σ' /\ ([I↦(C,cool (dom Flds))]Σ ▷ Σ') /\ (Σ' ⊨ σ') /\ wf σ' /\
-        getType Σ' I = Some (C, cool (dom Flds)).
+        Σ ≼ Σ' /\ Σ ≪ Σ' /\ ([ψ↦(C,cool (dom Flds))]Σ ▷ Σ') /\ (Σ' ⊨ σ') /\ wf σ'.
 
 (* We then prove several cases as lemmas *)
 
@@ -109,8 +107,8 @@ Lemma soundness_fld:
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
     (forall el ρ σ ψ r Γ Σ U Tl,
       expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
-    (forall C flds I x ρ σ Γ Σ r,
-        init_soundness n C flds I x ρ σ Γ Σ r) ->
+    (forall C I n1 n2 ρ σ Γ Σ r,
+        init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall e f ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_fld e f) ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
@@ -167,8 +165,8 @@ Lemma soundness_mtd:
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
       (forall el ρ σ ψ r Γ Σ U Tl,
           expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
-      (forall C flds I x ρ σ Γ Σ r,
-          init_soundness n C flds I x ρ σ Γ Σ r) ->
+      (forall C I n1 n2 ρ σ Γ Σ r,
+          init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall e m args ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_mtd e m args) ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
@@ -197,19 +195,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   unfold methodInfo in H__mtdinfo.
   destruct (ct C) as [Args1 Flds1 Mtds1] eqn:H__ct1.
   destruct (Mtds1 m) as [[?μ__r Ts retT ?] |] eqn:H__Mtds1; [| steps] . inverts H__mtdinfo...
-
-  repeat
-    match goal with
-    | H:⟦ ?e ⟧(?σ, ?ρ, ?ψ) --> (?v, ?σ')
-      |- _ => let fresh := fresh "H_dom" in
-            add_hypothesis fresh (evalP_dom e σ ρ ψ v σ' H)
-    | H:⟦ ?el ⟧(?σ, ?ρ, ?ψ) --> (?vl, ?σ')
-      |- _ => let fresh := fresh "H_dom" in
-            add_hypothesis fresh (evalListP_dom el σ ρ ψ vl σ' H)
-    | H:initP ?C ?ψ ?x ?ρ ?σ ?σ'
-      |- _ => let fresh := fresh "H_dom" in
-            add_hypothesis fresh (initP_dom C ψ x ρ σ σ' H)
-    end.
+  eval_dom.
 
   (* Destruct evaluation of arguments *)
   lets H__env0: env_typing_monotonicity H__mn0 H0.
@@ -263,8 +249,8 @@ Lemma soundness_new:
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
       (forall el ρ σ ψ r Γ Σ U Tl,
           expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
-      (forall C flds I x ρ σ Γ Σ r,
-          init_soundness n C flds I x ρ σ Γ Σ r) ->
+      (forall C I n1 n2  ρ σ Γ Σ r,
+          init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall C args ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_new C args) ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
@@ -284,7 +270,6 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__argsval) :
     IH__list HT__args H0 H1 H3 H__eval1; try inverts H__r; try congruence ...
   inverts H...
-  rewrite H__ct in H5 |- *.
   eapply eval_implies_evalP_list in H__eval1...
 
   (* Destruct result of initialization *)
@@ -311,15 +296,15 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       repeat eexists... }
   lets H__wf2: wf_add_empty C H__wf1. rewrite -Heqσ2 in H__wf2.
   lets: getObj_last σ1 C ([]: Env).
-  destruct (init C Flds dom σ1 0 args_val σ2 n) as [ | | σ3] eqn:Heq;
+  destruct (init C dom σ1 0 args_val σ2 n) as [ | | σ3] eqn:Heq;
     try rewrite Heq in H5 |- *; try congruence;
-    specialize (IH__init C Flds (dom σ1) 0 args_val σ2 argsTs Σ2);
-  lets (Σ4 & σ4 & H__r & H__mn4 & H__stk4 & H__aty4 & H__st4 & H__wf4 & H__getType4):
-     IH__init ([]: list Field) H__st2 H__wf2 H__ct ; subst; simpl in *...
+    specialize (IH__init C (dom σ1) 0 0 args_val σ2 argsTs Σ2);
+  lets (Σ4 & σ4 & H__r & H__mn4 & H__stk4 & H__aty4 & H__st4 & H__wf4):
+     IH__init H__st2 H__wf2 H__ct ; subst; simpl in *...
   all: try solve [intros; discriminate].
   all: try solve [rewrite (proj1 H__st1) getType_last; simpl; reflexivity].
   inverts H__r.
-  eapply init_implies_initP with (DoneFlds := []) in Heq...
+  eapply init_implies_initP in Heq...
 
   (* Promotion *)
   remember ([dom σ1 ↦ (C, warm)] (Σ4)) as Σ5.
@@ -337,6 +322,8 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     + destruct (H__stk4 l); updates...
       left; exists C0, (C0, μ0); updates...
   }
+  lets: H__aty4 (dom σ1) C (dom Flds). rewrite getType_update_same in H5...
+  specialize (H5 eq_refl).
   lets (H__aty5 & H__mn5' & H__stk5' & H__st5) : promotion Σ1 Σ4 (dom σ1) σ4 HeqΣ5...
 
   (* Case analysis : warm or hot *)
@@ -365,9 +352,9 @@ Proof with (meta; meta_clean; eauto 2 with typ;
     * exists Σ6, (dom σ1), σ4; splits;
         eauto 3 with typ.
       exists (C, hot)...
-      lets (? & ? & ? & ? & ?): H13 (dom σ1); subst...
-      rewrite getType_update_same in H16... inverts H16...
-      lets: H__vnew (dom σ1) In_singleton... inverts H16... inverts H18...
+      lets (? & ? & ? & ? & ?): H14 (dom σ1); subst...
+      rewrite getType_update_same in H17... inverts H17...
+      lets: H__vnew (dom σ1) In_singleton... inverts H17... inverts H19...
 Qed.
 
 (* ------------------------------------------------------------------------ *)
@@ -379,8 +366,8 @@ Lemma soundness_asgn:
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
       (forall el ρ σ ψ r Γ Σ U Tl,
           expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
-      (forall C flds I x ρ σ Γ Σ r,
-          init_soundness n C flds I x ρ σ Γ Σ r) ->
+      (forall C I n1 n2 ρ σ Γ Σ r,
+          init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall e1 f e2 e' ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_asgn e1 f e2 e') ρ σ ψ r Γ Σ U T).
 Proof with (meta; meta_clean; eauto 2 with typ;
@@ -458,10 +445,10 @@ Lemma soundness_init_cons:
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
       (forall el ρ σ ψ r Γ Σ U Tl,
           expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
-      (forall C flds I x ρ σ Γ Σ r,
-          init_soundness n C flds I x ρ σ Γ Σ r) ->
-    (forall f flds C I x ρ σ Γ Σ r,
-        init_soundness (S n) C (f::flds) I x ρ σ Γ Σ r).
+      (forall C I n1 n2 ρ σ Γ Σ r,
+          init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
+    (forall C I n1 n2 ρ σ Γ Σ r,
+        init_soundness (S n) C I n1 n2 ρ σ Γ Σ r).
 Proof with (meta; meta_clean; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
@@ -469,24 +456,39 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
-  destruct f as [μ__f e]. subst.
+  rewrite H3 in H7.
 
-  (* Extract typing from the well-typed classes *)
+  (* Retrieve current field *)
+  assert (n2 <= dom Flds). {
+    lets (?C&?ω&?&?&?&?): (proj2 H0) I...
+    lets [? _]: H1 H10.
+    lets: ot_cool_dom H12...
+    lets: H4 H3...
+  }
+  destruct (nth_error Flds n1) as [[T e]|] eqn:?.
+  2:{ (* no fields left*)
+    apply nth_error_None in Heqo.
+    assert (n1 = dom Flds) by lia; subst.
+    assert (n2 = dom Flds) by lia; subst.
+    rewrite Nat.eqb_refl in H8 |- *.
+    exists Σ σ; splits...
+    intros l D Ω ?. destruct_eq (I = l); subst; updates...
+    rewrite getType_update_same in H7... inverts H7...
+  }
+  lets (DoneFlds&LeftFlds&?&?): nth_error_split Heqo; subst.
+
+  (* Extract typing info from the well-typed classes *)
   pose proof (typable_classes C) as HT__C. rewrite H3 in HT__C.
   destruct HT__C as [HT__Field _].
   eapply T_Fields_In in HT__Field. simpl in HT__Field.
   eapply weakening with (Γ' := Γ) in HT__Field...
   rename HT__Field into HT__e.
 
-  (* assert (H__doms: dom DoneFlds = dom ω) by (updates; meta; lia). *)
-  (* rewrite H__doms in HT__e |- *. *)
-
   (* Destruct evaluation of e *)
   destruct_eval H__eval v' σ';
     lets (Σ0 & v0 & σ0 & H__r & H__mn0 & H__stk0 & H__aty0 & H__st0 & H__wf0 & H__v0) :
     IH__expr HT__e H0 H1 H2 H__eval; try inverts H__r; try congruence ...
   eapply eval_implies_evalP_expr in H__eval.
-  (* lets H__eM: aty_theorem_expr H__eval. lets [ω' [ ]]: H__eM H4. *)
   lets: monotonicity_dom H__mn0.
   lets (? & ? & ? & ? & ?): H__mn0 I...
   lets (?C & ?ω & ?μ & ? & ? & ?): (proj2 H__st0) I...
@@ -494,54 +496,100 @@ Proof with (meta; meta_clean; eauto 2 with typ;
 
   destruct (assign_new I dom DoneFlds v0 σ0) as [σ1 |] eqn:H__assign;
     [| unfold assign_new in H__assign; steps].
+  lets: wf_assign_new H__assign... {updates... }
+  lets: assign_new_dom H__assign.
 
   (* Use field initialization lemma *)
   lets H__env0: env_typing_monotonicity H__mn0 H.
   clear IH__expr IH__list.
-  lets: H__aty0 I H11.
+  lets: H__aty0 I H13.
   assert (H__field: fieldType C (dom DoneFlds) = Some (C0, μ)). {
     unfold fieldType. rewrite H3.
     rewrite nth_error_app2... subst.
     rewrite -minus_diag_reverse...
   }
   cross_rewrites.
-  remember ([I ↦ (C, cool (S (dom DoneFlds)))] (Σ0)) as Σ1.
-  lets (H__st1 & H__mn1 & H__stk1): field_initialization I (dom DoneFlds) H__st0 H__field Σ1...
-  { lets: ot_cool_dom H16... }
 
-  (* Use induction hypothesis *)
-  lets: env_typing_monotonicity H__mn1 H__env0.
-  lets: wf_assign_new H__assign...
-  specialize (IH__init
-                C flds I (S dom DoneFlds) ρ
-                σ1
-                Γ Σ1
-                (init C flds I (S dom DoneFlds) ρ σ1 n)
-                Args (DoneFlds++(field (C0,μ) e)::flds) Mtds
-                (DoneFlds ++ [field (C0, μ) e])).
-  subst; modus.
-  lets: assign_new_dom H__assign.
-  destruct IH__init
-    as (Σ2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 & H__getType2)...
-  + apply ss_trans with σ0...
-  + rewrite app_assoc_reverse. simpl => //.
-  + updates...
-  + rewrite getType_update_same; updates...
-  + (* Result *)
-    updates.
-    lets H__initP: H__r.
-    eapply init_implies_initP with (DoneFlds := DoneFlds ++ [field (C0, μ) e]) in H__initP;
-      updates; try rewrite app_assoc_reverse...
-    lets H__scpInit: scp_theorem_init H__initP.
-    lets: scp_theorem_expr H__eval H1...
-    exists Σ2, σ2; splits...
-    * eauto with typ.
-    * eauto with typ.
-    * intros l ?C Ω H__getType.
-      destruct_eq (I = l); subst; updates.
-      -- rewrite getType_update_same in H__getType... steps.
-      -- eapply H__aty0 in H__getType.
-         eapply H__aty2. updates...
+  (* Case analysis : is it the updating point ? *)
+  destruct_eq (n2 = dom DoneFlds); subst.
+  - (* Updating point, using the field initialization lemma *)
+    remember ([I ↦ (C, cool (S (dom DoneFlds)))] (Σ0)) as Σ1.
+    lets (H__st1 & H__mn1 & H__stk1): field_initialization I σ0 H__st0 H__field Σ1 ...
+    { lets: ot_cool_dom σ0 H18... }
+
+    (* Use induction hypothesis *)
+    lets: env_typing_monotonicity H__mn1 H__env0.
+    specialize (IH__init
+                  C I (S dom DoneFlds) (S dom DoneFlds) ρ
+                  σ1 Γ Σ1
+                  (init C I (S dom DoneFlds) ρ σ1 n)
+                  Args (DoneFlds++(field (C0,μ) e)::LeftFlds) Mtds).
+    subst; modus.
+    destruct IH__init
+      as (Σ2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2)...
+    + apply ss_trans with σ0...
+    + updates...
+    + (* Result *)
+      updates.
+      lets H__initP: H__r.
+      eapply init_implies_initP in H__initP;
+        updates; try rewrite app_assoc_reverse...
+      lets H__scpInit: scp_theorem_init H__initP.
+      lets: scp_theorem_expr H__eval H1...
+      exists Σ2, σ2; splits...
+      * eauto with typ.
+      * eauto with typ.
+      * intros l ?C Ω H__getType.
+        destruct_eq (I = l); subst;
+           eapply H__aty2; updates...
+        rewrite getType_update_same in H__getType...
+
+  - (* Not an updating point, we keep Σ *)
+    lets H__mn1: mn_refl Σ0.
+    lets H__stk1: stk_st_refl Σ0.
+
+    specialize (IH__init C I (S dom DoneFlds) n2 ρ σ1 Γ Σ0
+                  (init C I (S dom DoneFlds) ρ σ1 n)
+                  Args (DoneFlds++(field (C0,μ) e)::LeftFlds) Mtds).
+    destruct IH__init
+      as (Σ2 & σ2 & H__r & H__mn2 & H__stk2 & H__aty2 & H__st2 & H__wf2 )...
+    + (* assign_new *)
+      rewrite /assign_new H4 in H__assign.
+      destruct_if_eqb; inverts H__assign.
+      * lets (?&?&?&?&?&?): (proj2 H__st0) I...
+        inverts H22. lets (?v&?C&?μ&?&?&?): H26 (dom ω)...
+        lets: getVal_dom H16...
+      * remember (dom DoneFlds) as x.
+        assert (x < dom ω). { lets: ot_cool_dom Σ0 σ0 H18... }
+        lets (v__old&?): getVal_Some ω x; auto.
+        lets (?&?&?&?&?&?): (proj2 H__st0) I...
+        inverts H24. lets (?v&?C&?μ&?&?&?): H28 x...
+        split...
+        intros.
+        destruct_eq (l = I); [inverts Heq1|] ...
+        -- rewrite getObj_update_same... repeat eexists...
+           eapply ot_cool... intros.
+           destruct_eq (f = x).
+           ++ inverts Heq1; rewrite getVal_update_same...
+              repeat eexists...
+           ++ rewrite getVal_update_diff...
+        -- rewrite getObj_update_diff...
+           lets (?C&?ω&?): getObj_Some l...
+           lets (?&?&?&?&?&?): (proj2 H__st0) l...
+           repeat eexists...
+    + apply ss_trans with σ0...
+    + (* Result *)
+      updates.
+      lets H__initP: H__r.
+      eapply init_implies_initP in H__initP;
+        updates; try rewrite app_assoc_reverse...
+      lets H__scpInit: scp_theorem_init H__initP.
+      lets: scp_theorem_expr H__eval H1...
+      exists Σ2, σ2; splits...
+      intros l ?C Ω H__getType.
+      destruct_eq (I = l); subst;
+        eapply H__aty2; updates...
+      rewrite getType_update_same in H__getType...
 Qed.
 
 
@@ -554,8 +602,8 @@ Theorem soundness:
         expr_soundness n e ρ σ ψ r Γ Σ U T) /\
     (forall el ρ σ ψ r Γ Σ U Tl,
       expr_list_soundness n el ρ σ ψ r Γ Σ U Tl) /\
-    (forall C flds I x ρ σ Γ Σ r,
-       init_soundness n C flds I x ρ σ Γ Σ r).
+    (forall C I n1 n2 ρ σ Γ Σ r,
+       init_soundness n C I n1 n2 ρ σ Γ Σ r).
 Proof with (
     meta;
     meta_clean;
@@ -566,7 +614,7 @@ Proof with (
   ).
   induction n as [n IHn] using lt_wf_ind. destruct n;
     intros; unfold expr_soundness, expr_list_soundness, init_soundness; splits; intros;
-    [steps | steps | steps | destruct e | destruct el | destruct flds ]; subst;
+    [steps | steps | steps | destruct e | destruct el | ]; subst;
     simpl in *;
     try specialize (IHn n ltac:(lia)) as [IH__expr [IH__list IH__init]]...
 
@@ -612,13 +660,6 @@ Proof with (
     exists Σ1, (v::vl), σ1; splits...
     lets (?T & ?T & ? & ? & ?): H__mn1 v ...
     apply et_cons...
-
-  - (* init [] *)
-    updates. simpl in *. repeat rewrite Nat.add_0_r in H6 |- *.
-    exists Σ, σ. splits...
-    + intros l ?C Ω H__getType.
-      destruct_eq (I = l); subst; updates...
-      rewrite getType_update_same in H__getType... steps.
 
   - (* init_cons *)
     eapply soundness_init_cons...

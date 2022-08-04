@@ -89,6 +89,10 @@ Global Instance notation_semantic_mode : notation_dash_colon Store Loc Mode :=
   { dash_colon_ := semantic_mode}.
 Global Instance notation_semantic_set_mode : notation_dash_colon Store LocSet Mode :=
   { dash_colon_ := fun σ L μ => forall l, l ∈ L -> σ ⊨ l : μ }.
+Global Instance notation_semantic_classname : notation_dash_colon Store Loc ClN :=
+  { dash_colon_ := fun σ l C => exists ω, getObj σ l = Some(C, ω)}.
+Global Instance notation_semantic_type : notation_dash_colon Store Loc Tpe :=
+  { dash_colon_ := fun σ l T => let (C,μ) := T in (σ ⊨ l : μ) /\ (σ ⊨ l : C)}.
 
 Global Hint Unfold notation_semantic_mode notation_semantic_set_mode: rch.
 Global Hint Extern 1 => (eapply sm_warm): rch.

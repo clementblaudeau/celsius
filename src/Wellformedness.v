@@ -167,7 +167,8 @@ Proof with (updates; cross_rewrites; eauto 4 with wf ss lia).
 
   - (* e_new *)
     destruct IH__args ...
-    split... rewrite H__ct in IH__init.
+    split...
+    ct_lookup C.
     destruct Flds; [steps; inverts H__init|]...
     + inverts H6.
     + eapply IH__init; ss;

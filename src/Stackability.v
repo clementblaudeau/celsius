@@ -80,22 +80,40 @@ the current object are being initialized. We can however show that the number of
 grows during initialization, reaching warm at the end (thanks to the mandatory field initializers)
 *)
 
+Lemma initP_warm :
+  forall C I x ρ σ σ',
+        initP C I x ρ σ σ' ->
+        (σ ⊨ I : (C, cool x)) ->
+        (σ' ⊨ I : (C, warm)).
+Proof with (updates; cross_rewrites; eauto 3 with stk pM lia ).
+  intros.
+  induction H.
+  - inverts H0; inverts H1; inverts H2...
+    split; [eapply sm_warm | eexists ]...
+  - lets H__pM: pM_theorem_expr H2.
+    lets H__pM2: pM_theorem_init H4.
+    inverts H0. inverts H5. inverts H6... rename x0 into ω.
+    lets [?ω [ ]]: H__pM H7...
+    rewrite /assign_new H0 in H3.
+    lets: getObj_dom H0.
+    destruct IHinitP. {
+    destruct_if_eqb ; inverts H3; split;
+      try eapply sm_cool; try eexists ... all: updates... }
+    inverts H8. inverts H9...
+    destruct_if_eqb ; inverts H3; split;
+      try eapply sm_warm; try eexists ...
+Qed.
+
+
 Theorem stk_theorem :
   (forall e σ ρ ψ v σ',
       ⟦e⟧ (σ, ρ, ψ) --> (v, σ') -> σ ≪ σ') /\
     (forall el σ ρ ψ vl σ',
         ⟦el⟧ (σ, ρ, ψ) --> (vl, σ') -> σ ≪ σ') /\
     (forall C I x ρ σ σ',
-        initP C I x ρ σ σ' ->
-          forall ω Args Flds Mtds,
-            getObj σ I = Some (C, ω) ->
-            dom ω >= x ->
-            ct C = class Args Flds Mtds ->
-            σ ≪ σ' /\
-            exists ω', getObj σ' I = Some (C, ω') /\
-                    dom ω' >= dom Flds).
+        initP C I x ρ σ σ' -> σ ≪ σ').
 
-Proof with (updates; cross_rewrites; eauto 4 with rch stk pM lia ).
+Proof with (updates; cross_rewrites; eauto 3 with stk pM lia ).
 
   apply evalP_multi_ind;
     unfold assign; simpl; intros;
@@ -103,15 +121,19 @@ Proof with (updates; cross_rewrites; eauto 4 with rch stk pM lia ).
 
   - (* e = m.(el) *)
     eapply stk_trans...
+    eauto with pM.
 
   - (* e = new C(args) *)
     lets: pM_theorem_list H__args.
     lets: pM_theorem_init H__init.
+    ct_lookup C.
+    lets [ ]: initP_warm H__init. { split; [eapply sm_cool | eexists]... }
+    inverts H3; inverts H4...
     eapply stk_trans with σ1...
-    rewrite getObj_last in IH__init; edestruct IH__init as [H3 [ω' [ ]]]...
-    move => l Hl.
-    specialize (H3 l Hl)...
-    destruct_eq (l = dom σ1); steps; [left |] ...
+    intros l Hl.
+    specialize (IH__init l Hl)...
+    destruct_eq (l = dom σ1); steps...
+    left. eapply sm_warm...
 
   - (* e = e1.x <- e2; e' *)
     lets: pM_theorem_expr H__e1.
@@ -119,23 +141,14 @@ Proof with (updates; cross_rewrites; eauto 4 with rch stk pM lia ).
     lets: pM_theorem_expr H__e'.
     destruct (getObj σ2 v1) as [[?C ω]|] eqn:?; updates;
       eapply stk_trans...
+    eapply stk_trans with σ2 ...
     eapply stk_trans with ([v1 ↦ (C, [x ↦ v2] (ω))] (σ2)) ...
 
-  - (* fld = e::flds *)
+  - (* init_cons *)
+    lets: stk_assign_new H__assign.
     lets H__pM: pM_theorem_expr H__e.
     lets H__pM2: pM_theorem_init H__init.
-    lets [?ω [ ]]: H__pM H...
-    lets: stk_assign_new H__assign.
-    lets: pM_assign_new H__assign.
-    unfold assign_new in H__assign. rewrite H1 in H__assign.
-    destruct (Nat.eqb x (dom ω0)) eqn:Heq; inverts H__assign.
-    + rewrite getObj_update_same in IH__init; eauto with updates ...
-      apply PeanoNat.Nat.eqb_eq in Heq; subst.
-      specialize (IH__init (ω0++[v]) Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]...
-      split; [| exists ω1; split]...
-    + apply PeanoNat.Nat.eqb_neq in Heq; subst.
-      specialize (IH__init ([x↦v]ω0) Args0 Flds0 Mtds0) as [H__stk [?ω [ ]]]... eauto with updates lia.
-      split...
+    eapply stk_trans with σ2 ...
 Qed.
 
 Corollary stk_theorem_expr :
