@@ -57,4 +57,4 @@ Parameter EntryClass: Class.
 
 Definition ct (C:ClN) := match C with | cln n => nth n Ξ EntryClass end.
 Parameter EntryClass_ct : ct Entry = EntryClass.
-Definition main: Mtd := mtd(0).
+Definition main: Mtd := mtd 0.

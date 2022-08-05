@@ -10,7 +10,8 @@ Implicit Type (ρ: Env).
 Local Hint Constructors evalP expr_typing expr_list_typing: typ.
 
 (* We assume the class table is well typed : *)
-Parameter typable_classes: T_Classes.
+
+Parameter typable_classes : T_Classes.
 
 (* ------------------------------------------------------------------------ *)
 (** ** Weakening *)
