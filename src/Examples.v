@@ -31,6 +31,7 @@ class Entry () {
 
 Definition A := cln(1).
 Definition B := cln(2).
+Definition C := cln(3).
 Definition Entry := cln(0).
 Definition EntryClass :=
   class nil nil (fun m => if (let 'mtd n := m in PeanoNat.Nat.eqb n 0)
@@ -42,10 +43,20 @@ Definition Ξ : list Class :=
     EntryClass;
 
     (* Class A *)
-    class nil [field (B,warm) (e_new B [e_this])] (fun _ => None);
+    class nil [
+        field (B,warm) (e_new B [e_this]);
+        field (C,warm) (e_fld (e_fld 0 e_this) 1)] (fun _ => None);
 
     (* Class B *)
-    class [(A,cold)] [field (A,cold) (e_var 0)] (fun _ => None)
+    class [(A,cold)] [
+        field (A,cold) (e_var 0);
+        field (C,warm) (e_new C [e_this])
+      ] (fun _ => None);
+
+    (* Class C *)
+    class [(B, cool 1)] [
+        field (A,cold) (e_fld (e_var 0) 0);
+        field (B,cool 1) (e_var 0)] (fun _ => None)
   ].
 
 Lemma EntryClass_ct : ct Entry = EntryClass.

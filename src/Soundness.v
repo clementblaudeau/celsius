@@ -11,7 +11,41 @@ Local Hint Constructors evalP expr_typing expr_list_typing: typ.
 
 (* We assume the class table is well typed : *)
 
-Parameter typable_classes : T_Classes.
+Lemma typable_classes : T_Classes.
+Proof with (unfold A, B, C, Entry; simpl; eauto with typ).
+  unfold T_Classes.
+  intros [c].
+  assert (c = 1 \/ c = 2 \/ c = 3 \/ (c = 0 \/ c > 3)) as [|[|[|]]] by lia; subst; simpl.
+  - (* Class A *)
+    split.
+    + eapply t_fields_cool_cons; eauto using T_Fields.
+      eapply t_new...
+      eapply t_fields_cool_cons; eauto using T_Fields.
+      apply t_selwarm with (D := B)...
+    + intros. inverts H.
+  - (* Class B *)
+    split.
+    + eapply t_fields_cool_cons ; eauto using T_Fields.
+      eapply t_var...
+      eapply t_fields_cool_cons ; eauto using T_Fields.
+      eapply t_new...
+    + intros. inverts H.
+  - (* Class C *)
+    split.
+    + eapply t_fields_cool_cons ; eauto using T_Fields.
+      eapply t_selcool with (D := B)... eapply t_var...
+      eapply t_fields_cool_cons ; eauto using T_Fields.
+      eapply t_var...
+    + intros. inverts H.
+  - (* Class Entry *)
+    assert (P_hots []) by (unfold P_hots; eauto using Forall).
+    steps; try lia...
+    + eapply t_new_hot...
+    + eapply t_new_hot...
+    + eapply t_new_hot...
+Qed.
+
+(* Parameter typable_classes : T_Classes. *)
 
 (* ------------------------------------------------------------------------ *)
 (** ** Weakening *)
@@ -699,11 +733,11 @@ Corollary Program_soundness :
 Proof with (meta; eauto 2 with typ).
   unfold eval_prog, T_Prog.
   lets H__ct: EntryClass_ct. rewrite H__ct.
-  destruct EntryClass.
+  unfold EntryClass.
   steps...
   specialize (H1 Entry). steps.
-  specialize (H2 main hot [] (c,m) e matched).
-  lets: Soundness [(Entry, hot)] H0 H2; eauto with typ; steps.
+  specialize (H2 main hot [] (A,hot) (e_new A [])). steps.
+  lets: Soundness [(Entry, hot)] H0 H1; eauto with typ; steps.
   + split; steps.
     ct_lookup Entry.
     assert (l = 0) by lia; steps.
@@ -711,7 +745,7 @@ Proof with (meta; eauto 2 with typ).
     eapply ot_hot...
     simpl; intros; lia.
   + eapply vt_sub; steps.
-  + lets (? & ? & ?): H1; steps...
+  + lets (? & ? & ?): H2; steps...
     intros l C ω ?H.
     lets: getObj_dom H3; simpl in *.
     assert (l=0) by lia; steps.

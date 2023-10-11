@@ -51,10 +51,43 @@ Definition LocSet      : Type := Ensemble Loc.
 (* ------------------------------------------------------------------------ *)
 (** ** Global Parameters *)
 
-Parameter Ξ: list Class.
-Parameter Entry: ClN.
-Parameter EntryClass: Class.
+
+Definition A := cln(1).
+Definition B := cln(2).
+Definition C := cln(3).
+Definition Entry := cln(0).
+Definition EntryClass :=
+  class nil nil (fun m => if (let 'mtd n := m in PeanoNat.Nat.eqb n 0)
+                       then Some (method hot nil (A,hot) (e_new A nil))
+                       else None).
+
+Definition Ξ : list Class :=
+  [(* Main Class *)
+    EntryClass;
+
+    (* Class A *)
+    class nil [
+        field (B,warm) (e_new B [e_this]);
+        field (C,warm) (e_fld (e_fld e_this 0) 1)] (fun _ => None);
+
+    (* Class B *)
+    class [(A,cold)] [
+        field (A,cold) (e_var 0);
+        field (C,warm) (e_new C [e_this])
+      ] (fun _ => None);
+
+    (* Class C *)
+    class [(B, cool 1)] [
+        field (A,cold) (e_fld (e_var 0) 0);
+        field (B,cool 1) (e_var 0)] (fun _ => None)
+  ].
+
+(* Parameter Ξ: list Class. *)
+(* Parameter Entry: ClN. *)
+(* Parameter EntryClass: Class. *)
 
 Definition ct (C:ClN) := match C with | cln n => nth n Ξ EntryClass end.
-Parameter EntryClass_ct : ct Entry = EntryClass.
+Lemma EntryClass_ct : ct Entry = EntryClass.
+Proof. unfold ct, Entry. simpl. reflexivity. Qed.
+(* Parameter EntryClass_ct : ct Entry = EntryClass. *)
 Definition main: Mtd := mtd 0.
