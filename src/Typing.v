@@ -158,10 +158,9 @@ Inductive expr_typing : EnvTyping -> Tpe -> Expr -> Tpe -> Prop :=
 
 (* Otherwise, it produces the base type *)
 | t_call:
-    forall Γ Tthis e m args argsT T e__m μ0 μ__m C,
-      (Γ, Tthis) ⊢ e : (C, μ0) ->
-      μ0 ⊑ μ__m ->
-      methodInfo C m = Some (μ__m, argsT, T, e__m) ->
+    forall Γ Tthis e m args argsT T e__m μ C,
+      (Γ, Tthis) ⊢ e : (C, μ) ->
+      methodInfo C m = Some (μ, argsT, T, e__m) ->
       (Γ, Tthis) ⊩ args : argsT ->
       (Γ, Tthis) ⊢ (e_mtd e m args) : T
 
@@ -187,6 +186,19 @@ Lemma t_selwarm:
 Proof.
   eauto with typ.
 Qed.
+
+Lemma t_call_sub :
+  forall Γ Tthis e m args argsT T e__m μ0 μ__m C,
+   (Γ, Tthis) ⊢ e : (C, μ0) ->
+   μ0 ⊑ μ__m ->
+   methodInfo C m = Some (μ__m, argsT, T, e__m) ->
+   (Γ, Tthis) ⊩ args : argsT ->
+   (Γ, Tthis) ⊢ (e_mtd e m args) : T.
+Proof.
+  intros.
+  eapply t_call; [ | eassumption | ]; eauto with typ.
+Qed.
+
 
 (* ------------------------------------------------------------------------ *)
 (** ** Field typing *)
@@ -362,11 +374,10 @@ Section typing_ind.
       P Γ Tthis e3 U H__e3 ->
       P Γ Tthis (e_asgn e1 f e2 e3) U (t_block Γ Tthis U e1 f e2 e3 C μ H__fld H__e2 H__e3).
 
-  Variable P_call: forall Γ Tthis e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args,
-      P Γ Tthis e (C, μ0) H__e ->
+  Variable P_call: forall Γ Tthis e m args argsT U e__m μ C H__e H__mtd H__args,
+      P Γ Tthis e (C, μ) H__e ->
       Pl Γ Tthis args argsT H__args ->
-      (* P argsT (C, μ__m) e__m U (typable_method m C μ__m argsT U e__m H__mtd) ->*)
-      P Γ Tthis (e_mtd e m args) U (t_call Γ Tthis e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args).
+      P Γ Tthis (e_mtd e m args) U (t_call Γ Tthis e m args argsT U e__m μ C H__e H__mtd H__args).
 
   Variable P_call_hot: forall Γ Tthis e m args argTs paramTs D body μ0 μ_r C H__e H__mtd H__args H__hots H__subs,
       P Γ Tthis e (C, hot) H__e ->
@@ -403,9 +414,9 @@ Section typing_ind.
                 (typing_ind Γ Tthis (e_fld e1 f) (C, μ) H__fld)
                 (typing_ind Γ Tthis e2 (C, hot) H__e2)
                 (typing_ind Γ Tthis e3 U H__e3)
-    | t_call Γ Tthis e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args =>
-        P_call Γ Tthis e m args argsT U e__m μ0 μ__m C H__e H__sub H__mtd H__args
-               (typing_ind Γ Tthis e (C, μ0) H__e)
+    | t_call Γ Tthis e m args argsT U e__m μ C H__e H__mtd H__args =>
+        P_call Γ Tthis e m args argsT U e__m μ C H__e H__mtd H__args
+               (typing_ind Γ Tthis e (C, μ) H__e)
                (typing_list_ind Γ Tthis args argsT H__args)
     | t_call_hot Γ Tthis e m args argTs paramTs D body μ0 μ_r C H__e H__mtd H__args H__hots H__subs =>
         P_call_hot Γ Tthis e m args argTs paramTs D body μ0 μ_r C H__e H__mtd H__args H__hots H__subs
