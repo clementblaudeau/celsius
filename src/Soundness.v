@@ -39,7 +39,7 @@ Proof with (unfold A, B, C, Entry; simpl; eauto with typ).
     + intros. inverts H.
   - (* Class Entry *)
     assert (P_hots []) by (unfold P_hots; eauto using Forall).
-    steps; try lia...
+    steps ; try lia.
     + eapply t_new_hot...
     + eapply t_new_hot...
     + eapply t_new_hot...
@@ -67,7 +67,7 @@ Theorem weakening: forall Γ Γ' U e T,
     S_Typs Γ' Γ ->
     ((Γ, U) ⊢ e : T) ->
     ((Γ', U) ⊢ e : T).
-Proof with (meta; eauto using expr_typing with typ lia).
+Proof with (meta; eauto 4 using expr_typing with typ lia).
   intros.
   lets: S_Typs_weakening H. clear H. gen Γ'.
   induction H0 using typing_ind with
@@ -76,8 +76,9 @@ Proof with (meta; eauto using expr_typing with typ lia).
                (forall x T__x, typeLookup Γ0 x = Some T__x -> exists T__x', typeLookup Γ' x = Some T__x' /\ T__x' <: T__x) ->
                ((Γ0, T0) ⊩ el : Ul) ->
                ((Γ', T0) ⊩ el : Ul));
-    intros ...
+    intros...
   eapply H1 in H__lkp as [T__x' [ ]]...
+  eapply t_block...
 Qed.
 
 (* ------------------------------------------------------------------------ *)
@@ -204,13 +205,14 @@ Lemma soundness_mtd:
           init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall e m args ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_mtd e m args) ρ σ ψ r Γ Σ U T).
-Proof with (meta; meta_clean; eauto 2 with typ;
+Proof with (meta; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto 4 with typ]
                 end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
+  meta_clean.
 
   (* Induction on the typing judgment *)
   eapply t_mtd_inv in H as
@@ -230,7 +232,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   unfold methodInfo in H__mtdinfo.
   destruct (ct C) as [Args1 Flds1 Mtds1] eqn:H__ct1.
   destruct (Mtds1 m) as [[?μ__r Ts retT ?] |] eqn:H__Mtds1; [| steps] . inverts H__mtdinfo...
-  eval_dom.
+  eval_dom. 
 
   (* Destruct evaluation of arguments *)
   lets H__env0: env_typing_monotonicity H__mn0 H0.
@@ -238,7 +240,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   lets (?T & ?T & ? & ? & ?): H__mn0 ψ ...
   destruct_eval H__eval1 vl σ';
     lets (Σ1 & args_val & σ1 & H__r & H__mn1 & H__stk1 & H__aty1 & H__st1 & H__wf1 & H__v1) :
-    IH__list HT__args H__env0 H__st0 H__wf0 H__eval1; try inverts H__r; try congruence ...
+    IH__list HT__args H__env0 H__st0 H__wf0 H__eval1; try inverts H__r; try congruence...
   eapply eval_implies_evalP_list in H__eval1. eval_dom; eval_wf.
 
   (* Extract typing for method body from Ξ (well-typed) *)
@@ -288,13 +290,14 @@ Lemma soundness_new:
           init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall C args ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_new C args) ρ σ ψ r Γ Σ U T).
-Proof with (meta; meta_clean; eauto 2 with typ;
+Proof with (meta;  eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
                 end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
-  simpl in *...
+  simpl in * ...
+  meta_clean.
 
   (* Induction on the typing judgment *)
   eapply t_new_inv in H as
@@ -405,13 +408,13 @@ Lemma soundness_asgn:
           init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall e1 f e2 e' ρ σ ψ r Γ Σ U T,
         expr_soundness (S n) (e_asgn e1 f e2 e') ρ σ ψ r Γ Σ U T).
-Proof with (meta; meta_clean; eauto 2 with typ;
+Proof with (meta; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
                 end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
-  simpl in *...
+  simpl in * ... meta_clean.
   (* Induction on typing derivation *)
   eapply t_asgn_inv in H as
       (D & ? & ? & HT__e1 & HT__e2 & ? & HT__e3) ...
@@ -484,13 +487,14 @@ Lemma soundness_init_cons:
           init_soundness n C I n1 n2 ρ σ Γ Σ r) ->
     (forall C I n1 n2 ρ σ Γ Σ r,
         init_soundness (S n) C I n1 n2 ρ σ Γ Σ r).
-Proof with (meta; meta_clean; eauto 2 with typ;
+Proof with (meta; eauto 2 with typ;
             try match goal with
                 | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
                 end) using.
   intros n [IH__expr [IH__list IH__init]];
     unfold expr_soundness, expr_list_soundness, init_soundness; intros.
   simpl in *...
+  meta_clean.
   rewrite H3 in H7.
 
   (* Retrieve current field *)
@@ -541,7 +545,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
   assert (H__field: fieldType C (dom DoneFlds) = Some (C0, μ)). {
     unfold fieldType. rewrite H3.
     rewrite nth_error_app2... subst.
-    rewrite -minus_diag_reverse...
+    rewrite Nat.sub_diag...
   }
   cross_rewrites.
 
@@ -568,7 +572,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       updates.
       lets H__initP: H__r.
       eapply init_implies_initP in H__initP;
-        updates; try rewrite app_assoc_reverse...
+        updates; try rewrite -app_assoc...
       lets H__scpInit: scp_theorem_init H__initP.
       lets: scp_theorem_expr H__eval H1...
       exists Σ2, σ2; splits...
@@ -617,7 +621,7 @@ Proof with (meta; meta_clean; eauto 2 with typ;
       updates.
       lets H__initP: H__r.
       eapply init_implies_initP in H__initP;
-        updates; try rewrite app_assoc_reverse...
+        updates; try rewrite -app_assoc...
       lets H__scpInit: scp_theorem_init H__initP.
       lets: scp_theorem_expr H__eval H1...
       exists Σ2, σ2; splits...
@@ -641,7 +645,6 @@ Theorem soundness:
        init_soundness n C I n1 n2 ρ σ Γ Σ r).
 Proof with (
     meta;
-    meta_clean;
     eauto 4 with typ wf lia;
     try match goal with
         | |- ?Σ ⊨ ?l : ?T => try solve [eapply vt_sub; eauto with typ]
@@ -721,9 +724,10 @@ Theorem Soundness :
         Σ ≼ Σ' /\
         Σ ▷ Σ' /\
         Σ ≪ Σ'.
-Proof with (eauto with typ).
+Proof with (eauto 2 with typ).
   intros.
-  lets [(Σ'& v& σ'& ?) _]: soundness n... steps.
+  edestruct (soundness n) as [(Σ'& v& σ'& ?) _]...
+  steps.
   exists Σ', v, σ'; splits...
 Qed.
 

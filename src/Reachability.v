@@ -279,19 +279,17 @@ Section Reachability_Dec.
         (exists t0 t1, tr = t0 ++ l__m :: t1 /\
                     (σ ⊨ l ⇝ l__m ↑ t0) /\
                     (σ ⊨ l__m ⇝ l' ↑ t1)).
-  Proof with (eauto using app_assoc_reverse with rch).
+  Proof with (subst; repeat rewrite -app_assoc; eauto using app_assoc with rch).
     split; intros.
     - destruct H as [H ?].
       induction H; steps.
       apply in_app_iff in H0 as [|[|]].
       + lets (t & t' & ? & ? & ?): IHreachability_trace1 H0.
-        exists t, (t'++l1::t2); subst; splits... rewrite app_assoc_reverse...
-      + subst.
-        exists t1, t2; splits...
+        exists t, (t'++l1::t2)... 
+      + exists t1, t2... 
       + lets (t & t' & ? & ? & ?): IHreachability_trace2 H0.
-        exists (t1++l1::t), t'; subst; splits... rewrite app_assoc_reverse...
-    - destruct H as (t0 & t1 & ? & ? & ?). subst.
-      split...
+        exists (t1++l1::t), t'...
+    - destruct H as (t0 & t1 & ? & ? & ?); splits... 
       apply in_elt.
   Qed.
 
@@ -300,7 +298,7 @@ Section Reachability_Dec.
       (σ ⊨ l ⇝ l' ↑ (l__m::tr)) ->
       (σ ⊨ l ⇝ l__m ↑ []) /\
         (σ ⊨ l__m ⇝ l' ↑ tr).
-  Proof with (eauto using app_assoc_reverse with rch).
+  Proof with (eauto using app_assoc with rch).
     intros.
     remember (l__m::tr) as T. gen l__m tr.
     induction H; intros; steps;

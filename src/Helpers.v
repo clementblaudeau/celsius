@@ -267,8 +267,8 @@ Proof.
     simpl in H1;
     fold (dom σ) in H1;
     rewrite_anywhere PeanoNat.Nat.add_1_r.
-  apply Lt.le_lt_or_eq in H1 as [H1 | H1].
-  + rewrite getObj_last2 in H; eauto using Lt.lt_S_n.
+  apply Nat.lt_eq_cases in H1 as [H1 | H1].
+  + rewrite getObj_last2 in H; eauto with lia. 
   + inversion H1; subst.
     rewrite getObj_last in H.
     invert_constructor_equalities; steps;
@@ -282,9 +282,9 @@ Lemma getVal_add:
 Proof.
   unfold getVal.
   steps.
-  assert (f < length ω \/ f = length ω) as [Hf | Hf];
+  assert (f < length ω \/ f = length ω) as [Hf | Hf] ;
     [
-      apply Lt.le_lt_or_eq, Lt.lt_n_Sm_le;
+      apply Nat.lt_eq_cases, Nat.lt_succ_r;
       pose proof (nth_error_Some (ω ++ [l]) f) as Hf;
       rewrite app_length PeanoNat.Nat.add_1_r in Hf;
       apply Hf
