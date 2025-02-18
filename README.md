@@ -5,7 +5,7 @@
 # Celsius Coq formalization
 
 This repository contains the Coq formalization of the paper:
-* A Conceptual framework for Safe Object initialization, (submitted to OOPSLA 2022)
+* [A Conceptual Framework for Safe Object Initialization](https://dl.acm.org/doi/10.1145/3563314), (published at OOPSLA 2022)
   Clément Blaudeau and Fengyun Liu
 
 ## Install/Build
